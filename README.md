@@ -50,6 +50,30 @@ read directly from the rmq ws broker itself for realtime monitoring in frontend 
     <img src="https://github.com/wildonion/hoopoe/blob/main/infra/arch.png">
 </p>
 
+## routes and apis
+
+```bash
+🥛 HOOPOE WEBSOCKET STREAMING HTTP ROUTE   ==> https://event.api.hoopoe.app/stream
+🥛 HOOPOE WEBSOCKET STREAMING WS ROUTE     ==> wss://event.api.hoopoe.app/stream
+🛤️ HOOPOE HTTP APIs                        ==> https://api.hoopoe.app/
+🛤️ HOOPOE gRPC APIs                        ==> https://grpc.api.hoopoe.app/
+🛢️ HOOPOE ADMINER                          ==> https://adminer.hoopoe.app
+👨🏻‍💻 HOOPOE DBEAVER                          ==> https://dbeaver.hoopoe.app
+⛵ HOOPOE PRTAINER                         ==> https://portainer.hoopoe.app
+📊 HOOPOE GRAFANA                          ==> https://grafana.hoopoe.app
+🚥 HOOPOE RMQ                              ==> https://rmq.hoopoe.app
+🗞️ HOOPOE LOGS                             ==> https://api.hoopoe.app/logs
+🗂️ HOOPOE ASSETS FOLDER                    ==> https://api.hoopoe.app/assets
+```
+
+## 🗃️ wikis, docs, erds, schemas and collections
+
+[Rust Ownership and Borrowing Rules](https://github.com/wildonion/gvm/wiki/Ownership-and-Borrowing-Rules)
+
+[ERD Schema](https://github.com/wildonion/hooper/blob/main/infra/hoopoe.png)
+
+[HTTP Postman Collection](https://github.com/wildonion/hooper/blob/main/infra/api.http.json)
+
 ## How 2 setup, develop, and deploy?
 
 > if you want to deploy as a publisher or producer service then get your hands dirty by developing the `apis/http`, `actors/producers`, as a subscriber or consumer however, develop the `apis/http`, `actors/consumers` folders.
@@ -139,9 +163,9 @@ cargo run --bin hooper -- --help
 
 ### 🚀 Prod env (the CI/CD approach):
 
-make sure you've opened all necesary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script creates ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container! for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
+make sure you've opened all necessary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages as well! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script will create ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container. for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
 
-#### me before you! (make sure you've done followings properly before pushing to your repo):
+#### 🚨 me before you! (make sure you've done followings properly before pushing to your repo):
 
 - **step1)** first thing as the first, connect your device to github for workflow actions using `gh auth login -s workflow`.
 
@@ -151,15 +175,15 @@ make sure you've opened all necesary domains inside your DNS panel per each ngin
 
 - **step4)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achive this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for `logs` dir and `docker.hoopoe.app` route by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `rustacki@1234`.
 
-- **step5)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets and variables on your repository.
+- **step5)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository.
 
 - **step6)** setup nginx config and ssl cert files per each domain and subdomain using `renew.sh` script then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github cause there is already an nginx container inside the `docker-compose.yml`**. 
 
 - **step7)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file, take this note that the default location and directory for none root users are `/home`.
 
-- **step8)** each image name inside your compose file must be prefixed with your docker hub registry endpoint which in this case is `docker.hoopoe.app` cause the doamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which in this case is `docker.hoopoe.app` cause this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
-#### What's happening inside the `cicd.yml` file?
+#### ☕ What's happening inside the `cicd.yml` file?
 
 - **step1)** read the codes inside the repository to find the `docker-compose.yml` file.
 
@@ -170,27 +194,3 @@ make sure you've opened all necesary domains inside your DNS panel per each ngin
 - **step3)** eventually it push them to your custom docker hub registry.
 
 - **step4)** ssh to the VPS and cd to where you've put the `docker-compose.yml` file in there then pull and up all pushed docker containers from the VPS hub inside the VPS.
-
-## routes and apis
-
-```bash
-🥛 HOOPOE WEBSOCKET STREAMING HTTP ROUTE   ==> https://event.api.hoopoe.app/stream
-🥛 HOOPOE WEBSOCKET STREAMING WS ROUTE     ==> wss://event.api.hoopoe.app/stream
-🛤️ HOOPOE HTTP APIs                        ==> https://api.hoopoe.app/
-🛤️ HOOPOE gRPC APIs                        ==> https://grpc.api.hoopoe.app/
-🛢️ HOOPOE ADMINER                          ==> https://adminer.hoopoe.app
-👨🏻‍💻 HOOPOE DBEAVER                          ==> https://dbeaver.hoopoe.app
-⛵ HOOPOE PRTAINER                         ==> https://portainer.hoopoe.app
-📊 HOOPOE GRAFANA                          ==> https://grafana.hoopoe.app
-🚥 HOOPOE RMQ                              ==> https://rmq.hoopoe.app
-🗞️ HOOPOE LOGS                             ==> https://api.hoopoe.app/logs
-🗂️ HOOPOE ASSETS FOLDER                    ==> https://api.hoopoe.app/assets
-```
-
-## 🗃️ wikis, docs, erds, schemas and collections
-
-[Rust Ownership and Borrowing Rules](https://github.com/wildonion/gvm/wiki/Ownership-and-Borrowing-Rules)
-
-[ERD Schema](https://github.com/wildonion/hooper/blob/main/infra/hoopoe.png)
-
-[HTTP Postman Collection](https://github.com/wildonion/hooper/blob/main/infra/api.http.json)
