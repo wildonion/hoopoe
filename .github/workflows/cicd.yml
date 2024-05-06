@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    services:
+    services: # use docker services for building and pushing compose file inside the repo
       docker:
         image: docker:latest
         options: --privileged
@@ -34,4 +34,4 @@ jobs:
           script: | # for none root user the default current directory is /home
             cd /root/hoopoe
             docker compose -f "docker-compose.yml" pull
-            docker compose -f "docker-compose.yml" up -d 
+            docker compose -f "docker-compose.yml" up -d
