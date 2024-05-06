@@ -1,0 +1,94 @@
+@startuml
+
+hide circle
+skinparam linetype ortho
+
+class "**geography_columns**" {
+---
+* <b>""coord_dimension""</b>: //""integer""  //
+* <b>""f_geography_column""</b>: //""name""  //
+* <b>""f_table_catalog""</b>: //""name""  //
+* <b>""f_table_name""</b>: //""name""  //
+* <b>""f_table_schema""</b>: //""name""  //
+* <b>""srid""</b>: //""integer""  //
+* <b>""type""</b>: //""text""  //
+}
+
+class "**geometry_columns**" {
+---
+* <b>""coord_dimension""</b>: //""integer""  //
+* <b>""f_geometry_column""</b>: //""name""  //
+* <b>""f_table_catalog""</b>: //""character varying""  //
+* <b>""f_table_name""</b>: //""name""  //
+* <b>""f_table_schema""</b>: //""name""  //
+* <b>""srid""</b>: //""integer""  //
+* <b>""type""</b>: //""character varying""  //
+}
+
+class "**hyper_locations**" {
+---
+* <b>""altitude""</b>: //""double precision""  //
+* <b>""cell_id""</b>: //""bigint""  //
+* <b>""correlation_id""</b>: //""character varying""  //
+* <b>""cumulative_mileage""</b>: //""double precision""  //
+* <b>""date""</b>: //""timestamp with time zone""  //
+* <b>""device_id""</b>: //""character varying""  //
+* <b>""gsm_signal""</b>: //""bigint""  //
+* <b>""hdop""</b>: //""double precision""  //
+* <b>""heading""</b>: //""double precision""  //
+* <b>""imei""</b>: //""character varying""  //
+* <b>""latitude""</b>: //""double precision""  //
+* <b>""location_area_code""</b>: //""bigint""  //
+* <b>""longitude""</b>: //""double precision""  //
+* <b>""mobile_country_code""</b>: //""bigint""  //
+* <b>""mobile_network_code""</b>: //""bigint""  //
+* <b>""odometer""</b>: //""double precision""  //
+* <b>""position_status""</b>: //""boolean""  //
+* <b>""satellites""</b>: //""bigint""  //
+* <b>""speed""</b>: //""double precision""  //
+* <b>""timestamp""</b>: //""character varying""  //
+}
+
+class "**locations**" {
+# <b>""id""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""altitude""</b>: //""real""  //
+* <b>""cell_id""</b>: //""integer""  //
+* <b>""correlation_id""</b>: //""character varying""  //
+* <b>""date""</b>: //""timestamp with time zone""  //
+* <b>""device_id""</b>: //""character varying""  //
+* <b>""gsm_signal""</b>: //""integer""  //
+* <b>""hdop""</b>: //""real""  //
+* <b>""heading""</b>: //""real""  //
+* <b>""imei""</b>: //""character varying""  //
+* <b>""latitude""</b>: //""real""  //
+* <b>""location_area_code""</b>: //""integer""  //
+* <b>""longitude""</b>: //""real""  //
+* <b>""mobile_country_code""</b>: //""integer""  //
+* <b>""mobile_network_code""</b>: //""integer""  //
+* <b>""odometer""</b>: //""real""  //
+* <b>""position_status""</b>: //""boolean""  //
+* <b>""satellites""</b>: //""integer""  //
+* <b>""speed""</b>: //""real""  //
+* <b>""timestamp""</b>: //""character varying""  //
+}
+
+class "**seaql_migrations**" {
+# <b>""version""</b>: //""character varying"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""applied_at""</b>: //""bigint""  //
+}
+
+class "**spatial_ref_sys**" {
+# <b>""srid""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""auth_name""</b>: //""character varying""  //
+* <b>""auth_srid""</b>: //""integer""  //
+* <b>""proj4text""</b>: //""character varying""  //
+* <b>""srtext""</b>: //""character varying""  //
+}
+
+
+
+@enduml
+

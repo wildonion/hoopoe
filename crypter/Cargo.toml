@@ -1,0 +1,37 @@
+
+[package]
+name = "crypter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+
+[dependencies]
+hex = "0.4"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+serde = {version = "1", features = ["derive"] }
+# ------------------
+#    crypto libs
+# ------------------
+rand = "0.8"
+rust-argon2 = "2"
+ring = "0.17"
+sha2 = "0.10"
+themis = "0.14.0"
+secp256k1 = { version = "0.29", features = ["rand"] }
+tiny-keccak = "2"
+rand_chacha = "0.3"
+chacha20 = "0.9"
+web3 = "0.19"
+wallexerr = "0.3.3"
+base64 = "0.22"
+base58 = "0.2.0"
+sha3 = "0.10.8"
+aes256ctr_poly1305aes = "0.2.0"
+# ------------------
+
+
+[lib]
+name = "crypter"
+path = "src/lib.rs"

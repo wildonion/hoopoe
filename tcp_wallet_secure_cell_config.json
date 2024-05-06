@@ -1,0 +1,17 @@
+{
+  "wallet": {
+    "secp256k1_secret_key": null,
+    "secp256k1_public_key": null,
+    "secp256k1_public_address": null,
+    "secp256k1_mnemonic": null,
+    "secp256r1_secret_key": null,
+    "secp256r1_public_key": null,
+    "ed25519_secret_key": "nGpVmGTNjfvJ9ojqijQwUN3nfgo6VPLaBLCULXjwUoEghdzFAxJT8sGvegxoipLfA6HPvjVVUhys7gUnVnMpC3ZHtqRjP8dwT35TyrRkR93YXWMkP",
+    "ed25519_public_key": "3trm3KPuyDx9WEeGQGKKftQghDr3uMmNVFiBrDgvAfJb"
+  },
+  "secure_cell_config": {
+    "secret_key": "89dbb9db5283c91c0b044dec943bc86ed394d00a12fcf84cf81d8bdcf1be3684",
+    "passphrase": "",
+    "data": []
+  }
+}

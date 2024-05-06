@@ -1,0 +1,6 @@
+code: 65535 | message: Query Error: error returned from database: column "hyper_locations.speed" must appear in the GROUP BY clause or be used in an aggregate function | due to: Redis, RMQ or Seaorm Error
+ | time: 1714561589584 | method name: LocationMutatorActor.store.db.execute
+code: 65535 | message: Query Error: error returned from database: column "seed" does not exist | due to: Redis, RMQ or Seaorm Error
+ | time: 1714561667081 | method name: LocationMutatorActor.store.db.execute
+code: 65535 | message: Query Error: error returned from database: column "hyper_locations.speed" must appear in the GROUP BY clause or be used in an aggregate function | due to: Redis, RMQ or Seaorm Error
+ | time: 1714565774537 | method name: LocationMutatorActor.store.db.execute
