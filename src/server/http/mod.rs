@@ -14,6 +14,7 @@ use crate::actors::sse::Broadcaster;
 use appstate::*;
 use appstate::AppState;
 use crate::error::*;
+use crate::consts::SERVER_IO_ERROR_CODE;
 
 
 // use this method to add new sse client
@@ -74,21 +75,7 @@ macro_rules! bootsteap_http {
         
         {   
 
-            use consts::*;
-            use actors::producers::*;
-            use actors::consumers::*;
-            use actors::consumers::location::*;
-            use actors::producers::location::*;
-            use actors::cqrs::mutators::location::*;
-            use actors::cqrs::accessors::location::*;
-            use actors::ws::servers::hoop::*;
-            use actors::ws::sessions::hoop::*;
-            use actors::cqrs::accessors::*;
-            use actors::cqrs::mutators::*;
-            use actors::sse::Broadcaster;
-            use server::http::sse_client;
-            use appstate::*;
-            use server::http::broadcast_event;
+            pub use self::*;
 
             let tcp_listener = std::net::TcpListener::bind(
                 format!("{}:{}", 
@@ -151,7 +138,7 @@ macro_rules! bootsteap_http {
                         let error_content = &e.to_string();
                         let error_content = error_content.as_bytes().to_vec();
                         let mut error_instance = HoopoeErrorResponse::new(
-                            *SERVER_IO_ERROR_CODE, // error code
+                            *crate::consts::SERVER_IO_ERROR_CODE, // error code
                             error_content, // error content
                             ErrorKind::Server(ActixWeb(e)), // error kind
                             "HttpServer::new().bind", // method

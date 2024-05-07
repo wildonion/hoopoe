@@ -152,13 +152,14 @@ pub(self) async fn mint_demo(
     // ...
 ) -> HoopoeHttpResponse{
 
-    let product = pinfo.to_owned();
+    let product = pinfo.to_owned(); // received product info from user
 
     tokio::spawn(async move{
         
-        // lock free checking: 
+        // lock-free processes: 
         // check is already minted or purchased in db or not
-        // other never-trust-user-inputs validation
+        // other never-trust-user-inputs validations
+        // ...
 
     });
     
@@ -188,24 +189,11 @@ pub(self) async fn mint_demo(
                     &[u8],
                     &[],
                     None, // metadata
-                    &format!("ERROR: product {} wasn't minted", product.pid),
+                    &format!("ERROR: product {} wasn't minted, try again", product.pid),
                     StatusCode::OK,
                     None::<Cookie<'_>>,
                 }
             }
-
-            // meanwhile in the background without blocking the current thread
-            tokio::spawn(
-                {
-                    let prod_info = product_info.clone();
-                    async move{
-
-                        // ... send notif to client
-
-                    }
-
-                }
-            );
 
             resp!{
                 &[u8],

@@ -138,7 +138,21 @@ pub struct Product{
 impl AtomicPurchase for Product{
     type Product = Self;
     async fn atomic_purchase_status(&self) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>) {
-        mint_product_demo(self.pid, self.buyer_id).await
+        mint_product_demo(self.clone()).await
+    }
+    async fn mint(&mut self) -> (bool, Product){
+        
+        let Product{pid, buyer_id, is_minted} = self.clone();
+        log::info!("minting product with id {}", pid);
+
+        // it takes approximately 10 seconds or more to mint a product
+        // meanwhile we MUST reject any request coming to the api from 
+        // other clients upon purchasing this product, until the time
+        // is over
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        
+        let pinfo = Product{pid, buyer_id, is_minted: false}; // some product info
+        (false, pinfo)
     }
 }
 
@@ -167,8 +181,20 @@ impl AtomicPurchase for Product{
     once the purchase completes the lock is released, both locking and releasing 
     must be considered as async tasks spawned inside separate tokio spawn scope 
     to avoid blocking current thread so other requests can be handled concurrently.
+
+    channel is useful to send tasks into threads to invoke them in a separate threads
+    as well as sending their results into the channel to receive them outside of the 
+    threads, a local type can be mutated safely using an atomic synchronisation logic
+    like Arc<Mutex<. it can be mutated in two different ways, one is cloning it and 
+    then move the cloned one into threads or methods or send it to a channel from multiple 
+    different threads and scopes and receive it only in one scope or thread. an static 
+    arc mutex type however can be mutated across all scopes and threads in the app safely 
+    without using channels. in the context of http routers we can use Data<Arc<Mutex<
+    to share data between routers' threads safely
 */
-pub(self) async fn mint_product_demo(pid: i32, buyer_id: i32) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+
+    let Product { pid, buyer_id, is_minted } = product;
 
     // cloning the static mutex, having a global data in Rust requires to define 
     // an static type and if it wants to be mutated we should use arc mutex which 
@@ -228,9 +254,10 @@ pub(self) async fn mint_product_demo(pid: i32, buyer_id: i32) -> (bool, tokio::s
         {
             let psender = psender.clone();
             let lock_ids = lock_ids.clone();
+            let mut product_info = product.clone();
             async move{
 
-                let (err, mut pinfo) = mint(pid, buyer_id).await;
+                let (err, mut pinfo) = product_info.mint().await;
                 
                 // set the minting flag to true so if there was no error
                 if !err{
@@ -278,6 +305,9 @@ pub(self) async fn mint_product_demo(pid: i32, buyer_id: i32) -> (bool, tokio::s
         minted or is not minted yet,
         we're returning the preceiver back to the caller, it can receives the 
         product info for future processes.
+
+        get a task that is solved sooner than the other async jobs or tasks 
+        since we have only two different async tasks: minting and checking 
     */
     tokio::select! {
         // if this branch is selected means the product minting
@@ -299,182 +329,5 @@ pub(self) async fn mint_product_demo(pid: i32, buyer_id: i32) -> (bool, tokio::s
         }
     }
     
-
-}
-
-pub(self) async fn mint(pid: i32, buyer_id: i32) -> (bool, Product){
-    log::info!("minting product with id {}", pid);
-
-    // it takes approximately 10 seconds or more to mint a product
-    // meanwhile we MUST reject any request coming to the api from 
-    // other clients upon purchasing this product, until the time
-    // is over
-    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-    
-    let pinfo = Product{pid, buyer_id, is_minted: false}; // some product info
-    (false, pinfo)
-}
-
-/* -------------------------------------------------------------------------------------------
-         atomic synchronisation and handling mutual exclusion state on hashmap data 
-  -------------------------------------------------------------------------------------------
-    channel is useful to send tasks into threads to invoke them in a separate threads
-    as well as sending their results into the channel to receive them outside of the 
-    threads, a local type can be mutated safely using an atomic synchronisation logic
-    like Arc<Mutex<. it can be mutated in two different ways, one is cloning it and 
-    then move the cloned one into threads or methods or send it to a channel from multiple 
-    different threads and scopes and receive it only in one scope or thread. an static 
-    arc mutex type however can be mutated across all scopes and threads in the app safely 
-    without using channels. in the context of http routers we can use Data<Arc<Mutex<
-    to share data between routers' threads safely
-*/
-pub async fn atomic_map_demo(){
-
-    // ----- joining thread vs executing in the background -----
-    tokio::spawn(async move{
-        
-        let (tx, rx) = std::sync::mpsc::channel::<String>();
-        let res = std::thread::spawn(
-            {
-                let tx = tx.clone();
-                move ||{
-                    let name = String::from("wildonion");
-                    tx.send(name.clone());
-                    name
-                }
-            }
-        ).join().unwrap(); // waits for the associated thread to finish
-        println!("joined thread result {:?}", res);
-
-        // use rx to receive data in here without unwrapping the thread
-        while let Ok(data) = rx.recv(){
-            println!("mpsc channel result {:?}", data);
-        }
-
-    });
-
-    // ----- atomic bool and channel -----
-    // by default atomic types can be mutated in threads safely
-    let atomic_bool = AtomicBool::new(true);
-    // need channel to share atomic bool and generally any type of data
-    // between threads, enables us to have it outsife of the threads
-    let (atom_tx, mut atomc_rx) 
-        = tokio::sync::mpsc::channel::<AtomicBool>(1);
-    atom_tx.send(atomic_bool);
-    let cloned_atom_tx = atom_tx.clone();
-
-    // ----- atomic map -----
-    // if you want to mutate a type inside tokio threads you have 
-    // to share it between those threads using channels
-    let mut map = std::sync::Arc::new( // Arc is atomic reference counting
-        tokio::sync::Mutex::new(
-            std::collections::HashMap::new()
-        )
-    );
-
-    // ----- channel to share map -----
-    // use channels to share the data owned by a threadpool between 
-    // other threads otherwise Arc<Mutex is good for atomic syncing
-    let (tx, mut rx) 
-        = tokio::sync::mpsc::channel(1024);
-    let cloned_tx = tx.clone();
-    let cloned_map = map.clone();
-
-
-    // locking in first threadpool after sending the data for mutation
-    tokio::spawn(
-        { // begin scope
-            let tx = tx.clone();
-            async move{ // return type of the scope
-                println!("first spawn last state of the map: {:#?}", cloned_map);
-                let mut _map = cloned_map.lock().await;
-                (*_map).insert(String::from("wildonionkey"), String::from("wildonionval"));
-                // channel is useful when we need to send data owned by the tokio scope 
-                // or is a result of invoking an async task moved to tokio scope to 
-                // different threads, however the content of the mutex has changed in
-                // this tokio scope and we have access it in other scopes without receiving
-                // from the channel
-                tx.send(cloned_map.clone()).await; 
-            }
-        } // end scope
-    );
-
-    // since map is an atomic type we can dereference it in here to see
-    // the its mutated content without receiving it from an mpsc channel
-    println!("map has changed since it's an atomic type: {:#?}", *map);
-
-    // instead of cloning the map again we've used channels to send the mutated map
-    // into the channel so we can receive it inside another thread
-    // locking in second threadpool after receiving the data 
-    tokio::spawn(async move{
-
-        // receiving atomic bool
-        while let Some(atom) = atomc_rx.recv().await{
-            println!("atom bool received");
-            atom.store(false, Ordering::Relaxed);
-            println!("atom bool mutated: {:#?}", atom);
-        }
-
-        // receiving mutexed data
-        while let Some(map_data) = rx.recv().await{
-            println!("second spawn last state of the map: {:#?}", map_data);
-            let mut _map = map_data.lock().await;
-            (*_map).insert(String::from("wildonionkey3"), String::from("wildonionval3"));
-            cloned_tx.clone().send(map_data.clone()).await; // later catch it in other threads
-        }
-    });
-
-    // locking in main thread
-    println!("main thread last state of the map: {:#?}", map.clone());
-    let mut map = map.lock().await;
-    (*map).insert(String::from("wildonionkey2"), String::from("wildonionval2"));
-    println!("main thread last state of the map: {:#?}", map.clone());
-
-
-    /* results different on every run based on the tokio runtime scheduler
-    
-        first spawn last state of the map: Mutex {
-            data: {},
-        }
-        main thread last state of the map: Mutex {
-            data: {
-                "wildonionkey": "wildonionval",
-            },
-        }
-        second spawn last state of the map: Mutex {
-            data: {
-                "wildonionkey": "wildonionval",
-            },
-        }
-        main thread last state of the map: {
-            "wildonionkey": "wildonionval",
-            "wildonionkey2": "wildonionval2",
-        }
-
-        -------
-        
-        main thread last state of the map: Mutex {
-            data: {},
-        }
-        first spawn last state of the map: Mutex {
-            data: <locked>,
-        }
-        main thread last state of the map: {
-            "wildonionkey2": "wildonionval2",
-        }
-
-        -------
-
-        main thread last state of the map: Mutex {
-            data: {},
-        }
-        main thread last state of the map: {
-            "wildonionkey2": "wildonionval2",
-        }
-        first spawn last state of the map: Mutex {
-            data: <locked>,
-        }
-    
-    */
 
 }

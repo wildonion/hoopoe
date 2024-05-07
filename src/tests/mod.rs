@@ -92,9 +92,162 @@
     before it gets solved.
 */
 
-use log::info;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::*;
+
+pub async fn atomic_map_demo(){
+
+    // ----- joining thread vs executing in the background -----
+    tokio::spawn(async move{
+        
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        let res = std::thread::spawn(
+            {
+                let tx = tx.clone();
+                move ||{
+                    let name = String::from("wildonion");
+                    tx.send(name.clone());
+                    name
+                }
+            }
+        ).join().unwrap(); // waits for the associated thread to finish
+        println!("joined thread result {:?}", res);
+
+        // use rx to receive data in here without unwrapping the thread
+        while let Ok(data) = rx.recv(){
+            println!("mpsc channel result {:?}", data);
+        }
+
+    });
+
+    // ----- atomic bool and channel -----
+    // by default atomic types can be mutated in threads safely
+    let atomic_bool = AtomicBool::new(true);
+    // need channel to share atomic bool and generally any type of data
+    // between threads, enables us to have it outsife of the threads
+    let (atom_tx, mut atomc_rx) 
+        = tokio::sync::mpsc::channel::<AtomicBool>(1);
+    atom_tx.send(atomic_bool);
+    let cloned_atom_tx = atom_tx.clone();
+
+    // ----- atomic map -----
+    // if you want to mutate a type inside tokio threads you have 
+    // to share it between those threads using channels
+    let mut map = std::sync::Arc::new( // Arc is atomic reference counting
+        tokio::sync::Mutex::new(
+            std::collections::HashMap::new()
+        )
+    );
+
+    // ----- channel to share map -----
+    // use channels to share the data owned by a threadpool between 
+    // other threads otherwise Arc<Mutex is good for atomic syncing
+    let (tx, mut rx) 
+        = tokio::sync::mpsc::channel(1024);
+    let cloned_tx = tx.clone();
+    let cloned_map = map.clone();
+
+
+    // locking in first threadpool after sending the data for mutation
+    tokio::spawn(
+        { // begin scope
+            let tx = tx.clone();
+            async move{ // return type of the scope
+                println!("first spawn last state of the map: {:#?}", cloned_map);
+                let mut _map = cloned_map.lock().await;
+                (*_map).insert(String::from("wildonionkey"), String::from("wildonionval"));
+                // channel is useful when we need to send data owned by the tokio scope 
+                // or is a result of invoking an async task moved to tokio scope to 
+                // different threads, however the content of the mutex has changed in
+                // this tokio scope and we have access it in other scopes without receiving
+                // from the channel
+                tx.send(cloned_map.clone()).await;
+            }
+        } // end scope
+    );
+
+    // since map is an atomic type we can dereference it in here to see
+    // the its mutated content without receiving it from an mpsc channel
+    println!("map has changed since it's an atomic type: {:#?}", *map);
+
+    // instead of cloning the map again we've used channels to send the mutated map
+    // into the channel so we can receive it inside another thread
+    // locking in second threadpool after receiving the data 
+    tokio::spawn(async move{
+
+        // receiving atomic bool
+        while let Some(atom) = atomc_rx.recv().await{
+            println!("atom bool received");
+            atom.store(false, Ordering::Relaxed);
+            println!("atom bool mutated: {:#?}", atom);
+        }
+
+        // receiving mutexed data
+        while let Some(map_data) = rx.recv().await{
+            println!("second spawn last state of the map: {:#?}", map_data);
+            let mut _map = map_data.lock().await;
+            (*_map).insert(String::from("wildonionkey3"), String::from("wildonionval3"));
+            cloned_tx.clone().send(map_data.clone()).await; // later catch it in other threads
+        }
+    });
+
+    // locking in main thread
+    println!("main thread last state of the map: {:#?}", map.clone());
+    let mut map = map.lock().await;
+    (*map).insert(String::from("wildonionkey2"), String::from("wildonionval2"));
+    println!("main thread last state of the map: {:#?}", map.clone());
+
+
+    /* results different on every run based on the tokio runtime scheduler
+    
+        first spawn last state of the map: Mutex {
+            data: {},
+        }
+        main thread last state of the map: Mutex {
+            data: {
+                "wildonionkey": "wildonionval",
+            },
+        }
+        second spawn last state of the map: Mutex {
+            data: {
+                "wildonionkey": "wildonionval",
+            },
+        }
+        main thread last state of the map: {
+            "wildonionkey": "wildonionval",
+            "wildonionkey2": "wildonionval2",
+        }
+
+        -------
+        
+        main thread last state of the map: Mutex {
+            data: {},
+        }
+        first spawn last state of the map: Mutex {
+            data: <locked>,
+        }
+        main thread last state of the map: {
+            "wildonionkey2": "wildonionval2",
+        }
+
+        -------
+
+        main thread last state of the map: Mutex {
+            data: {},
+        }
+        main thread last state of the map: {
+            "wildonionkey2": "wildonionval2",
+        }
+        first spawn last state of the map: Mutex {
+            data: <locked>,
+        }
+    
+    */
+}
 
 pub async fn test_code_order_exec(){
+
     let (heavyme_sender, mut heavyme_receiver) = tokio::sync::mpsc::channel::<u128>(1024);
     let (heavyyou_sender, mut heavyyou_receiver) = tokio::sync::mpsc::channel::<String>(1024);
 

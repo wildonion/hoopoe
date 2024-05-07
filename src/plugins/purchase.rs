@@ -8,4 +8,5 @@ use crate::*;
 pub trait AtomicPurchase{
     type Product;
     async fn atomic_purchase_status(&self) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>);
+    async fn mint(&mut self) -> (bool, Self::Product);
 }
