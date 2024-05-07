@@ -165,23 +165,29 @@ cargo run --bin hooper -- --help
 
 make sure you've opened all necessary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages as well! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script will create ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container. for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
 
-#### 🚨 me before you! (make sure you've done followings properly before pushing to your repo):
+#### 🚨 me before you!
 
-- **step1)** first thing as the first, connect your device to github for workflow actions using `gh auth login -s workflow`.
+> make sure you've done following configurations properly before pushing to your repo:
 
-- **step2)** run `sudo rm .env && sudo mv .env.prod .env` then update necessary variables inside `.env` file.
+- **step0)** generate new ssl dh params for nginx using `openssl dhparam -out infra/docker/nginx/ssl-dhparams.pem 4096` command.
 
-- **step3)** the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS and you have an already setup the `docker.hoopoe.app` subdomain for that.
+- **step1)** setup ssl certs using `renew.sh` script and nginx config files per each domain and subdomain then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github** cause there is already an nginx container inside the `docker-compose.yml` needs its files to be there to move them into the container on every push! 
 
-- **step4)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achive this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for `logs` dir and `docker.hoopoe.app` route by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `rustacki@1234`.
+- **step2)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achieve this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for them by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `hoopoe@1234`.
+
+- **step3)** run `sudo rm .env && sudo mv .env.prod .env` then update necessary variables inside `.env` file.
+
+- **step4)** connect your device to github for workflow actions using `gh auth login -s workflow`, this allows you to push to the repo.
 
 - **step5)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository.
 
-- **step6)** setup nginx config and ssl cert files per each domain and subdomain using `renew.sh` script then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github cause there is already an nginx container inside the `docker-compose.yml`**. 
+- **step6)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step7)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file, take this note that the default location and directory for none root users are `/home`.
+- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`.
 
-- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which in this case is `docker.hoopoe.app` cause this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which in this case is `docker.hoopoe.app`, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+
+> **current hub registry is set to `docker.youwho.club`.**
 
 #### ☕ What's happening inside the `cicd.yml` file?
 
