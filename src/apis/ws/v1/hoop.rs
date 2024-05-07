@@ -28,7 +28,12 @@ pub(self) async fn index(
     while let Some(chunk) = stream.next().await{ // reading future objects from the streamer is a mutable process
         let bytes = chunk.unwrap();
         buffer.extend_from_slice(&bytes)
-    }    
+    }
+
+
+    // some user inputs validation
+    // starting session actor probably!
+    // ...
 
     todo!()
 

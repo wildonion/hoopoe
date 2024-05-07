@@ -4,6 +4,12 @@
 pub use super::*;
 
 
+
+/* -ˋˏ✄┈┈┈┈
+    >_  this route is used to either produce a data to RMQ exchange 
+        or start consuming in the background, look at the postman
+        collection for more details.
+*/
 #[post("/location/register")]
 pub(self) async fn register_notif(
     req: HttpRequest,
@@ -29,7 +35,7 @@ pub(self) async fn register_notif(
                 as the data coming at a same time, kindly put the sending
                 message logic to actor inside a loop{}
         */
-        tokio::spawn(
+        tokio::spawn( // running the producing notif job in the background in a free thread
             {
                 let cloned_app_state = app_state.clone();
                 let cloned_notif = notif.clone();
@@ -74,7 +80,7 @@ pub(self) async fn register_notif(
         /* -ˋˏ✄┈┈┈┈
             >_ start consuming in the background
         */
-        tokio::spawn(
+        tokio::spawn( // running the consuming notif job in the background in a free thread
             {
                 let cloned_app_state = app_state.clone();
                 let cloned_notif = notif.clone();

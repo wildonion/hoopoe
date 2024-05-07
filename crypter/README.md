@@ -18,4 +18,4 @@ sudo make install
 brew install libthemis
 ```
 
-`themis-wasm` contains an example of using a themis `secp256r1` keys.
+`themis-wasm` contains an example of using a themis `secp256r1` keys in js.

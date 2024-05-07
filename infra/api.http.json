@@ -98,7 +98,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"pid\": 1,\n    \"is_minted\": false,\n    \"buyer_id\": \n}",
+							"raw": "{\n    \"pid\": 1,\n    \"is_minted\": false,\n    \"buyer_id\": 1\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -112,6 +112,35 @@
 							],
 							"path": [
 								"mint-demo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pid\": 1,\n    \"is_minted\": false,\n    \"buyer_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{health-v1}}/check",
+							"host": [
+								"{{health-v1}}"
+							],
+							"path": [
+								"check"
 							]
 						}
 					},

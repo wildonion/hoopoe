@@ -43,7 +43,7 @@ Coded by
    | state and its value, this behaviour is called none blocking completion but based on the 
    | beginning notes the order of async task execution is not async by itself and if we have 
    | async_task1 first followed by async_task2 the order of executing them is regular and it's 
-   | not pure async like goroutines in Go or event loop in NodeJS, to achive this we should spawn 
+   | not pure async like goroutines in Go or event loop in NodeJS, to achieve this we should spawn 
    | them insie tokio::spawn which runs all the futures in the background like what goroutines 
    | and NodeJS event loop do
    |

@@ -52,7 +52,9 @@ pub mod wannacry{
         tools: RSA ed25519 ECC curve with aes256 hash in wallexerr, openssl and ring for RSA + KDF like sha256 and keccak256
         ransomewere, steganography and files encryption to generate unique assets by encrypting using 
         aes256 cbc with pbkdf2 + sha384 + salt then showing key and iv like:
-                    
+            
+            openssl dhparam -out infra/docker/nginx/ssl-dhparams.pem 4096
+            
             openssl aes-256-cbc -a -salt -pbkdf2 -in img.png -out img.png.enc -p
             openssl aes-256-cbc -d -a -pbkdf2 -in img.png.enc -out img.png.new -p 
 
@@ -373,6 +375,10 @@ pub mod eddsa_with_keccak256_signing{
 
 pub mod zkp{
 
+    // https://noir-lang.org/index.html
+    // https://github.com/rust-cc/awesome-cryptography-rust#zero-knowledge-proofs
+    // https://github.com/cossacklabs/themis/blob/master/docs/examples/rust/secure_compare.rs => themis zkp
+
     pub use super::*;
 
     pub struct ZkpError;
@@ -395,9 +401,5 @@ pub mod zkp{
     fn get_zkp_comparator() -> themis::secure_comparator::SecureComparator{
         wallexerr::misc::Wallet::generate_zkp_comparator()
     }
-
-    // https://noir-lang.org/index.html
-    // https://github.com/rust-cc/awesome-cryptography-rust#zero-knowledge-proofs
-    // https://github.com/cossacklabs/themis/blob/master/docs/examples/rust/secure_compare.rs => themis zkp
 
 }
