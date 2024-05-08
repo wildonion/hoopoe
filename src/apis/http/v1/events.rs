@@ -1,13 +1,10 @@
 
 
 use crate::{
-    actors::cqrs::accessors::location::{LocationAccessorActor, RequestLocationBasicReport}, 
-    consts::{STORAGE_IO_ERROR_CODE}, models::event::{FetchLocationBasicReport, ReportQuery}
+    actors::cqrs::accessors::notif::{LocationAccessorActor, RequestNotifData}, 
+    consts::{STORAGE_IO_ERROR_CODE},
 };
 use crate::{
-    actors::consumers::location::{
-        ActionType, ConsumeNotif, NotifData, ReceiverInfo
-    }, 
     consts::MAILBOX_CHANNEL_ERROR_CODE
 };
 use crate::*;

@@ -1,14 +1,17 @@
 
 
 
-
-// we have producer and consumer actors per each data streamer 
-// we have mutator and accessor actors per each db model
+/* 
+    actor based components:
+    we have producer and consumer actors per each data streamer 
+    we have mutator and accessor actors per each db model
+    we have ws session and server actors per each route
+*/
 pub mod cqrs;
 pub mod consumers;
 pub mod producers;
-pub mod sse;
 pub mod ws;
+pub mod user;
 
 
 /* 
@@ -75,6 +78,7 @@ struct ActerMessage{
     pub body: String,
 }
 
+#[derive(Clone)]
 struct Acter{
     // std::sync::Mutex is not Send so we can't move it into tokio spawn
     // we must use tokio Mutex
@@ -90,27 +94,35 @@ impl Acter{
 
     // execute tasks and messages in its threadpool (mainly tokio spawn)
     pub async fn execute(&mut self){
-        // PROBLEM: can't move out self because it's behind a mutable pointer
-        // some how we should move it to tokio scope without losing ownership
-        // passing its ref to tokio scope is not ok since the reference won't 
-        // be valid and must be static cause self is only valid inside the method
-        // body and by moving the &self.mailbox, the pointer will be in tokio scope 
-        // and the `self` itself will be dropped out once the method gets executed
-        // so it escapes the method body,
-        // SOLUTION: use clone, Box, Arc, (Rc is for single thread)
-        // we've used Arc and Mutex to make it sendable, shareable and safe to share
-        let arced_mutex_mailbox = self.mailbox.clone();
         
-        // don't deref the arced_mutex_mailbox since Clone is not implemented for that
-        // and can't be move out of the type since derefing return the owned type it's 
-        // kinda like clone the type
-        tokio::spawn(async move{
-            let mut mailbox = arced_mutex_mailbox.lock().await;
-            while let Some(task) = mailbox.recv().await{
-                
-            }
+        // use custom worker threadpool 
+        let this = self.clone();
+        let mut pool = workerthreadpool::sync::RayonSyncWorker::new();
+        pool.spawn(Box::new(||{
+            // don't deref the arced_mutex_mailbox since Clone is not implemented for that
+            // and can't be move out of the type since derefing return the owned type it's 
+            // kinda like clone the type
+            tokio::spawn(async move{
+                // PROBLEM: can't move out self because it's behind a mutable pointer
+                // some how we should move it to tokio scope without losing ownership
+                // passing its ref to tokio scope is not ok since the reference won't 
+                // be valid and must be static cause self is only valid inside the method
+                // body and by moving the &self.mailbox, the pointer will be in tokio scope 
+                // and the `self` itself will be dropped out once the method gets executed
+                // so it escapes the method body,
+                // SOLUTION: use clone, Box, Arc, (Rc is for single thread)
+                // we've used Arc and Mutex to make it sendable, shareable and safe to share
+                let arced_mutex_mailbox = this.mailbox.clone();
+                let mut mailbox = arced_mutex_mailbox.lock().await;
+                while let Some(task) = (*mailbox).recv().await{
+                    // ...
+                }
 
-        });
+            });
+        }));
+
+        pool.execute().await; // it will receive the spawned task inside a free thread then it call it
+
     }
 
     pub async fn start(&mut self) -> Self {
@@ -156,6 +168,15 @@ pub mod workerthreadpool{
     // 2 - pass the task to spawn() or execute() method then send it to channel
     // 3 - make sure receiver is of type Arc<Mutex<Receiver>>
 
+    /* 
+        how threadpool works?
+        once the execute method is called the task is sent to the jobq channel 
+        spawned threads on the other hand are thrilling to receive the task 
+        coming from the channel that's why we should put the receiver inside 
+        mutex and make it arc to move it between threads, once a free thread
+        acquire the lock on the receiver then the task can be called inside 
+        that thread
+    */
 
     pub use super::*;
 

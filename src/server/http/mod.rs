@@ -4,68 +4,17 @@
 use std::collections::HashMap;
 use crate::*;
 use types::HoopoeHttpResponse;
-use crate::actors::sse::{AddClient, BroadcastEvent};
 use actix::{actors, Addr};
 use config::{Env as ConfigEnv, Context};
 use config::EnvExt;
 use s3::Storage;
 use consts::*;
-use crate::actors::sse::Broadcaster;
 use appstate::*;
 use appstate::AppState;
 use crate::error::*;
 use crate::consts::SERVER_IO_ERROR_CODE;
 
 
-// use this method to add new sse client
-pub async fn sse_client(app_state: web::Data<AppState>) -> HoopoeHttpResponse{
-
-    // since unwrap() takes the ownership of the isntance and the app_state hence we should clone the 
-    // sse_broadcaster to prevent it from moving, as_ref() and as_mut() is not working here
-    // DerefMut is not implemented for AppState
-    let actors = app_state.actors.as_ref().unwrap();
-    // send add client message to the actor
-    let sse_broadcaster = actors.sse_actor.clone();
-    sse_broadcaster.send(AddClient{}).await;
-
-    let resp = models::http::Response::<&[u8]>{
-        data: Some(&[]),
-        message: consts::SEE_EVENT_SENT,
-        status: 200,
-        is_error: false,
-        meta: None
-    };
-    return Ok(HttpResponse::Ok().json(resp))
-}
-
-// use this method to broadcast new event
-pub async fn broadcast_event(
-    app_state: web::Data<AppState>,
-    event_info: web::Path<(String, String)>,
-) -> HoopoeHttpResponse{
-    
-    let topic = event_info.clone().0;
-    let event = event_info.clone().1;
-    // since unwrap() takes the ownership of the isntance and the app_state hence we should clone the 
-    // sse_broadcaster to prevent it from moving, as_ref() and as_mut() is not working here
-    // DerefMut is not implemented for AppState
-    let actors = app_state.actors.as_ref().unwrap();
-    let mut sse_broadcaster = actors.sse_actor.clone();
-    // send broadcast message to the actor
-    sse_broadcaster.send(BroadcastEvent{
-        topic,
-        event
-    }).await;
-
-    let resp = models::http::Response::<&[u8]>{
-        data: Some(&[]),
-        message: consts::SEE_CLIENT_ADDED,
-        status: 200,
-        is_error: false,
-        meta: None
-    };
-    return Ok(HttpResponse::Ok().json(resp))
-}
 
 #[macro_export]
 macro_rules! bootsteap_http {

@@ -25,61 +25,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{events-v1}}/location/register",
+							"raw": "{{events-v1}}/register",
 							"host": [
 								"{{events-v1}}"
 							],
 							"path": [
-								"location",
 								"register"
-							]
-						},
-						"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
-					},
-					"response": []
-				},
-				{
-					"name": "Get Basic Reports",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
-					"request": {
-						"method": "GET",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    // \"producer_info\": {\n    //     \"info\":{\n    //         \"notif_receiver\": { \"id\": 1 },\n    //         \"notif_data\": { \n    //             \"id\": \"unqie-id\",\n    //             \"action_data\": {\n    //                 \"pid\": 200\n    //             }, \n    //             \"actioner_info\": \"wildonion is purchasing the product\", \n    //             \"action_type\": \"ProductPurchased\", \n    //             \"fired_at\": 1714316645, \n    //             \"is_seen\": false\n    //         }, \n    //         \"exchange_name\": \"wildonionExchange\",\n    //         \"exchange_type\": \"amq.topic\", // amq.topic for pubsub\n    //         \"routing_key\": \"accept.only.*\" // routing pattern or key\n    //     }\n    // },\n    \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"Events:LocationEvent\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300\n        }\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{events-v1}}/location/stats/get/basic/?imei=0358899055298281&from=0001-01-01T00:00:00&to=0001-01-01T00:00:00",
-							"host": [
-								"{{events-v1}}"
-							],
-							"path": [
-								"location",
-								"stats",
-								"get",
-								"basic",
-								""
-							],
-							"query": [
-								{
-									"key": "imei",
-									"value": "0358899055298281"
-								},
-								{
-									"key": "from",
-									"value": "0001-01-01T00:00:00"
-								},
-								{
-									"key": "to",
-									"value": "0001-01-01T00:00:00"
-								}
 							]
 						},
 						"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"

@@ -71,8 +71,8 @@ Coded by
 
 */
 
-use crate::actors::consumers::location::ConsumeNotif;
-use crate::actors::producers::location::ProduceNotif;
+use crate::actors::consumers::notif::ConsumeNotif;
+use crate::actors::producers::notif::ProduceNotif;
 use crate::consts::APP_NAME;
 use std::env;
 use std::net::SocketAddr;
@@ -190,7 +190,7 @@ async fn main() -> std::io::Result<()>{
     /* -ˋˏ✄┈┈┈┈ bootstrapping http server
         >_ 
     */
-    info!("➔ 🚀 {} HTTP+WebSocket socket server has launched from [{}:{}] at {}", 
+    info!("➔ 🚀 {} HTTP+WebSocket server has launched from [{}:{}] at {}", 
         APP_NAME, app_state.config.as_ref().unwrap().vars.HOST, 
         app_state.config.as_ref().unwrap().vars.HTTP_PORT.parse::<u16>().unwrap(), 
         chrono::Local::now().naive_local());

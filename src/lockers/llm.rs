@@ -105,8 +105,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use actix_web::web::route;
 use serde::{Deserialize, Serialize};
-use plugins::purchase::AtomicPurchase;
-use crate::*;
+use plugins::purchase::ProductExt;
+use crate::{consts::PURCHASE_DEMO_LOCK_MUTEX, *};
 
 
 
@@ -122,10 +122,10 @@ use crate::*;
     is being implemented for the struct.
     impl anothercrate1::Passport for anothercrate2::HttpRequest{} 
 
-    in our case Product struct is defined here but AtomicPurchase trait definition
+    in our case Product struct is defined here but ProductExt trait definition
     is inside another crate and there would be no problem with implementing the trait
     for the Product struct but the following is not ok:
-    impl anothercrate1::AtomicPurchase for anothercrate2::Product{}
+    impl anothercrate1::ProductExt for anothercrate2::Product{}
 */
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Product{
@@ -134,24 +134,36 @@ pub struct Product{
     pub is_minted: bool
 }
 
-
-impl AtomicPurchase for Product{
+impl ProductExt for Product{
     type Product = Self;
     async fn atomic_purchase_status(&self) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>) {
-        mint_product_demo(self.clone()).await
+        start_minting(self.clone()).await
     }
-    async fn mint(&mut self) -> (bool, Product){
+    async fn mint(&mut self) -> (bool, Product){ 
         
         let Product{pid, buyer_id, is_minted} = self.clone();
         log::info!("minting product with id {}", pid);
 
-        // it takes approximately 10 seconds or more to mint a product
+        // eg: it takes approximately 10 seconds or more to mint a product
         // meanwhile we MUST reject any request coming to the api from 
         // other clients upon purchasing this product, until the time
         // is over
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        
-        let pinfo = Product{pid, buyer_id, is_minted: false}; // some product info
+
+        /* 
+            future improvements:
+            send product info to a mint-producer actor to send to rmq
+            in mint service: mint-consumer actor receives the product info and starts the minting process
+            once it finishes with the waiting time the result will be sent to rmq 
+            in main service: consumer actor begins to start consuming in the background as soon as its actor gets started, it receives all products constantly from the rmq
+            if the product was minted or there was any error then we release the id
+            t1 => every locking process on the ids must be inside tokio spawn to avoid blocking
+            t2 => store notif coming from producer into db or redis
+            t3 => notify client with short pulling or send them email
+            ...
+        */
+
+        let pinfo = Product{pid, buyer_id, is_minted: false}; // some minted product info
         (false, pinfo)
     }
 }
@@ -192,7 +204,7 @@ impl AtomicPurchase for Product{
     without using channels. in the context of http routers we can use Data<Arc<Mutex<
     to share data between routers' threads safely
 */
-pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
 
     let Product { pid, buyer_id, is_minted } = product;
 
@@ -234,7 +246,7 @@ pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mp
                 let mut write_lock = lock_ids.lock().await;
                 if (*write_lock).contains(&pid){
                     log::info!("rejecting client request another one is minting it!");
-                    // reject the request
+                    // reject the request since the product is being minted
                     tx.send(true).await;
                 } else{
                     (*write_lock).push(pid); // save the id for later readers to reject their request during the minting process
@@ -259,7 +271,7 @@ pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mp
 
                 let (err, mut pinfo) = product_info.mint().await;
                 
-                // set the minting flag to true so if there was no error
+                // set the minting flag to true, if there was no error
                 if !err{
                     pinfo.is_minted = true;
                 }
@@ -286,7 +298,7 @@ pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mp
                     with storing product info in db and notify the client with the status
                 */
                 let mut write_lock = lock_ids.lock().await;
-                (*write_lock).retain(|&p_id| p_id != pid);
+                (*write_lock).retain(|&p_id| p_id != pid); // product got minted, don't keep its id in the locks vector
 
             }
         }
@@ -324,10 +336,9 @@ pub(self) async fn mint_product_demo(product: Product) -> (bool, tokio::sync::mp
         // it completes and notify the client later, note that the 
         // whole logic of the minting process is inside the start_minting_task
         // spawned task
-        _ = start_minting_task => {
+        _ = start_minting_task => { // if start_minting_task was solved then we simply return false and the receiver
             return (false, preceiver); // during the minting process, if we're here means the minting is done
-        }
+        },
     }
-    
 
 }

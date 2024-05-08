@@ -14,9 +14,7 @@ use lapin::BasicProperties;
 use plugins::*;
 use plugins::notif::NotifExt;
 use std::sync::Arc;
-use crate::actors::consumers::location::NotifData;
-use crate::actors::consumers::location::ReceiverInfo;
-
+use crate::models::event::*;
 use super::zerlog::ZerLogProducerActor;
 
 
@@ -32,18 +30,18 @@ pub struct ProduceNotif{
 }
 
 #[derive(Clone)]
-pub struct LocationProducerActor{
+pub struct NotifProducerActor{
     pub app_storage: Option<Arc<s3::Storage>>,
     pub zerlog_producer_actor: Addr<ZerLogProducerActor>,
-}
+} 
 
-impl Actor for LocationProducerActor{
+impl Actor for NotifProducerActor{
     
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 LocationProducerActor has started, let's produce baby!");
+        log::info!("🎬 NotifProducerActor has started, let's produce baby!");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -62,7 +60,7 @@ impl Actor for LocationProducerActor{
     }
 }
 
-impl LocationProducerActor{
+impl NotifProducerActor{
 
     pub async fn produce(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str){
 
@@ -114,7 +112,7 @@ impl LocationProducerActor{
                                             *consts::STORAGE_IO_ERROR_CODE, // error code
                                             error_content, // error content
                                             ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                            "LocationProducerActor.exchange_declare", // method
+                                            "NotifProducerActor.exchange_declare", // method
                                             Some(&zerlog_producer_actor)
                                         ).await;
 
@@ -152,7 +150,7 @@ impl LocationProducerActor{
                                                     *consts::STORAGE_IO_ERROR_CODE, // error code
                                                     error_content, // error content
                                                     ErrorKind::Storage(crate::error::StorageError::Rmq(error_content_)), // error kind
-                                                    "LocationProducerActor.get_confirmation", // method
+                                                    "NotifProducerActor.get_confirmation", // method
                                                     Some(&zerlog_producer_actor)
                                                 ).await;
 
@@ -172,7 +170,7 @@ impl LocationProducerActor{
                                                 *consts::STORAGE_IO_ERROR_CODE, // error code
                                                 error_content, // error content
                                                 ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                                "LocationProducerActor.basic_publish", // method
+                                                "NotifProducerActor.basic_publish", // method
                                                 Some(&zerlog_producer_actor)
                                             ).await;
 
@@ -190,7 +188,7 @@ impl LocationProducerActor{
                                 *consts::STORAGE_IO_ERROR_CODE, // error code
                                 error_content, // error content
                                 ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                "LocationProducerActor.create_channel", // method
+                                "NotifProducerActor.create_channel", // method
                                 Some(&zerlog_producer_actor)
                             ).await;
 
@@ -207,7 +205,7 @@ impl LocationProducerActor{
                         *consts::STORAGE_IO_ERROR_CODE, // error code
                         error_content, // error content
                         ErrorKind::Storage(crate::error::StorageError::RmqPool(e)), // error kind
-                        "LocationProducerActor.produce_pool", // method
+                        "NotifProducerActor.produce_pool", // method
                         Some(&zerlog_producer_actor)
                     ).await;
 
@@ -226,7 +224,7 @@ impl LocationProducerActor{
 
 }
 
-impl Handler<ProduceNotif> for LocationProducerActor{
+impl Handler<ProduceNotif> for NotifProducerActor{
     
     type Result = ();
     fn handle(&mut self, msg: ProduceNotif, ctx: &mut Self::Context) -> Self::Result {

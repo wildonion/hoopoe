@@ -2,122 +2,134 @@ version: "3"
 
 services:
 
-  # nginx:
-  #   image: nginx
-  #   container_name: nginx
-  #   build:
-  #     context: ./ 
-  #     dockerfile: ./infra/docker/nginx/Dockerfile
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./infra/data/nginx/confs:/etc/nginx:ro
-  #     - ./infra/data/nginx/wwws:/usr/share/nginx
-  #     - ./assets:/etc/nginx/assets:ro
-  #     - ./infra/logs:/etc/nginx/logs:rw
-  #   networks:
-  #     - host
+  nginx:
+    image: nginx
+    container_name: nginx
+    build:
+      context: ./ 
+      dockerfile: ./infra/docker/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/data/nginx/confs:/etc/nginx:ro
+      - ./infra/data/nginx/wwws:/usr/share/nginx
+      - ./assets:/etc/nginx/assets:ro
+      - ./infra/logs:/etc/nginx/logs:rw
+    networks:
+      - host
 
-  # redis:
-  #   container_name: redis
-  #   image: redis:latest
-  #   restart: always
-  #   environment:
-  #     - REDIS_PASSWORD=${REDIS_PASSWORD}
-  #   volumes:
-  #     - ./infra/data/redis:/data 
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - hoopoe
-  #   hostname: redis
-  #   command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+  redis:
+    container_name: redis
+    image: redis:latest
+    restart: always
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - ./infra/data/redis:/data 
+    ports:
+      - "6379:6379"
+    networks:
+      - hoopoe
+    hostname: redis
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
 
-  # grafana:
-  #   container_name: grafana
-  #   image: grafana/grafana
-  #   restart: always
-  #   volumes:
-  #     - /infra/data:/var/lib/grafana
-  #   ports:
-  #     - "7050:3000"
-  #   networks:
-  #     - hoopoe
-  #   user: "$(id -u)"
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    restart: always
+    volumes:
+      - /infra/data:/var/lib/grafana
+    ports:
+      - "7050:3000"
+    networks:
+      - hoopoe
+    user: "$(id -u)"
 
-  # dbeaver:
-  #   image: dbeaver/cloudbeaver:latest
-  #   container_name: dbeaver
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./infra/data/dbeaver/opt/cloudbeaver/workspace:/opt/cloudbeaver/workspace
-  #   ports:
-  #     - "8080:8978"
-  #   networks:
-  #     - hoopoe
+  dbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: dbeaver
+    restart: unless-stopped
+    volumes:
+      - ./infra/data/dbeaver/opt/cloudbeaver/workspace:/opt/cloudbeaver/workspace
+    ports:
+      - "8080:8978"
+    networks:
+      - hoopoe
 
-  # portainer:
-  #   container_name: portainer
-  #   image: portainer/portainer-ce:latest
-  #   restart: always
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - ./infra/data/portainer_data:/data
-  #   ports:
-  #     - "8000:8000"
-  #     - "9443:9443"
-  #   networks:
-  #     - hoopoe
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infra/data/portainer_data:/data
+    ports:
+      - "8000:8000"
+      - "9443:9443"
+    networks:
+      - hoopoe
 
-  # timescaledb:
-  #   container_name: timescaledb
-  #   image: timescale/timescaledb-ha:pg16
-  #   restart: unless-stopped
-  #   environment:
-  #     - POSTGRES_USER=${POSTGRES_USERNAME}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-  #     - PGDATA=${PGDATA}
-  #     - POSTGRES_DB=${DB_NAME}
-  #   volumes:
-  #     - ./infra/data/timescaledb:/home/postgres/pgdata/data
-  #   ports:
-  #     - "5433:5432"
-  #   networks:
-  #     - hoopoe
-  #   healthcheck:
-  #     test: ["CMD", "pg_isready", "-h", "localhost", "-U", "$POSTGRES_USER", "-d", "postgres"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
+  timescaledb:
+    container_name: timescaledb
+    image: timescale/timescaledb-ha:pg16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=${PGDATA}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - ./infra/data/timescaledb:/home/postgres/pgdata/data
+    ports:
+      - "5433:5432"
+    networks:
+      - hoopoe
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "$POSTGRES_USER", "-d", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # rabbitmq:
-  #   container_name: rabbitmq
-  #   image: rabbitmq:latest
-  #   restart: unless-stopped
-  #   environment:
-  #     - RABBITMQ_DEFAULT_USER=${AMQP_USERNAME}
-  #     - RABBITMQ_DEFAULT_PASS=${AMQP_PASSWORD}
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - hoopoe
-  #   hostname: rabbitmq
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:latest
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${AMQP_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${AMQP_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - hoopoe
+    hostname: rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
 
-  # adminer:
-  #   container_name: adminer
-  #   image: adminer 
-  #   restart: unless-stopped
-  #   links:
-  #     - timescaledb
-  #   depends_on:
-  #     - timescaledb
-  #   ports:
-  #     - "7543:8080"
-  #   networks:
-  #     - hoopoe
+  adminer:
+    container_name: adminer
+    image: adminer 
+    restart: unless-stopped
+    links:
+      - timescaledb
+    depends_on:
+      - timescaledb
+    ports:
+      - "7543:8080"
+    networks:
+      - hoopoe
 
   hoopoe-http:
     container_name: hoopoe-http
@@ -126,11 +138,11 @@ services:
       context: ./
       dockerfile: ./infra/docker/hoopoe-http/Dockerfile
     restart: unless-stopped
-    # links:
-    #   - timescaledb
-    # depends_on:
-    #   - timescaledb
-    #   - redis
+    links:
+      - timescaledb
+    depends_on:
+      - timescaledb
+      - redis
     ports:
       - "2345:2344"
     volumes:
@@ -139,65 +151,65 @@ services:
     networks:
       - hoopoe
 
-  # hooper-tcp:
-  #   container_name: hooper-tcp
-  #   image: docker.youwho.club/hooper-tcp
-  #   build:
-  #     context: ./
-  #     dockerfile: ./infra/docker/hooper-tcp/Dockerfile
-  #   restart: unless-stopped
-  #   links:
-  #     - timescaledb
-  #   depends_on:
-  #     - timescaledb
-  #     - redis
-  #   ports:
-  #     - "2735:2734"
-  #   volumes:
-  #     - ./assets:/app/assets:ro
-  #     - ./infra/logs:/app/logs:rw
-  #   networks:
-  #     - hoopoe
+  hooper-tcp:
+    container_name: hooper-tcp
+    image: docker.youwho.club/hooper-tcp
+    build:
+      context: ./
+      dockerfile: ./infra/docker/hooper-tcp/Dockerfile
+    restart: unless-stopped
+    links:
+      - timescaledb
+    depends_on:
+      - timescaledb
+      - redis
+    ports:
+      - "2735:2734"
+    volumes:
+      - ./assets:/app/assets:ro
+      - ./infra/logs:/app/logs:rw
+    networks:
+      - hoopoe
 
-  # hooper-grpc:
-  #   container_name: hooper-grpc
-  #   image: docker.youwho.club/hooper-grpc
-  #   build:
-  #     context: ./
-  #     dockerfile: ./infra/docker/hooper-grpc/Dockerfile
-  #   restart: unless-stopped
-  #   links:
-  #     - timescaledb
-  #   depends_on:
-  #     - timescaledb
-  #     - redis
-  #   ports:
-  #     - "2257:2256"
-  #   volumes:
-  #     - ./assets:/app/assets:ro
-  #     - ./infra/logs:/app/logs:rw
-  #   networks:
-  #     - hoopoe
+  hooper-grpc:
+    container_name: hooper-grpc
+    image: docker.youwho.club/hooper-grpc
+    build:
+      context: ./
+      dockerfile: ./infra/docker/hooper-grpc/Dockerfile
+    restart: unless-stopped
+    links:
+      - timescaledb
+    depends_on:
+      - timescaledb
+      - redis
+    ports:
+      - "2257:2256"
+    volumes:
+      - ./assets:/app/assets:ro
+      - ./infra/logs:/app/logs:rw
+    networks:
+      - hoopoe
   
-  # hooper-p2p:
-  #   container_name: hooper-p2p
-  #   image: docker.youwho.club/hooper-p2p
-  #   build:
-  #     context: ./
-  #     dockerfile: ./infra/docker/hooper-p2p/Dockerfile
-  #   restart: unless-stopped
-  #   links:
-  #     - timescaledb
-  #   depends_on:
-  #     - timescaledb
-  #     - redis
-  #   ports:
-  #     - "2290:2289"
-  #   volumes:
-  #     - ./assets:/app/assets:ro
-  #     - ./infra/logs:/app/logs:rw
-  #   networks:
-  #     - hoopoe
+  hooper-p2p:
+    container_name: hooper-p2p
+    image: docker.youwho.club/hooper-p2p
+    build:
+      context: ./
+      dockerfile: ./infra/docker/hooper-p2p/Dockerfile
+    restart: unless-stopped
+    links:
+      - timescaledb
+    depends_on:
+      - timescaledb
+      - redis
+    ports:
+      - "2290:2289"
+    volumes:
+      - ./assets:/app/assets:ro
+      - ./infra/logs:/app/logs:rw
+    networks:
+      - hoopoe
 
 networks:
   hoopoe:

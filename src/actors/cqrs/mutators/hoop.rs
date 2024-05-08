@@ -94,7 +94,7 @@ impl HoopMutatorActor{
             log::info!("active model has changed");
         }
 
-        /* -ˋˏ✄┈┈┈┈ saving location event active model
+        /* -ˋˏ✄┈┈┈┈ saving hoop event active model
             An ActiveModel has all the attributes of Model wrapped in ActiveValue, an ActiveValue 
             is a wrapper structand to capture the changes made to ActiveModel attributes like it has
             Set and NotSet struct to change the state of the actual model (row), it's a model or row 

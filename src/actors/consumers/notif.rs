@@ -3,9 +3,9 @@
 
 use actix::prelude::*;
 use lapin::protocol::exchange;
-use crate::actors::cqrs::mutators::location::{LocationMutatorActor, StoreLocationEvent};
+use crate::actors::cqrs::mutators::notif::*;
 use crate::actors::producers::zerlog::ZerLogProducerActor;
-use crate::models::event::{LocationEvent, LocationEventMessage};
+use crate::actors::producers::notif::ProduceNotif;
 use redis::{AsyncCommands, RedisResult};
 use std::error::Error;
 use std::sync::Arc;
@@ -19,37 +19,6 @@ use crate::s3::Storage;
 use crate::consts::{self, MAILBOX_CHANNEL_ERROR_CODE, PING_INTERVAL};
 use serde::{Serialize, Deserialize};
 
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ReceiverNotif{
-    receiver_info: ReceiverInfo,
-    notifs: Vec<NotifData>
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ReceiverInfo{
-    pub id: i32, // a unique identity
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub enum ActionType{ // all the action type that causes the notif to get fired
-    #[default]
-    ProductPurchased,
-    Zerlog,
-    // probably other system notifs
-    // to be sent through SSE 
-    // ...
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct NotifData{
-    pub id: String,
-    pub action_data: Option<serde_json::Value>, // any data
-    pub actioner_info: Option<String>, // json stringified identifer
-    pub action_type: ActionType, // type event
-    pub fired_at: Option<i64>, 
-    pub is_seen: bool,
-}
 
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
@@ -75,18 +44,18 @@ pub struct ConsumeNotif{
 }
 
 #[derive(Clone)]
-pub struct LocationConsumerActor{
+pub struct NotifConsumerActor{
     pub app_storage: std::option::Option<Arc<Storage>>,
-    pub location_mutator_actor: Addr<LocationMutatorActor>,
+    pub notif_mutator_actor: Addr<NotifMutatorActor>,
     pub zerlog_producer_actor: Addr<ZerLogProducerActor>
 }
 
-impl Actor for LocationConsumerActor{
+impl Actor for NotifConsumerActor{
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 LocationConsumerActor has started, let's consume baby!");
+        log::info!("🎬 NotifConsumerActor has started, let's consume baby!");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -105,12 +74,12 @@ impl Actor for LocationConsumerActor{
     }
 }
 
-impl LocationConsumerActor{
+impl NotifConsumerActor{
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, 
-            location_mutator_actor: Addr<LocationMutatorActor>,
+            notif_mutator_actor: Addr<NotifMutatorActor>,
             zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
-        Self { app_storage, location_mutator_actor, zerlog_producer_actor}
+        Self { app_storage, notif_mutator_actor, zerlog_producer_actor}
     }
 
     pub async fn consume(&self, exp_seconds: u64,
@@ -121,7 +90,7 @@ impl LocationConsumerActor{
         let storage = self.app_storage.clone();
         let rmq_pool = storage.as_ref().unwrap().get_lapin_pool().await.unwrap();
         let redis_pool = storage.unwrap().get_redis_pool().await.unwrap();
-        let location_mutator_actor = self.location_mutator_actor.clone();
+        let notif_mutator_actor = self.notif_mutator_actor.clone();
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
 
         match rmq_pool.get().await{
@@ -149,7 +118,7 @@ impl LocationConsumerActor{
                                 *consts::STORAGE_IO_ERROR_CODE, // error code
                                 error_content, // error content
                                 ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                "LocationConsumerActor.queue_declare", // method
+                                "NotifConsumerActor.queue_declare", // method
                                 Some(&zerlog_producer_actor)
                             ).await;
 
@@ -181,7 +150,7 @@ impl LocationConsumerActor{
                                             *consts::STORAGE_IO_ERROR_CODE, // error code
                                             error_content, // error content
                                             ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                            "LocationConsumerActor.queue_bind", // method
+                                            "NotifConsumerActor.queue_bind", // method
                                             Some(&zerlog_producer_actor)
                                         ).await;
 
@@ -220,34 +189,34 @@ impl LocationConsumerActor{
                                         match delivery{
                                             Ok(delv) => {
 
-                                                // if the consumer receives the data
+                                                // if the consumer receives this data from the queue
                                                 match delv.ack(BasicAckOptions::default()).await{
                                                     Ok(ok) => {
 
+                                                        /* --------------------- storing and caching logics --------------------- */
                                                         let buffer = delv.data;
                                                         let data = std::str::from_utf8(&buffer).unwrap();
                                                         
-                                                        let get_location_event = serde_json::from_str::<LocationEvent>(&data);
-                                                        match get_location_event{
-                                                            Ok(location_event) => {
-
-                                                                let message = location_event.message;
-                                                                let redis_notif_key = message.clone().imei.unwrap_or_default();
+                                                        let get_notif_event = serde_json::from_str::<ProduceNotif>(&data);
+                                                        match get_notif_event{
+                                                            Ok(notif_event) => {
 
                                                                 // caching in redis
                                                                 match redis_pool.get().await{
                                                                     Ok(mut redis_conn) => {
 
+                                                                        let redis_notif_key = format!("notif_{}", notif_event.notif_receiver.id);
+
                                                                         // -ˋˏ✄┈┈┈┈ notif pattern in reids
                                                                         // key  : String::from(device_imei)
-                                                                        // value: Vec<LocationEventMessage>
+                                                                        // value: Vec<ProduceNotif>
                                                                         let get_device_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
                                                                         let events = match get_device_events{
                                                                             Ok(events_string) => {
-                                                                                let get_messages = serde_json::from_str::<Vec<LocationEventMessage>>(&events_string);
+                                                                                let get_messages = serde_json::from_str::<Vec<ProduceNotif>>(&events_string);
                                                                                 match get_messages{
                                                                                     Ok(mut messages) => {
-                                                                                        messages.push(message.clone());
+                                                                                        messages.push(notif_event.clone());
                                                                                         messages
                                                                                     },
                                                                                     Err(e) => {
@@ -258,7 +227,7 @@ impl LocationConsumerActor{
                                                                                             *consts::CODEC_ERROR_CODE, // error code
                                                                                             error_content_, // error content
                                                                                             ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                                                                            "LocationConsumerActor.decode_serde_redis", // method
+                                                                                            "NotifConsumerActor.decode_serde_redis", // method
                                                                                             Some(&zerlog_producer_actor)
                                                                                         ).await;
 
@@ -275,7 +244,7 @@ impl LocationConsumerActor{
                                                                                     *consts::STORAGE_IO_ERROR_CODE, // error code
                                                                                     error_content_, // error content
                                                                                     ErrorKind::Storage(crate::error::StorageError::Redis(e)), // error kind
-                                                                                    "LocationConsumerActor.redis_get", // method
+                                                                                    "NotifConsumerActor.redis_get", // method
                                                                                     Some(&zerlog_producer_actor)
                                                                                 ).await;
 
@@ -284,7 +253,7 @@ impl LocationConsumerActor{
                                                                                 // or the key is expired already, we'll create a new key either way and put
                                                                                 // the init message in there.
                                                                                 let init_message = vec![
-                                                                                    message.clone()
+                                                                                    notif_event.clone()
                                                                                 ];
 
                                                                                 init_message
@@ -292,6 +261,7 @@ impl LocationConsumerActor{
                                                                             }
                                                                         };
 
+                                                                        // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
                                                                         let events_string = serde_json::to_string(&events).unwrap();
                                                                         let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
                                                                         if is_key_there{ // update only the value
@@ -310,16 +280,16 @@ impl LocationConsumerActor{
                                                                             let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
                                                                         }
 
-                                                                        // -ˋˏ✄┈┈┈┈ storing the location event into timescaledb
-                                                                        // sending StoreLocationEvent message to the location event mutator actor
+                                                                        // -ˋˏ✄┈┈┈┈ storing the notif event into timescaledb
+                                                                        // sending StoreNotifEvent message to the notif event mutator actor
                                                                         tokio::spawn(
                                                                             {
-                                                                                let cloned_message = message.clone();
-                                                                                let cloned_mutator_actor = location_mutator_actor.clone();
+                                                                                let cloned_message = notif_event.clone();
+                                                                                let cloned_mutator_actor = notif_mutator_actor.clone();
                                                                                 let zerlog_producer_actor = zerlog_producer_actor.clone();
                                                                                 async move{
                                                                                     match cloned_mutator_actor
-                                                                                        .send(StoreLocationEvent{
+                                                                                        .send(StoreNotifEvent{
                                                                                             message: cloned_message,
                                                                                         })
                                                                                         .await
@@ -331,7 +301,7 @@ impl LocationConsumerActor{
                                                                                                     *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                                                                                                     source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                                                                                                     crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                                                                                    &String::from("LocationConsumerActor.location_mutator_actor.send"), // current method name
+                                                                                                    &String::from("NotifConsumerActor.notif_mutator_actor.send"), // current method name
                                                                                                     Some(&zerlog_producer_actor)
                                                                                                 ).await;
                                                                                                 return;
@@ -350,7 +320,7 @@ impl LocationConsumerActor{
                                                                             *consts::STORAGE_IO_ERROR_CODE, // error code
                                                                             error_content_, // error content
                                                                             ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
-                                                                            "LocationConsumerActor.redis_pool", // method
+                                                                            "NotifConsumerActor.redis_pool", // method
                                                                             Some(&zerlog_producer_actor)
                                                                         ).await;
                                                                         return; // cancel streaming over consumer and terminate the caller
@@ -366,7 +336,7 @@ impl LocationConsumerActor{
                                                                     *consts::CODEC_ERROR_CODE, // error code
                                                                     error_content_, // error content
                                                                     ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                                                    "LocationConsumerActor.decode_serde", // method
+                                                                    "NotifConsumerActor.decode_serde", // method
                                                                     Some(&zerlog_producer_actor)
                                                                 ).await;
 
@@ -382,7 +352,7 @@ impl LocationConsumerActor{
                                                             *consts::STORAGE_IO_ERROR_CODE, // error code
                                                             error_content, // error content
                                                             ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                                            "LocationConsumerActor.consume_ack", // method
+                                                            "NotifConsumerActor.consume_ack", // method
                                                             Some(&zerlog_producer_actor)
                                                         ).await;
 
@@ -399,7 +369,7 @@ impl LocationConsumerActor{
                                                     *consts::STORAGE_IO_ERROR_CODE, // error code
                                                     error_content, // error content
                                                     ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                                    "LocationConsumerActor.consume_getting_delivery", // method
+                                                    "NotifConsumerActor.consume_getting_delivery", // method
                                                     Some(&zerlog_producer_actor)
                                                 ).await;
 
@@ -416,7 +386,7 @@ impl LocationConsumerActor{
                                         *consts::STORAGE_IO_ERROR_CODE, // error code
                                         error_content, // error content
                                         ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                        "LocationConsumerActor.consume_basic_consume", // method
+                                        "NotifConsumerActor.consume_basic_consume", // method
                                         Some(&zerlog_producer_actor)
                                     ).await;
 
@@ -435,7 +405,7 @@ impl LocationConsumerActor{
                             *consts::STORAGE_IO_ERROR_CODE, // error code
                             error_content, // error content
                             ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                            "LocationConsumerActor.consume_create_channel", // method
+                            "NotifConsumerActor.consume_create_channel", // method
                             Some(&zerlog_producer_actor)
                         ).await;
 
@@ -452,7 +422,7 @@ impl LocationConsumerActor{
                     *consts::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::RmqPool(e)), // error kind
-                    "LocationConsumerActor.consume_pool", // method
+                    "NotifConsumerActor.consume_pool", // method
                     Some(&zerlog_producer_actor)
                 ).await;
 
@@ -464,7 +434,7 @@ impl LocationConsumerActor{
 
 }
 
-impl Handler<ConsumeNotif> for LocationConsumerActor{
+impl Handler<ConsumeNotif> for NotifConsumerActor{
     
     type Result = ();
     fn handle(&mut self, msg: ConsumeNotif, ctx: &mut Self::Context) -> Self::Result {

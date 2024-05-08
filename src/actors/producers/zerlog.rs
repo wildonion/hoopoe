@@ -14,8 +14,7 @@ use lapin::BasicProperties;
 use plugins::*;
 use plugins::notif::NotifExt;
 use std::sync::Arc;
-use crate::actors::consumers::location::NotifData;
-use crate::actors::consumers::location::ReceiverInfo;
+use crate::models::event::*;
 
 
 

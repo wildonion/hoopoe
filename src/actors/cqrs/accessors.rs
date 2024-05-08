@@ -2,5 +2,5 @@
 
 
 
-pub mod location;
+pub mod notif;
 pub mod hoop;

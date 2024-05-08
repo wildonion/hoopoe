@@ -21,8 +21,7 @@ use crate::*;
 pub fn init(config: &mut web::ServiceConfig){
 
     config.service(apis::http::v1::events::set::exports::register_notif);
-    config.service(apis::http::v1::events::get::exports::get_basic_report);
-    config.service(apis::http::v1::events::get::exports::sse0_feed);
-    config.service(apis::http::v1::events::get::exports::sse1_feed);
+    config.service(apis::http::v1::events::get::exports::get_hoop);
+    config.service(apis::http::v1::events::get::exports::get_notif);
 
 }

@@ -14,7 +14,7 @@ use actix_web::{cookie::Cookie, http::StatusCode};
 use futures::StreamExt;
 use lockers::llm::Product;
 use log::error;
-use plugins::purchase::AtomicPurchase;
+use plugins::purchase::ProductExt; // load traits to use the methods on the object who impls the trait already!
 pub use super::*;
 use crate::error::*; // :: refers to all crates loaded in Cargo.toml
 
@@ -156,8 +156,8 @@ pub(self) async fn mint_demo(
 
     tokio::spawn(async move{
         
-        // lock-free processes: 
-        // check is already minted or purchased in db or not
+        // some lock-free logics: 
+        // check is already minted or purchased in db or not, if yes don't start the atomic_purchase_status process
         // other never-trust-user-inputs validations
         // ...
 
@@ -189,7 +189,7 @@ pub(self) async fn mint_demo(
                     &[u8],
                     &[],
                     None, // metadata
-                    &format!("ERROR: product {} wasn't minted, try again", product.pid),
+                    &format!("ERROR: product {} wasn't minted, try again later", product.pid),
                     StatusCode::OK,
                     None::<Cookie<'_>>,
                 }

@@ -17,19 +17,21 @@ use serde::{Serialize, Deserialize};
 use crate::consts;
 
 
+#[derive(Message, Clone, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct RequestNotifData{}
+
 #[derive(Clone)]
-pub struct HoopAccessorActor{
+pub struct LocationAccessorActor{
     pub app_storage: std::option::Option<Arc<Storage>>,
 }
 
-impl Actor for HoopAccessorActor{
+impl Actor for LocationAccessorActor{
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 HoopAccessorActor has started, let's read baby!");
-
-        let borrowed = &(*self);
+        log::info!("🎬 LocationAccessorActor has started, let's read baby!");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -48,18 +50,42 @@ impl Actor for HoopAccessorActor{
     }
 }
 
-impl HoopAccessorActor{
+impl LocationAccessorActor{
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>) -> Self{
         Self { app_storage }
     }
 
-    pub async fn fetch(&self){
+    
+    pub async fn get(&self, report_info: RequestNotifData){
 
-        // cache in redis with expirable key 
-        // retrieve it in main api to return it
+        // cache in redis to get the report in main api
         // ...
+        
+    }
+    
+}
+
+
+// a dead handler!
+impl Handler<RequestNotifData> for LocationAccessorActor{
+
+    type Result = ();
+
+    fn handle(&mut self, msg: RequestNotifData, ctx: &mut Self::Context) -> Self::Result {
+        
+        let RequestNotifData{
+            ..
+        } = msg.clone();
+
+        let this = self.clone();
+        
+        tokio::spawn(async move{
+            
+            this.get(msg).await;
+
+        });
 
     }
-
+    
 }

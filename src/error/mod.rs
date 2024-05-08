@@ -97,7 +97,7 @@ use crate::models::http::Response;
 */
 
 use actix::Addr;
-use actors::consumers::location::{ActionType, NotifData, ReceiverInfo};
+use crate::models::event::*;
 use serde::{Serialize, Deserialize};
 use std::error::Error;
 use std::io::{Write, Read};

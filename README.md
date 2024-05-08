@@ -9,7 +9,7 @@ don't afraid of changing my structure, understanding me is as quite dead simple 
 
 > this boilerplate can be either a producer or a consumer actor worker upon supported protocols (`http`, `grpc`, `tcp`, `p2p`).
 
-### As a producer/publisher (register notif) actor worker service: 
+### As a producer/publisher (register event) actor worker service: 
 
 send data through tcp or http request to this service (`notifs/set.rs`), server broadcasts message with rmq producer it then stores data in db for future reports (`notifs/get.rs`) and respond the caller with an ok status. producing or publishing process is done based on an event that is occurred during the lifetime of the app execution.
 
@@ -183,9 +183,9 @@ make sure you've opened all necessary domains inside your DNS panel per each ngi
 
 - **step6)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`.
+- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
 
-- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which in this case is `docker.hoopoe.app`, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
 > **current hub registry is set to `docker.youwho.club`.**
 

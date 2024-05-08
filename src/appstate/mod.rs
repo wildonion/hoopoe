@@ -1,20 +1,19 @@
 
 use std::collections::HashMap;
 use actix::{Actor, Addr};
-use crate::actors::cqrs::mutators::location::LocationMutatorActor;
-use crate::actors::cqrs::accessors::location::LocationAccessorActor;
+use crate::actors::cqrs::mutators::notif::NotifMutatorActor;
+use crate::actors::cqrs::accessors::notif::LocationAccessorActor;
 use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::s3::Storage;
-use crate::actors::consumers::location::LocationConsumerActor;
-use crate::actors::producers::location::LocationProducerActor;
+use crate::actors::consumers::notif::NotifConsumerActor;
+use crate::actors::producers::notif::NotifProducerActor;
 use crate::actors::producers::zerlog::ZerLogProducerActor;
-use crate::actors::ws::servers::hoop::HoopServer;
-use crate::actors::sse::Broadcaster;
 use serde::{Serialize, Deserialize};
 use crate::types::*;
 use crate::consts::*;
 use crate::storage;
+use crate::actors::ws::servers::hoop::HoopServer;
 
 
 #[derive(Clone)]
@@ -24,23 +23,23 @@ pub struct WsActors{
 
 #[derive(Clone)]
 pub struct ConsumerActors{
-    pub location_actor: Addr<LocationConsumerActor>,
+    pub notif_actor: Addr<NotifConsumerActor>,
 }
 
 #[derive(Clone)]
 pub struct ProducerActors{
-    pub location_actor: Addr<LocationProducerActor>,
+    pub notif_actor: Addr<NotifProducerActor>,
     pub zerlog_actor: Addr<ZerLogProducerActor>,
 }
 
 #[derive(Clone)]
 pub struct MutatorActors{
-    pub location_mutator_actor: Addr<LocationMutatorActor>,
+    pub notif_mutator_actor: Addr<NotifMutatorActor>,
 }
 
 #[derive(Clone)]
 pub struct AccessorActors{
-    pub location_accessor_actor: Addr<LocationAccessorActor>,
+    pub notif_accessor_actor: Addr<LocationAccessorActor>,
 }
 
 #[derive(Clone)]
@@ -55,7 +54,6 @@ pub struct ActorInstaces{
     pub producer_actors: ProducerActors,
     pub ws_actors: WsActors,
     pub cqrs_actors: CqrsActors,
-    pub sse_actor: Addr<Broadcaster>,
 }
 
 #[derive(Clone)]
@@ -91,20 +89,19 @@ impl AppState{
         // publisher/producer + subscriber/consumer actor workers
         // all of the actors must be started within the context 
         // of actix runtime or #[actix_web::main]
-        let hoop_ws_server_instance = HoopServer::new(app_storage.clone()).start();            
-        let sse_actor_instance = Broadcaster::new(app_storage.clone()).start();
+        let hoop_ws_server_instance = HoopServer::new(app_storage.clone()).start();
         let zerlog_producer_actor = ZerLogProducerActor::new(app_storage.clone()).start();
-        let location_producer_actor = LocationProducerActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let location_mutator_actor = LocationMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let location_accessor_actor = LocationAccessorActor::new(app_storage.clone()).start();
-        let location_consumer_actor = LocationConsumerActor::new(app_storage.clone(), location_mutator_actor.clone(), zerlog_producer_actor.clone()).start();
+        let notif_producer_actor = NotifProducerActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+        let notif_mutator_actor = NotifMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+        let notif_accessor_actor = LocationAccessorActor::new(app_storage.clone()).start();
+        let notif_consumer_actor = NotifConsumerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone()).start();
         
         let actor_instances = ActorInstaces{
             consumer_actors: ConsumerActors{
-                location_actor: location_consumer_actor.clone()
+                notif_actor: notif_consumer_actor.clone()
             },
             producer_actors: ProducerActors{
-                location_actor: location_producer_actor.clone(),
+                notif_actor: notif_producer_actor.clone(),
                 zerlog_actor: zerlog_producer_actor.clone()
             },
             ws_actors: WsActors{
@@ -112,13 +109,12 @@ impl AppState{
             },
             cqrs_actors: CqrsActors{
                 mutators: MutatorActors{
-                    location_mutator_actor: location_mutator_actor.clone()
+                    notif_mutator_actor: notif_mutator_actor.clone()
                 },
                 accessors: AccessorActors{
-                    location_accessor_actor: location_accessor_actor.clone()
-                }
+                    notif_accessor_actor: notif_accessor_actor.clone()
+                },
             },
-            sse_actor: sse_actor_instance.clone()
         };
         
         Self { 
