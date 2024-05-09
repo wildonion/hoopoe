@@ -244,7 +244,7 @@ pub enum StorageError{
     #[error("[REDIS ACTOR] - failed to get redis pool")]
     RedisPool(#[from] deadpool_redis::PoolError), 
     #[error("[RMQ] - failed to do rmq operation")]
-    Rmq(#[from] lapin::Error), 
+    Rmq(#[from] deadpool_lapin::lapin::Error), 
     #[error("[RMQ] - failed to get lapin pool")]
     RmqPool(#[from] deadpool_lapin::PoolError), 
     #[error("[SEAORM] - faild to do db operation")]
@@ -524,8 +524,8 @@ impl From<redis_async::error::Error> for HoopoeErrorResponse{
     }
 }
 
-impl From<lapin::Error> for HoopoeErrorResponse{
-    fn from(error: lapin::Error) -> Self {
+impl From<deadpool_lapin::lapin::Error> for HoopoeErrorResponse{
+    fn from(error: deadpool_lapin::lapin::Error) -> Self {
         Self{ 
             code: 0, 
             msg: error.to_string().as_bytes().to_vec(), 
@@ -613,7 +613,7 @@ impl HoopoeErrorResponse{
                     notif_data: NotifData{ 
                         id: uuid::Uuid::new_v4().to_string(), 
                         action_data: Some(action_data), 
-                        actioner_info: Some(APP_NAME.to_string()), 
+                        actioner_info: Some(ActionerInfo{id: 0}), 
                         action_type: ActionType::Zerlog, 
                         fired_at: Some(chrono::Local::now().timestamp()), 
                         is_seen: false 

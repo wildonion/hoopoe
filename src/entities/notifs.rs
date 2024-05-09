@@ -4,18 +4,18 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
-#[sea_orm(table_name = "hoops")]
+#[sea_orm(table_name = "notifs")]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
-    pub etype: String,
-    pub manager: i32,
-    pub entrance_fee: i64,
-    #[sea_orm(created_at)]
-    pub created_at: DateTimeWithTimeZone,
-    #[sea_orm(updated_at)]
-    pub updated_at: DateTimeWithTimeZone,
+    pub receiver: Json,
+    pub nid: String,
+    pub action_data: Json,
+    pub actioner_info: Json,
+    pub action_type: String,
+    pub fired_at: DateTime,
+    pub is_seen: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

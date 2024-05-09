@@ -2,18 +2,19 @@
 
 
 use actix::prelude::*;
-use lapin::protocol::exchange;
+use deadpool_lapin::lapin::protocol::exchange;
 use crate::actors::cqrs::mutators::notif::*;
 use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::actors::producers::notif::ProduceNotif;
+use crate::models::event::NotifData;
 use redis::{AsyncCommands, RedisResult};
 use std::error::Error;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
 use async_std::stream::StreamExt;
-use lapin::options::{BasicAckOptions, BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions};
-use lapin::types::FieldTable;
-use lapin::{message, BasicProperties};
+use deadpool_lapin::lapin::options::{BasicAckOptions, BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions};
+use deadpool_lapin::lapin::types::FieldTable;
+use deadpool_lapin::lapin::{message, BasicProperties};
 use crate::plugins::notif::NotifExt;
 use crate::s3::Storage;
 use crate::consts::{self, MAILBOX_CHANNEL_ERROR_CODE, PING_INTERVAL};
@@ -205,18 +206,18 @@ impl NotifConsumerActor{
                                                                 match redis_pool.get().await{
                                                                     Ok(mut redis_conn) => {
 
-                                                                        let redis_notif_key = format!("notif_{}", notif_event.notif_receiver.id);
-
                                                                         // -ˋˏ✄┈┈┈┈ notif pattern in reids
-                                                                        // key  : String::from(device_imei)
-                                                                        // value: Vec<ProduceNotif>
-                                                                        let get_device_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
-                                                                        let events = match get_device_events{
+                                                                        // key  : String::from(notif_event.notif_receiver.id)
+                                                                        // value: Vec<NotifData>
+                                                                        let redis_notif_key = format!("notif_owner:{}", notif_event.notif_receiver.id);
+
+                                                                        let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
+                                                                        let events = match get_events{
                                                                             Ok(events_string) => {
-                                                                                let get_messages = serde_json::from_str::<Vec<ProduceNotif>>(&events_string);
+                                                                                let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
                                                                                 match get_messages{
                                                                                     Ok(mut messages) => {
-                                                                                        messages.push(notif_event.clone());
+                                                                                        messages.push(notif_event.notif_data.clone());
                                                                                         messages
                                                                                     },
                                                                                     Err(e) => {
@@ -253,7 +254,7 @@ impl NotifConsumerActor{
                                                                                 // or the key is expired already, we'll create a new key either way and put
                                                                                 // the init message in there.
                                                                                 let init_message = vec![
-                                                                                    notif_event.clone()
+                                                                                    notif_event.notif_data.clone()
                                                                                 ];
 
                                                                                 init_message
@@ -267,7 +268,7 @@ impl NotifConsumerActor{
                                                                         if is_key_there{ // update only the value
                                                                             let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
                                                                         } else{
-                                                                            // initial value for the expirable key 
+                                                                            // initializing value for the expirable key 
                                                                             /*
                                                                                 make sure you won't get the following error on set_ex():
                                                                                 called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
@@ -280,8 +281,9 @@ impl NotifConsumerActor{
                                                                             let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
                                                                         }
 
-                                                                        // -ˋˏ✄┈┈┈┈ storing the notif event into timescaledb
+                                                                        // -ˋˏ✄┈┈┈┈ storing the notif event into db
                                                                         // sending StoreNotifEvent message to the notif event mutator actor
+                                                                        // spawning the async task of storing data in db in the background
                                                                         tokio::spawn(
                                                                             {
                                                                                 let cloned_message = notif_event.clone();

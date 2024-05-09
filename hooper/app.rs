@@ -152,9 +152,10 @@ pub mod event{
 
 
 /* ******************************* IMPORTANT *******************************
-    can't start tokio stuffs or actix stuffs like actors inside the context
-    of actix or tokio runtime, so we can't have a pure TCP server with 
-    actix_web::main HTTP server with tokio::main. 
+    can't start tokio stuffs/actix stuffs like actors inside the context
+    of actix/tokio runtime, so we can't have a pure TCP server with 
+    actix_web::main or HTTP server with tokio::main. 
+                        DON'T USE ACTORS WITH TOKIO
  ************************************************************************* */
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{
@@ -221,7 +222,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
             }
 
         },
-        "p2p" => { // grpc stream
+        "p2p" => { // p2p stream (ws, webrtc, quic, tcp, ...)
 
             /* -ˋˏ✄┈┈┈┈ bootstrapping bidi grpc server
                 >_ 

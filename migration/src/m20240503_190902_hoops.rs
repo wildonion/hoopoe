@@ -1,4 +1,4 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{prelude::*, sea_orm::entity};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
         let manager_index = Index::create()
             .if_not_exists()
             .index_type(sea_query::IndexType::BTree)
-            .name("idx-le-longitude")
+            .name("idx-le-man")
             .table(Hoops::Table)
             .col(Hoops::Manager)
             .to_owned();
@@ -73,10 +73,6 @@ impl MigrationTrait for Migration {
                 .create_index(etype_index).await;
             manager
                 .create_index(manager_index).await;
-
-            // try seeding data with entity in here 
-            // https://www.sea-ql.org/SeaORM/docs/migration/writing-migration/#tip-3-seed-data-with-entity
-            // ...
 
         Ok(())
 

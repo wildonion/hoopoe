@@ -4,3 +4,11 @@ code: 65535 | message: Query Error: error returned from database: column "seed" 
  | time: 1714561667081 | method name: LocationMutatorActor.store.db.execute
 code: 65535 | message: Query Error: error returned from database: column "hyper_locations.speed" must appear in the GROUP BY clause or be used in an aggregate function | due to: Redis, RMQ or Seaorm Error
  | time: 1714565774537 | method name: LocationMutatorActor.store.db.execute
+code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'Events:LocationEvent' in vhost '/' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715201854032 | method name: NotifConsumerActor.queue_bind
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715202058250 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715202822445 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715258406940 | method name: NotifConsumerActor.queue_bind

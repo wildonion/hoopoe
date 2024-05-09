@@ -29,13 +29,12 @@ pub struct HoopEvent{
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ReceiverNotif{
-    receiver_info: ReceiverInfo,
-    notifs: Vec<NotifData>
+pub struct ReceiverInfo{
+    pub id: i32, // a unique identity
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ReceiverInfo{
+pub struct ActionerInfo{
     pub id: i32, // a unique identity
 }
 
@@ -44,7 +43,9 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
     #[default]
     ProductPurchased,
     Zerlog,
-    EventCreated
+    EventCreated,
+    EventExpired,
+    EventLocked,
     // probably other system notifs
     // ...
 }
@@ -53,7 +54,7 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
 pub struct NotifData{
     pub id: String,
     pub action_data: Option<serde_json::Value>, // any data
-    pub actioner_info: Option<String>, // json stringified identifer
+    pub actioner_info: Option<ActionerInfo>, // json stringified identifer
     pub action_type: ActionType, // type event
     pub fired_at: Option<i64>, 
     pub is_seen: bool,

@@ -7,19 +7,7 @@ don't afraid of changing my structure, understanding me is as quite dead simple 
 
 ## Execution flow & system design?
 
-> this boilerplate can be either a producer or a consumer actor worker upon supported protocols (`http`, `grpc`, `tcp`, `p2p`).
-
-### As a producer/publisher (register event) actor worker service: 
-
-send data through tcp or http request to this service (`notifs/set.rs`), server broadcasts message with rmq producer it then stores data in db for future reports (`notifs/get.rs`) and respond the caller with an ok status. producing or publishing process is done based on an event that is occurred during the lifetime of the app execution.
-
-### As a consumer/subscriber actor worker service:
-
-server consume or subscribe to data topics by creating channel per thread which contains message frame then binds a queue to the specified topic with the given routing key, this service can be used to send received data to frontend in realtime through ws connection or http sse, in this service we'll store in timescaledb and cache received data in redis with an expiration key, all consuming and subscribing processes.
-
-### What about frontend service:
-
-read directly from the rmq ws broker itself for realtime monitoring in frontend side.
+> having producer and consumer actor workers in http contexts is a bit tricky since we have a server in here we should manage the execution flow of each actor worker in the background asyncly, that's why i wrote a register http api which can be invoked to register either a producer (generate notif data) or a consumer (start consuming) in the background.
 
 ### 🎬 Actor worker communication flow:
 
@@ -86,13 +74,13 @@ read directly from the rmq ws broker itself for realtime monitoring in frontend 
 sudo chown -R root:root . && sudo chmod -R 777 . 
 ```
 
-> install necessary packages on Linux:
+#### step0) install necessary packages on Linux:
 
 ```bash
 cd scripts && ./setup.sh
 ```
 
-#### step0) create database 
+#### step1) create database 
 
 > make sure you've created the database using:
 
@@ -100,14 +88,14 @@ cd scripts && ./setup.sh
 sqlx database create
 ```
 
-#### step1) create migration folder (make sure you have already!)
+#### step2) create migration folder (make sure you have already!)
 
 > make sure you uncomment the runtime setup inside its `Cargo.toml` file.
 
 ```bash
 sea-orm-cli migrate init -d migration
 ```
-#### step2) create migration files
+#### step3) create migration files
 
 > make sure you've installed the `sea-orm-cli` then create migration file per each table operation, contains `Migrations` structure with `up` and `down` methods extended by the `MigrationTrait` interface, take not that you must create separate migration per each db operation when you're in production.
 
@@ -115,7 +103,7 @@ sea-orm-cli migrate init -d migration
 sea-orm-cli migrate generate "table_name"
 ```
 
-#### step3) apply pending migrations (fresh, refresh, reset, up or down)
+#### step4) apply pending migrations (fresh, refresh, reset, up or down)
 
 > once you've done with adding changes in your migration files just run the following to apply them in db.
 
@@ -124,7 +112,7 @@ sea-orm-cli migrate generate "table_name"
 sea-orm-cli migrate refresh # or up
 ```
 
-#### step4) generate entity files for ORM operations
+#### step5) generate entity files for ORM operations
 
 > generate Rust structures from your applied migrations inside the db for the `hoopoe` database in `entity/src` folder after that you can proceed with editing each eintity like adding hooks for different actions on an active model.
 
@@ -136,7 +124,7 @@ sea-orm-cli generate entity -t hoops -o src/entities --with-serde both --serde-s
 # don't skip deserializing primary key
 sea-orm-cli generate entity -u postgres://postgres:geDteDd0Ltg2135FJYQ6rjNYHYkGQa70@localhost/hoopoe -o src/entities --with-serde both
 ```
-#### step4) run server
+#### step6) run server
 
 > when you run server with `--fresh` command it'll fresh all migrations at startup (drop all tables from the database, then reapply all migrations) otherwise it'll only apply migrations (calling `up` method of all migration files).
 

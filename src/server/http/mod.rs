@@ -68,14 +68,15 @@ macro_rules! bootsteap_http {
                 .listen(tcp_listener){ // bind the http server on the passed in tcp listener cause after all http is a tcp based protocol!
                     Ok(server) => {
                         server
-                            // spawning 10 workers, once the workers are created, they each receive 
-                            // a separate application factory instance to handle requests, each worker thread 
-                            // processes its requests sequentially, apis which block the current thread 
-                            // will cause the current worker thread to stop processing new requests
-                            // async apis get executed concurrently by worker threads and thus don't 
-                            // block execution like each worker thread which contains the app instance
-                            // handles coming requests to async apis as an async task by spawning them
-                            // into tokio task with tokio::spawn()
+                            // spawning 10 worker threads separately, once the workers are created, they each 
+                            // receive a separate application factory instance to handle requests, each worker 
+                            // thread processes its requests sequentially, apis which block the current thread 
+                            // will cause the current worker thread to stop processing new requests, async apis 
+                            // get executed concurrently by worker threads and thus don't block execution: 
+                            // each worker thread which contains the app instance handles coming requests to 
+                            // async apis as an async task by spawning them into tokio task with tokio::spawn()
+                            // that's why we should not to lock anything inside an api unless we put it inside 
+                            // a tokio spawn and send resp to the api body using channels.
                             .workers(10) 
                             .run() /* actix web http+ws server runs in the same thread that actix has ran */
                             .await

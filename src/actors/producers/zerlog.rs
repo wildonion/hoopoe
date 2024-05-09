@@ -7,10 +7,10 @@ use actix::{AsyncContext, Context};
 use actix_redis::{resp_array, Command, RespValue};
 use config::EnvExt;
 use consts::PING_INTERVAL;
-use lapin::options::{ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions};
-use lapin::protocol::exchange;
-use lapin::types::FieldTable;
-use lapin::BasicProperties;
+use deadpool_lapin::lapin::options::{ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions};
+use deadpool_lapin::lapin::protocol::exchange;
+use deadpool_lapin::lapin::types::FieldTable;
+use deadpool_lapin::lapin::BasicProperties;
 use plugins::*;
 use plugins::notif::NotifExt;
 use std::sync::Arc;
@@ -90,10 +90,10 @@ impl ZerLogProducerActor{
                             match chan
                                 .exchange_declare(&exchange, {
                                     match exchange_type.as_str(){
-                                        "fanout" => lapin::ExchangeKind::Fanout,
-                                        "direct" => lapin::ExchangeKind::Direct,
-                                        "headers" => lapin::ExchangeKind::Headers,
-                                        _ => lapin::ExchangeKind::Topic,
+                                        "fanout" => deadpool_lapin::lapin::ExchangeKind::Fanout,
+                                        "direct" => deadpool_lapin::lapin::ExchangeKind::Direct,
+                                        "headers" => deadpool_lapin::lapin::ExchangeKind::Headers,
+                                        _ => deadpool_lapin::lapin::ExchangeKind::Topic,
                                     }
                                 }, 
                                     ExchangeDeclareOptions::default(), FieldTable::default()
@@ -124,7 +124,7 @@ impl ZerLogProducerActor{
                                 // later consumer bind its queue to this exchange and its
                                 // routing key so messages go inside its queue, later they 
                                 // can be consumed from the queue by the consumer
-                                use lapin::options::BasicPublishOptions;
+                                use deadpool_lapin::lapin::options::BasicPublishOptions;
                                 let payload = data.as_bytes();
                                 match chan
                                     .basic_publish(

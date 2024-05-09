@@ -3,3 +3,4 @@
 pub mod prelude;
 
 pub mod hoops;
+pub mod notifs;

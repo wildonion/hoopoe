@@ -151,16 +151,18 @@ impl ProductExt for Product{
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
         /* 
-            future improvements:
-            send product info to a mint-producer actor to send to rmq
-            in mint service: mint-consumer actor receives the product info and starts the minting process
-            once it finishes with the waiting time the result will be sent to rmq 
-            in main service: consumer actor begins to start consuming in the background as soon as its actor gets started, it receives all products constantly from the rmq
-            if the product was minted or there was any error then we release the id
+            step1) in main service: send product info to notif producer actor to send to rmq
+            step2) in mint service: 
+                consumer actor receives the product info and starts the minting process
+                once it finishes with the waiting time the result will be sent to rmq using 
+                its producer actor
+            step3) in main service: 
+                consumer actor begins to start consuming in the background (we know the queue!) 
+                as soon as its actor gets started, it receives all products constantly from the 
+                rmq, if the product was minted or there was any error then we release the id
             t1 => every locking process on the ids must be inside tokio spawn to avoid blocking
-            t2 => store notif coming from producer into db or redis
-            t3 => notify client with short pulling or send them email
-            ...
+            t2 => get notif_owner:{} data which contains the status of all his products
+            t3 => notify client with short pulling
         */
 
         let pinfo = Product{pid, buyer_id, is_minted: false}; // some minted product info
@@ -251,7 +253,6 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
                 } else{
                     (*write_lock).push(pid); // save the id for later readers to reject their request during the minting process
                 }
-
             }
         }
     );
@@ -260,9 +261,8 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
     let (psender, preceiver) = 
         tokio::sync::mpsc::channel::<Product>(1024);
 
-    // second spawn, minting process and pop the pid out on any error 
-    // so other clients can go for minting product again
-    let start_minting_task = tokio::spawn(
+    // second spawn, minting process and releasing the pid lock
+    let mint_task = tokio::spawn(
         {
             let psender = psender.clone();
             let lock_ids = lock_ids.clone();
@@ -334,9 +334,9 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         // if this branch is selected means the product is inside 
         // the minting process and we should release the lock after
         // it completes and notify the client later, note that the 
-        // whole logic of the minting process is inside the start_minting_task
+        // whole logic of the minting process is inside the mint_task
         // spawned task
-        _ = start_minting_task => { // if start_minting_task was solved then we simply return false and the receiver
+        _ = mint_task => { // if mint_task was solved then we simply return false and the receiver
             return (false, preceiver); // during the minting process, if we're here means the minting is done
         },
     }

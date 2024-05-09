@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use actix::{Actor, Addr};
 use crate::actors::cqrs::mutators::notif::NotifMutatorActor;
-use crate::actors::cqrs::accessors::notif::LocationAccessorActor;
+use crate::actors::cqrs::accessors::notif::NotifAccessorActor;
 use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::s3::Storage;
@@ -39,7 +39,7 @@ pub struct MutatorActors{
 
 #[derive(Clone)]
 pub struct AccessorActors{
-    pub notif_accessor_actor: Addr<LocationAccessorActor>,
+    pub notif_accessor_actor: Addr<NotifAccessorActor>,
 }
 
 #[derive(Clone)]
@@ -82,18 +82,21 @@ impl AppState{
             configs.as_ref().unwrap().vars.clone().DB_ENGINE,
             configs.as_ref().unwrap().vars.POSTGRES_HOST,
             configs.as_ref().unwrap().vars.POSTGRES_PORT,
-            configs.as_ref().unwrap().vars.POSTGRES_USERNAME,
+            configs.as_ref().unwrap().vars.POSTGRES_USER,
             configs.as_ref().unwrap().vars.POSTGRES_PASSWORD
         }.await;
         
-        // publisher/producer + subscriber/consumer actor workers
-        // all of the actors must be started within the context 
-        // of actix runtime or #[actix_web::main]
+        /* 
+            actix web spawn threads separately and move the application factory instance 
+            in each thread to handle requests concrrently, actix however uses a shread
+            threadpool within the actor system instead of using a threadpool per each 
+            actor objects this logic prevents runtime overhead.
+        */
         let hoop_ws_server_instance = HoopServer::new(app_storage.clone()).start();
         let zerlog_producer_actor = ZerLogProducerActor::new(app_storage.clone()).start();
         let notif_producer_actor = NotifProducerActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_mutator_actor = NotifMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let notif_accessor_actor = LocationAccessorActor::new(app_storage.clone()).start();
+        let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone()).start();
         let notif_consumer_actor = NotifConsumerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone()).start();
         
         let actor_instances = ActorInstaces{

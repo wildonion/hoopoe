@@ -11,7 +11,7 @@ use redis::Client as RedisClient;
 use uuid::Uuid;
 use sea_orm::{Database, DatabaseConnection, ConnectOptions};
 use rslock::LockManager;
-use lapin::{Connection as LapinConnection, ConnectionProperties};
+use deadpool_lapin::lapin::{Connection as LapinConnection, ConnectionProperties};
 use deadpool_lapin::{Config, Manager, Pool as LapinDeadPool, Runtime};
 use deadpool_lapin::lapin::{
     options::BasicPublishOptions,
@@ -192,7 +192,7 @@ macro_rules! storage {
             use crate::s3::{Storage, Mode, Db};
             use sea_orm::{Database, DatabaseConnection, ConnectOptions};
             use rslock::LockManager;
-            use lapin::{Connection as LapinConnection, ConnectionProperties};
+            use deadpool_lapin::lapin::{Connection as LapinConnection, ConnectionProperties};
             use deadpool_lapin::{Config, Manager, Pool as LapinDeadPool, Runtime};
             use deadpool_lapin::lapin::{
                 options::BasicPublishOptions,

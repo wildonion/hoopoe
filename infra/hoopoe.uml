@@ -1,0 +1,68 @@
+@startuml
+
+hide circle
+skinparam linetype ortho
+
+class "**geography_columns**" {
+---
+* <b>""coord_dimension""</b>: //""integer""  //
+* <b>""f_geography_column""</b>: //""name""  //
+* <b>""f_table_catalog""</b>: //""name""  //
+* <b>""f_table_name""</b>: //""name""  //
+* <b>""f_table_schema""</b>: //""name""  //
+* <b>""srid""</b>: //""integer""  //
+* <b>""type""</b>: //""text""  //
+}
+
+class "**geometry_columns**" {
+---
+* <b>""coord_dimension""</b>: //""integer""  //
+* <b>""f_geometry_column""</b>: //""name""  //
+* <b>""f_table_catalog""</b>: //""character varying""  //
+* <b>""f_table_name""</b>: //""name""  //
+* <b>""f_table_schema""</b>: //""name""  //
+* <b>""srid""</b>: //""integer""  //
+* <b>""type""</b>: //""character varying""  //
+}
+
+class "**hoops**" {
+# <b>""id""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""created_at""</b>: //""timestamp with time zone""  //
+* <b>""entrance_fee""</b>: //""bigint""  //
+* <b>""etype""</b>: //""character""  //
+* <b>""manager""</b>: //""integer""  //
+* <b>""updated_at""</b>: //""timestamp with time zone""  //
+}
+
+class "**notifs**" {
+# <b>""id""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""action_data""</b>: //""json""  //
+* <b>""action_type""</b>: //""character varying""  //
+* <b>""actioner_info""</b>: //""json""  //
+* <b>""fired_at""</b>: //""timestamp without time zone""  //
+* <b>""is_seen""</b>: //""boolean""  //
+* <b>""nid""</b>: //""character varying""  //
+* <b>""receiver""</b>: //""json""  //
+}
+
+class "**seaql_migrations**" {
+# <b>""version""</b>: //""character varying"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""applied_at""</b>: //""bigint""  //
+}
+
+class "**spatial_ref_sys**" {
+# <b>""srid""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+---
+* <b>""auth_name""</b>: //""character varying""  //
+* <b>""auth_srid""</b>: //""integer""  //
+* <b>""proj4text""</b>: //""character varying""  //
+* <b>""srtext""</b>: //""character varying""  //
+}
+
+
+
+@enduml
+
