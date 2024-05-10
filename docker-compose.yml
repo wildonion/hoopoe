@@ -53,17 +53,6 @@ services:
       - hoopoe
     user: "$(id -u)"
 
-  dbeaver:
-    image: dbeaver/cloudbeaver:latest
-    container_name: dbeaver
-    restart: unless-stopped
-    volumes:
-      - ./infra/data/dbeaver/opt/cloudbeaver/workspace:/opt/cloudbeaver/workspace
-    ports:
-      - "8080:8978"
-    networks:
-      - hoopoe
-
   portainer:
     container_name: portainer
     image: portainer/portainer-ce:latest
