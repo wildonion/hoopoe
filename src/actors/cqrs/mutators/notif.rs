@@ -13,6 +13,7 @@ use crate::models::event::NotifData;
 use crate::s3::Storage;
 use crate::consts::{self, PING_INTERVAL};
 use serde_json::json;
+use crate::entities::*;
 
 
 
@@ -73,6 +74,9 @@ impl NotifMutatorActor{
 
         // use crate::entities::notifs::ActiveModel;
         // add a single notif data into db 
+        let new_notif: notifs::ActiveModel = Default::default();
+        
+
         // ...
 
     }

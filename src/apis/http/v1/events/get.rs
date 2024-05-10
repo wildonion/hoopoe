@@ -1,6 +1,8 @@
 
 
 
+use crate::models::event::NotifQuery;
+
 pub use super::*;
 
 
@@ -26,9 +28,10 @@ pub(self) async fn get_hoop(
 
 }
 
-#[get("/notif/get/")]
+#[get("/notif/get/owner/")]
 pub(self) async fn get_notif(
     req: HttpRequest,
+    notif_query: web::Query<NotifQuery>,
     app_state: web::Data<AppState>,
 ) -> HoopoeHttpResponse{
 
@@ -42,9 +45,12 @@ pub(self) async fn get_notif(
     let actors = app_state.clone().actors.clone().unwrap();
     let notif_accessor_actor = actors.cqrs_actors.accessors.notif_accessor_actor;
     let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
+    let notif_owner = notif_query.to_owned().0;
 
     match notif_accessor_actor.send(
-        RequestNotifData{}
+        RequestNotifData{
+            owner: notif_owner.owner
+        }
     ).await
     {
         Ok(get_notifs) => {

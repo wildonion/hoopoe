@@ -6,6 +6,11 @@ use crate::*;
 
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct NotifQuery{
+    pub owner: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ProduceNotifInfo{
     pub info: ProduceNotif,
 }

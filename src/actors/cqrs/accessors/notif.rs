@@ -21,7 +21,9 @@ use crate::consts;
 
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "ResponseNotifData")]
-pub struct RequestNotifData{}
+pub struct RequestNotifData{
+    pub owner: Option<String>
+}
 
 /*
     future types as separate objects must be pinned into the ram 
@@ -69,7 +71,7 @@ impl NotifAccessorActor{
     
     pub async fn get(&self, report_info: RequestNotifData) -> Vec<NotifData>{
 
-        // cache in redis to get the report in main api
+        // get notifs for the passed in owner
         // ...
 
         vec![NotifData::default()]
