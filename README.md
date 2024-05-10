@@ -8,6 +8,15 @@ i'm hoopoe, the social event platform.
 
 ## Execution flow & system design?
 
+> any notification coming from different components or other service actor workers must be done accroding to the following steps:
+
+- **step1)** producer sends `NotifData` to exchange.
+
+- **step2)** consumer receives `NotifData` from its queue bounded to the exchange.
+
+- **step3)** instance of `NotifData` is cached on redis and stored in db.
+
+- **step4)** client invokes `/notif/get/owner/` api to get its notification during the app execution in a short polling manner.
 
 ```bash
 
@@ -18,14 +27,14 @@ i'm hoopoe, the social event platform.
   |  |           |                          |           |  |                  |                    |   CLIENT  |
   |  |  Actor1   |-----message handlers-----|  Actor2   |  |------------------------- HTTP --------|           |
   |  |  tokio    |     |___ jobq ___|       |   tokio   |  |             |                         |           |
-  |  | threadpool|----actix pubsub broker---| threadpool|  |             |                          -----------
+  |  | threadpool|--rmq prodcons channels---| threadpool|  |             |                          -----------
   |  |           |                          |           |  |             |
   |   -----------                            -----------   |             |
    --------------------------------------------------------              |
-  |     |                                                                |
-  |     |    synchronisation with                                        |
-  |     |_____ rmq prodcons _____                                        |
-  |                              |    ----------------- server2/node2 actor ------------------
+  |  |                                                                   |
+  |  |    synchronisation with                                           |
+  |  |_____ rmq notif prodcons __                                        |
+  |    data format:  NotifData   |    ----------------- server2/node2 actor ------------------
   |                              |   |                                                        |
   |                              |   |                                                        |
   |                              |   |   ___________                            ___________   |
@@ -33,7 +42,7 @@ i'm hoopoe, the social event platform.
   |                              |___|  |           |                          |           |  |
   |        _________                 |  |  Actor1   |-----message handlers-----|  Actor2   |  |
   |       |         |                |  |  tokio    |     |___ jobq ___|       |  tokio    |  |
-   -------|   PG    |                |  | threadpool|----actix pubsub broker---| threadpool|  |
+   -------|   PG    |                |  | threadpool|--rmq prodcons channels---| threadpool|  |
           |         |____mutators____|  |           |                          |           |  |
           |         |____readers ____|   -----------                            -----------   |
           |         |                |                                                        |
@@ -177,7 +186,7 @@ make sure you've opened all necessary domains inside your DNS panel per each ngi
 
 - **step6)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
+- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
 
 - **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
