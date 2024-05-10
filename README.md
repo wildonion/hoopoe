@@ -1,38 +1,44 @@
 
 
+<img src="https://github.com/wildonion/hoopoe/blob/main/assets/hoopoe.png" width="300">
+
 ## ᝰ.ᐟ What am i?
 
-you probably might be asking yourself what am i? well i'm an stateful distributed backend boilerplate promoting reusability and maintainability with an onion design pattern upon great stacks leveraging the power of streaming technologies by utilising redis and rmq so just code me! i have a supper clean code structure and actor based components which made me a ready to go microservice.
-don't afraid of changing my structure, understanding me is as quite dead simple as drinking water.
+i'm hoopoe, the social event platform.
 
 ## Execution flow & system design?
 
-> having producer and consumer actor workers in http contexts is a bit tricky since we have a server in here we should manage the execution flow of each actor worker in the background asyncly, that's why i wrote a register http api which can be invoked to register either a producer (generate notif data) or a consumer (start consuming) in the background.
 
-### 🎬 Actor worker communication flow:
+```bash
 
-> message brokers like rmq components are actor workers wich use internal rpc to talk remotely with the broker like creating queue, exchange, channels and exchangeing messages between producers and consumers based on various exchange patterns, the broker however communicate with client over tcp and mainly contains message queue, exchange, routing and binding strcutures and strategies to make a reliable message exchanging protocol.
-
-**channels:** create channel per thread cause they’re not safe to be shared, use channel to send message to them, they have mailbox and queues and routing strategies to execute async messages and tasks.
-
-**threadpool:** they execute async tasks like mutex atomic syncing operations within tokio spawn or their own builtin threadpool and control the flow of the code with tokio select event loop and channels.
-
-**communication:** local msg handlers backed by channel (mpsc) based job queues, remote msg handlers backed by rpc based job queues.
-
-**task scheduling:** if you want to check or execute something constantly in the background inside a threadpool actor is the beast to do so. 
-
-## Streaming stack!?
-
-- **Rabbitmq** message broker for PubSub and ProducerConsumer patterns.
-- **Postgres** with **timescaledb** extension to store seamlessly.
-- **Redis** mainly for expirable-caching of notif data.
-
-## Monitoring stack!?
-
-- **dbeaver** db administration tool.
-- **adminer** postgres admin panel.
-- **portainer** docker container manager.
-- **grafana** analytics visualization.
+   ------------------ server1/node1 actor -----------------                                         ___________
+  |                                                        |                   ____________________|           |
+  |   ___________                            ___________   |                  |                    |           |
+  |  |           |                          |           |  |    OVER WS STREAM/SHORT POLLING       |           |
+  |  |           |                          |           |  |                  |                    |   CLIENT  |
+  |  |  Actor1   |-----message handlers-----|  Actor2   |  |------------------------- HTTP --------|           |
+  |  |  tokio    |     |___ jobq ___|       |   tokio   |  |             |                         |           |
+  |  | threadpool|----actix pubsub broker---| threadpool|  |             |                          -----------
+  |  |           |                          |           |  |             |
+  |   -----------                            -----------   |             |
+   --------------------------------------------------------              |
+  |     |                                                                |
+  |     |    synchronisation with                                        |
+  |     |_____ rmq prodcons _____                                        |
+  |                              |    ----------------- server2/node2 actor ------------------
+  |                              |   |                                                        |
+  |                              |   |                                                        |
+  |                              |   |   ___________                            ___________   |
+  |                              |   |  |           |                          |           |  |
+  |                              |___|  |           |                          |           |  |
+  |        _________                 |  |  Actor1   |-----message handlers-----|  Actor2   |  |
+  |       |         |                |  |  tokio    |     |___ jobq ___|       |  tokio    |  |
+   -------|   PG    |                |  | threadpool|----actix pubsub broker---| threadpool|  |
+          |         |____mutators____|  |           |                          |           |  |
+          |         |____readers ____|   -----------                            -----------   |
+          |         |                |                                                        |
+           ---------                  --------------------------------------------------------
+```
 
 <p align="center">
     <img src="https://github.com/wildonion/hoopoe/blob/main/infra/arch.png">
