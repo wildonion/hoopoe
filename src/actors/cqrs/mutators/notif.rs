@@ -9,7 +9,7 @@ use actix::{Actor, AsyncContext, Context};
 use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::entities::hoops;
 use crate::actors::producers::notif::ProduceNotif;
-use crate::models::event::{NotifData, ReceiverInfo};
+use crate::models::event::NotifData;
 use crate::s3::Storage;
 use crate::consts::{self, PING_INTERVAL};
 use serde_json::json;
@@ -19,12 +19,11 @@ use serde_json::json;
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct StoreNotifEvent{
-    pub message: ProduceNotif
+    pub message: NotifData
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NotifInfo{
-    pub notif_receiver: ReceiverInfo,
     pub notif_data: NotifData,
 }
 
@@ -76,8 +75,6 @@ impl NotifMutatorActor{
         // add a single notif data into db 
         // ...
 
-
-
     }
 
     pub async fn delete(&mut self, notif_id: i32){
@@ -98,7 +95,7 @@ impl Handler<StoreNotifEvent> for NotifMutatorActor{
     fn handle(&mut self, msg: StoreNotifEvent, ctx: &mut Self::Context) -> Self::Result {
 
         let this_address = ctx.address();
-        
+
         // unpacking the consumed data
         let StoreNotifEvent { 
                 message,
@@ -108,8 +105,7 @@ impl Handler<StoreNotifEvent> for NotifMutatorActor{
         
         tokio::spawn(async move{
             this.store(NotifInfo{
-                notif_receiver: message.clone().notif_receiver,
-                notif_data: message.clone().notif_data
+                notif_data: message.clone()
             }).await;
         });
         

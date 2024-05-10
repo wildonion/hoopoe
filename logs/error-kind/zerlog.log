@@ -12,3 +12,7 @@ code: 65535 | message: Response was of incompatible type - TypeError: "Response 
  | time: 1715202822445 | method name: NotifConsumerActor.redis_get
 code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
  | time: 1715258406940 | method name: NotifConsumerActor.queue_bind
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715336508788 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715336703535 | method name: NotifConsumerActor.redis_get

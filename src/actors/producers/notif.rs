@@ -22,7 +22,7 @@ use super::zerlog::ZerLogProducerActor;
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
 #[rtype(result = "()")]
 pub struct ProduceNotif{
-    pub notif_receiver: ReceiverInfo,
+    pub local_spawn: bool,
     pub notif_data: NotifData,
     pub exchange_name: String,
     pub exchange_type: String,
@@ -234,17 +234,28 @@ impl Handler<ProduceNotif> for NotifProducerActor{
                 exchange_name,
                 exchange_type,
                 routing_key,
-                .. // notif_receiver and notif_data
+                local_spawn,
+                notif_data,
             } = msg.clone();
         
-        let stringified_data = serde_json::to_string_pretty(&msg).unwrap();
-        
+        let stringified_data = serde_json::to_string_pretty(&notif_data).unwrap();
         let this = self.clone();
-        tokio::spawn(async move{
-            this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
-        });
+
+        // spawn the future in the background into the give actor context
+        if local_spawn{
+            async move{
+                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
+            }
+            .into_actor(self)
+            .spawn(ctx);
+        } else{ // spawn the future in the background into the tokio lightweight thread
+            tokio::spawn(async move{
+                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
+            });
+        }
         
         return;
+        
     }
 
 }

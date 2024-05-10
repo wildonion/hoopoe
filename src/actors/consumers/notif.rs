@@ -42,6 +42,7 @@ pub struct ConsumeNotif{
     pub routing_key: String,
     pub tag: String,
     pub redis_cache_exp: u64,
+    pub local_spawn: bool
 }
 
 #[derive(Clone)]
@@ -61,6 +62,7 @@ impl Actor for NotifConsumerActor{
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
             let this = actor.clone();
+            let address = ctx.address();
 
             tokio::spawn(async move{
 
@@ -135,7 +137,9 @@ impl NotifConsumerActor{
                             which is the same as the queue name, the direct exchange is "" and 
                             rmq doesn't allow to bind any queue to that manually
                         */
-                        if exchange != ""{ // it's either fanout, topic or headers
+                        // it's either fanout, topic or headers, we need to bind the queue 
+                        // since the way of consuming messages wouldn't be direct
+                        if exchange != ""{ 
                             match chan
                                 .queue_bind(q.name().as_str(), &exchange, &routing_key, 
                                     QueueBindOptions::default(), FieldTable::default()
@@ -198,7 +202,7 @@ impl NotifConsumerActor{
                                                         let buffer = delv.data;
                                                         let data = std::str::from_utf8(&buffer).unwrap();
                                                         
-                                                        let get_notif_event = serde_json::from_str::<ProduceNotif>(&data);
+                                                        let get_notif_event = serde_json::from_str::<NotifData>(&data);
                                                         match get_notif_event{
                                                             Ok(notif_event) => {
 
@@ -206,18 +210,18 @@ impl NotifConsumerActor{
                                                                 match redis_pool.get().await{
                                                                     Ok(mut redis_conn) => {
 
-                                                                        // -ˋˏ✄┈┈┈┈ notif pattern in reids
-                                                                        // key  : String::from(notif_event.notif_receiver.id)
+                                                                        // key  : String::from(notif_receiver.id)
                                                                         // value: Vec<NotifData>
-                                                                        let redis_notif_key = format!("notif_owner:{}", notif_event.notif_receiver.id);
-
+                                                                        let redis_notif_key = format!("notif_owner:{}", serde_json::to_string(&notif_event.receiver_info).unwrap());
+                                                                        
+                                                                        // -ˋˏ✄┈┈┈┈ extend notifs
                                                                         let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
                                                                         let events = match get_events{
                                                                             Ok(events_string) => {
                                                                                 let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
                                                                                 match get_messages{
                                                                                     Ok(mut messages) => {
-                                                                                        messages.push(notif_event.notif_data.clone());
+                                                                                        messages.push(notif_event.clone());
                                                                                         messages
                                                                                     },
                                                                                     Err(e) => {
@@ -254,7 +258,7 @@ impl NotifConsumerActor{
                                                                                 // or the key is expired already, we'll create a new key either way and put
                                                                                 // the init message in there.
                                                                                 let init_message = vec![
-                                                                                    notif_event.notif_data.clone()
+                                                                                    notif_event.clone()
                                                                                 ];
 
                                                                                 init_message
@@ -281,7 +285,7 @@ impl NotifConsumerActor{
                                                                             let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
                                                                         }
 
-                                                                        // -ˋˏ✄┈┈┈┈ storing the notif event into db
+                                                                        // -ˋˏ✄┈┈┈┈ store notif in db 
                                                                         // sending StoreNotifEvent message to the notif event mutator actor
                                                                         // spawning the async task of storing data in db in the background
                                                                         tokio::spawn(
@@ -448,14 +452,26 @@ impl Handler<ConsumeNotif> for NotifConsumerActor{
                 exchange_name,
                 routing_key,
                 redis_cache_exp,
+                local_spawn
             } = msg.clone(); // the unpacking pattern is always matched so if let ... is useless
         
         let this = self.clone();
-        tokio::spawn(async move{
-            this.consume(redis_cache_exp, &tag, &queue, &routing_key, &exchange_name).await;
-        });
         
+        // spawn the future in the background into the give actor context
+        if local_spawn{
+            async move{
+                this.consume(redis_cache_exp, &tag, &queue, &routing_key, &exchange_name).await;
+            }
+            .into_actor(self)
+            .spawn(ctx);
+        } else{ // spawn the future in the background into the tokio lightweight thread
+            tokio::spawn(async move{
+                this.consume(redis_cache_exp, &tag, &queue, &routing_key, &exchange_name).await;
+            });
+        }
+
         return; // cancel streaming over consumer and terminate the caller
+
     }
 
 }

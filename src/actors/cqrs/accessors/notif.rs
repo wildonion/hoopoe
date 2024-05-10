@@ -23,6 +23,11 @@ use crate::consts;
 #[rtype(result = "ResponseNotifData")]
 pub struct RequestNotifData{}
 
+/*
+    future types as separate objects must be pinned into the ram 
+    to break their cycle of self-ref types and add some indirection
+    so the return type would be: Box::pin(async move{});
+*/
 #[derive(MessageResponse)]
 pub struct ResponseNotifData(pub std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<NotifData>>> + Send + Sync + 'static>>);
 
@@ -91,7 +96,7 @@ impl Handler<RequestNotifData> for NotifAccessorActor{
         // we need to be inside an async context, that's why we're returning an async
         // object from the method. async objects are future objects they're self-ref types 
         // they need to be pinned into the ram to break the cycle in them and returning
-        // future objects must be in form of Box::pin(async move{})
+        // future objects must be in form of Box::pin(async move{});
         ResponseNotifData(
             Box::pin(
                 async move{

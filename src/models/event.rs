@@ -41,7 +41,7 @@ pub struct ActionerInfo{
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub enum ActionType{ // all the action type that causes the notif to get fired
     #[default]
-    ProductPurchased,
+    ProductPurchased, // or minted
     Zerlog,
     EventCreated,
     EventExpired,
@@ -53,9 +53,10 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct NotifData{
     pub id: String,
-    pub action_data: Option<serde_json::Value>, // any data
-    pub actioner_info: Option<ActionerInfo>, // json stringified identifer
-    pub action_type: ActionType, // type event
+    pub receiver_info: Option<serde_json::Value>,
+    pub action_data: Option<serde_json::Value>,
+    pub actioner_info: Option<serde_json::Value>,
+    pub action_type: ActionType,
     pub fired_at: Option<i64>, 
     pub is_seen: bool,
 }

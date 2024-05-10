@@ -21,7 +21,6 @@ use crate::models::event::*;
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
 #[rtype(result = "()")]
 pub struct ProduceNotif{
-    pub notif_receiver: ReceiverInfo,
     pub notif_data: NotifData,
     pub exchange_name: String,
     pub exchange_type: String,

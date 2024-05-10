@@ -47,7 +47,9 @@ pub(self) async fn get_notif(
         RequestNotifData{}
     ).await
     {
-        Ok(notifs) => {
+        Ok(get_notifs) => {
+            
+            let notifs = get_notifs.0.await;
             
             todo!()
 
