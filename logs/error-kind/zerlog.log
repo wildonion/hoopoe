@@ -16,3 +16,71 @@ code: 65535 | message: Response was of incompatible type - TypeError: "Response 
  | time: 1715336508788 | method name: NotifConsumerActor.redis_get
 code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
  | time: 1715336703535 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067942 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067951 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067958 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067965 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067972 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067980 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067986 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413067991 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413068006 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413068015 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413068024 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413068031 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: invalid type: integer `1714316645`, expected a formatted date and time string | due to: Redis, RMQ or Seaorm Error
+ | time: 1715413068037 | method name: notif_active_model.set_from_json
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633357 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633399 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633415 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633433 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633445 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633453 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633459 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633465 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633484 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633534 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633574 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633593 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633602 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633613 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633620 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633645 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633662 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633677 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: trailing input | due to: Redis, RMQ or Seaorm Error
+ | time: 1715418633696 | method name: notif_active_model.set_from_json
+code: 65535 | message: protocol error: AMQP hard error: CONNECTION-FORCED: CONNECTION_FORCED - broker forced connection closure with reason 'shutdown' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715452894696 | method name: NotifConsumerActor.consume_getting_delivery
+code: 65535 | message: Error occurred while creating a new object: IO error: connection aborted | due to: Redis, RMQ or Seaorm Error
+ | time: 1715452894725 | method name: ZerLogProducerActor.produce_pool

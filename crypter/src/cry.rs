@@ -17,8 +17,7 @@ pub fn gen_random_chars(size: u32) -> String{
     }).collect()
 }
 
-pub fn get_random_elem<T: Clone>(vec: Vec<T>) -> T{
-    
+pub fn get_random_elem<T: Clone + Send + Sync>(vec: Vec<T>) -> T{
     // making a high entropy seed to create the rng
     let random_chars = gen_random_chars(10);
     let hash_of_random_chars = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
@@ -29,17 +28,19 @@ pub fn get_random_elem<T: Clone>(vec: Vec<T>) -> T{
     // it but costs a bit more at runtime, hence the generic must impls
     // the Clone trait! tha't why i've bound the T to Clone
     let random_elem = vec.choose(&mut crypto_seeded_rng).unwrap().to_owned();
-    random_elem
+    random_elem 
 }
 
 /*  -------------------------------------------------------------------------
-    0 - generate ed25519 wallet and AES256 secure cell config and share between trusted parties
-    1 - encrypt data using AES256
-    2 - sign AES256 hash of data using pvkey
-    3 - send the AES256 hash of signatre to client
-    4 - use the secure cell config to decrypt the signature
-    5 - use signature, pubkey and AES256 hash of data to verify the signature
-    6 - if the sig is valid then the connection between parties is now secured
+    how 2 make a secure connection between clients and server?
+        0 - generate ed25519 wallet and AES256 secure cell config and share between trusted parties
+        1 - encrypt data using AES256
+        2 - sign AES256 hash of data using pvkey
+        3 - send the AES256 hash of signatre to client
+        4 - use the secure cell config to decrypt the signature
+        5 - use signature, pubkey and AES256 hash of data to verify the signature
+        6 - if the sig is valid then the connection between parties is now secured
+        7 - they can now transfer data between each other
 */
 
 

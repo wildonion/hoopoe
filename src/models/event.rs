@@ -58,10 +58,10 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct NotifData{
     pub id: String,
-    pub receiver_info: Option<serde_json::Value>,
-    pub action_data: Option<serde_json::Value>,
-    pub actioner_info: Option<serde_json::Value>,
+    pub receiver_info: serde_json::Value,
+    pub action_data: serde_json::Value,
+    pub actioner_info: serde_json::Value,
     pub action_type: ActionType,
-    pub fired_at: Option<i64>, 
+    pub fired_at: i64,
     pub is_seen: bool,
 }

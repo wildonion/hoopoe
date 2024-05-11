@@ -4,7 +4,7 @@
 
 ## ᝰ.ᐟ What am i?
 
-i'm hoopoe, the social event platform.
+i'm hoopoe, the social event platform to hoop.
 
 ## Execution flow & system design?
 

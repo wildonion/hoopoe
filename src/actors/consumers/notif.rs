@@ -54,7 +54,7 @@ pub struct NotifConsumerActor{
 
 impl Actor for NotifConsumerActor{
     type Context = Context<Self>;
-
+    
     fn started(&mut self, ctx: &mut Self::Context) {
 
         log::info!("🎬 NotifConsumerActor has started, let's consume baby!");
@@ -63,9 +63,9 @@ impl Actor for NotifConsumerActor{
             
             let this = actor.clone();
             let address = ctx.address();
-
+            
             tokio::spawn(async move{
-
+                
                 // check something constantly, schedule to be executed 
                 // at a certain time in the background
                 // ...
@@ -75,6 +75,7 @@ impl Actor for NotifConsumerActor{
         });
 
     }
+
 }
 
 impl NotifConsumerActor{
@@ -297,6 +298,7 @@ impl NotifConsumerActor{
                                                                                     match cloned_mutator_actor
                                                                                         .send(StoreNotifEvent{
                                                                                             message: cloned_message,
+                                                                                            local_spawn: true
                                                                                         })
                                                                                         .await
                                                                                         {

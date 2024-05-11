@@ -151,6 +151,7 @@ impl ProductExt for Product{
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
         /*  https://github.com/wildonion/nftport-minter-service-actor
+            step0) up and run the nftport-minter-service-actor service actor
             step1) in main service: send product info to notif producer actor to send to rmq
             step2) in mint service: 
                 notif consumer actor receives the product info and starts the minting process

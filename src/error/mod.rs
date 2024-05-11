@@ -610,12 +610,12 @@ impl HoopoeErrorResponse{
             zerlog_actor.send(
                 ProduceNotif{
                     notif_data: NotifData{ 
-                        receiver_info: Some(serde_json::to_value(&ReceiverInfo{ id: 0 }).unwrap()),
+                        receiver_info: serde_json::to_value(&ReceiverInfo{ id: 0 }).unwrap(),
                         id: uuid::Uuid::new_v4().to_string(), 
-                        action_data: Some(action_data), 
-                        actioner_info: Some(serde_json::to_value(&ActionerInfo{ id: 0 }).unwrap()), 
+                        action_data: action_data, 
+                        actioner_info: serde_json::to_value(&ActionerInfo{ id: 0 }).unwrap(), 
                         action_type: ActionType::Zerlog, 
-                        fired_at: Some(chrono::Local::now().timestamp()), 
+                        fired_at: chrono::Local::now().timestamp(), 
                         is_seen: false 
                     },
                     exchange_name: "ZerlogExchange".to_string(),

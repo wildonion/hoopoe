@@ -15,7 +15,8 @@ use serde_json::json;
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct StoreHoopEvent{
-    pub hoop: HoopEvent
+    pub hoop: HoopEvent,
+    pub local_spawn: bool
 }
 
 
@@ -179,12 +180,22 @@ impl Handler<StoreHoopEvent> for HoopMutatorActor{
         // unpacking the consumed data
         let StoreHoopEvent { 
                 hoop,
+                local_spawn
             } = msg.clone(); // the unpacking pattern is always matched so if let ... is useless
         
         let mut this = self.clone();
-        tokio::spawn(async move{
-            this.store(hoop.clone()).await;
-        });
+
+        if local_spawn{
+            async move{
+                this.store(hoop.clone()).await;
+            }
+            .into_actor(self)
+            .spawn(ctx);
+        } else{
+            tokio::spawn(async move{
+                this.store(hoop.clone()).await;
+            });
+        }
         
         return;
     }
