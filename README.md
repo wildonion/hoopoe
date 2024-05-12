@@ -8,6 +8,7 @@ i'm hoopoe, the social event platform to hoop!
 
 ## Execution flow & system design?
 
+> [!TIP]
 > any notification coming from different components or other service actor workers must be done accroding to the following steps:
 
 - **step0)** a register notif api call can be written to register either a producer or a consumer in the bakcground.
@@ -81,6 +82,7 @@ i'm hoopoe, the social event platform to hoop!
 
 ## How 2 setup, develop, and deploy?
 
+> [!NOTE]
 > if you want to deploy as a publisher or producer service then get your hands dirty by developing the `apis/http`, `actors/producers`, as a subscriber or consumer however, develop the `apis/http`, `actors/consumers` folders.
 
 ### Dev env
@@ -168,10 +170,12 @@ cargo run --bin hooper -- --help
 
 ### 🚀 Prod env (the CI/CD approach):
 
-make sure you've opened all necessary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages as well! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script will create ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container. for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
+> [!IMPORTANT]
+> make sure you've opened all necessary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages as well! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script will create ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container. for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
 
 #### 🚨 me before you!
 
+> [!CAUTION]
 > make sure you've done following configurations properly before pushing to your repo:
 
 - **step0)** create database with the same name inside the `.env` file on the VPS using command.
