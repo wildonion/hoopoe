@@ -4,11 +4,13 @@
 
 ## ᝰ.ᐟ What am i?
 
-i'm hoopoe, the social event platform to hoop.
+i'm hoopoe, the social event platform to hoop!
 
 ## Execution flow & system design?
 
 > any notification coming from different components or other service actor workers must be done accroding to the following steps:
+
+- **step0)** a register notif api call can be written to register either a producer or a consumer in the bakcground.
 
 - **step1)** producer sends `NotifData` to exchange.
 
@@ -18,7 +20,7 @@ i'm hoopoe, the social event platform to hoop.
 
 - **step4)** client invokes `/notif/get/owner/` api to get its notification during the app execution in a short polling manner.
 
-```bash
+```
 
    ------------------ server1/node1 actor -----------------                                         ___________
   |                                                        |                   ____________________|           |
@@ -59,7 +61,7 @@ i'm hoopoe, the social event platform to hoop.
 🥛 HOOPOE WEBSOCKET STREAMING HTTP ROUTE   ==> https://event.api.hoopoe.app/stream
 🥛 HOOPOE WEBSOCKET STREAMING WS ROUTE     ==> wss://event.api.hoopoe.app/stream
 🛤️ HOOPOE HTTP APIs                        ==> https://api.hoopoe.app/
-🛤️ HOOPOE gRPC APIs                        ==> https://grpc.api.hoopoe.app/
+🛤️ HOOPOE gRPC APIs                        ==> grpcs://grpc.api.hoopoe.app/
 🛢️ HOOPOE ADMINER                          ==> https://adminer.hoopoe.app
 👨🏻‍💻 HOOPOE DBEAVER                          ==> https://dbeaver.hoopoe.app
 ⛵ HOOPOE PRTAINER                         ==> https://portainer.hoopoe.app
@@ -172,34 +174,40 @@ make sure you've opened all necessary domains inside your DNS panel per each ngi
 
 > make sure you've done following configurations properly before pushing to your repo:
 
-- **step0)** generate new ssl dh params for nginx using `openssl dhparam -out infra/docker/nginx/ssl-dhparams.pem 4096` command.
+- **step0)** create database with the same name inside the `.env` file on the VPS using command.
 
-- **step1)** setup ssl certs using `renew.sh` script and nginx config files per each domain and subdomain then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github** cause there is already an nginx container inside the `docker-compose.yml` needs its files to be there to move them into the container on every push! 
+- **step1)** generate new ssl dh params for nginx using `openssl dhparam -out infra/docker/nginx/ssl-dhparams.pem 4096` command.
 
-- **step2)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achieve this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for them by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `hoopoe@1234`.
+- **step2)** setup ssl certs using `renew.sh` script and nginx config files per each domain and subdomain then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github** cause there is already an nginx container inside the `docker-compose.yml` needs its files to be there to move them into the container on every push! 
 
-- **step3)** run `sudo rm .env && sudo mv .env.prod .env` then update necessary variables inside `.env` file.
+- **step3)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achieve this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for them by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `hoopoe@1234`.
 
-- **step4)** connect your device to github for workflow actions using `gh auth login -s workflow`, this allows you to push to the repo.
+- **step4)** run `sudo rm .env && sudo mv .env.prod .env` then update necessary variables inside `.env` file.
 
-- **step5)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository.
+- **step5)** connect your device to github for workflow actions using `gh auth login -s workflow`, this allows you to push to the repo.
 
-- **step6)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
+- **step6)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository.
 
-- **step7)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
+- **step7)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step8)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+- **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
+
+- **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
 > **current hub registry is set to `docker.youwho.club`.**
 
 #### ☕ What's happening inside the `cicd.yml` file?
 
-- **step1)** read the codes inside the repository to find the `docker-compose.yml` file.
+- **step1)** it reads the codes inside the repository to find the `docker-compose.yml` file.
 
-- **step1)** try to login (docker username and password) to your custom docker hub (the registry on your VPS secured with nginx auth gaurd).
+- **step1)** tries to login (docker username and password) to your custom docker hub (the registry on your VPS secured with nginx auth gaurd).
 
-- **step2)** build all docker container images inside your `docker-compose.yml` file.
+- **step2)** builda all docker container images inside your `docker-compose.yml` file.
 
-- **step3)** eventually it push them to your custom docker hub registry.
+- **step3)** eventually it pushes them to your custom docker hub registry.
 
-- **step4)** ssh to the VPS and cd to where you've put the `docker-compose.yml` file in there then pull and up all pushed docker containers from the VPS hub inside the VPS.
+- **step4)** does ssh to the VPS and cd to where you've put the `docker-compose.yml` file in there then pull and up all pushed docker containers from the VPS hub inside the VPS.
+
+#### last but not least!
+
+use postman to check the server health and register notif producer and consumer.
