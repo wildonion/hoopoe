@@ -28,8 +28,8 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(Notifs::Receiver)
-                            .json()
+                        ColumnDef::new(Notifs::ReceiverInfo)
+                            .string()
                             .not_null()
                     )
                     .col(
@@ -44,7 +44,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(Notifs::ActionerInfo)
-                            .json()
+                            .string()
                             .not_null()
                     )
                     .col(
@@ -84,7 +84,7 @@ impl MigrationTrait for Migration {
 enum Notifs {
     Table,
     Id,
-    Receiver,
+    ReceiverInfo,
     Nid,
     ActionData,
     ActionerInfo,

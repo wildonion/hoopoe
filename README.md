@@ -12,9 +12,9 @@ i'm hoopoe, the social event platform to hoop!
 
 - **step0)** a register notif api call can be written to register either a producer or a consumer in the bakcground.
 
-- **step1)** producer sends `NotifData` to exchange.
+- **step1)** producer service actor sends `NotifData` to exchange.
 
-- **step2)** consumer receives `NotifData` from its queue bounded to the exchange.
+- **step2)** consumer service actor receives `NotifData` from its queue bounded to the exchange.
 
 - **step3)** instance of `NotifData` is cached on redis and stored in db.
 

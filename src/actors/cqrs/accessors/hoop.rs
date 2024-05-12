@@ -8,7 +8,7 @@ use chrono::{DateTime, FixedOffset};
 use deadpool_redis::{Connection, Manager, Pool};
 use redis::{AsyncCommands, Commands};
 use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Statement, Value};
-use crate::actors::consumers;
+use crate::actors::{consumers, producers::zerlog::ZerLogProducerActor};
 use crate::types::RedisPoolConnection;
 use crate::s3::Storage;
 use crate::consts::PING_INTERVAL;
@@ -20,6 +20,7 @@ use crate::consts;
 #[derive(Clone)]
 pub struct HoopAccessorActor{
     pub app_storage: std::option::Option<Arc<Storage>>,
+    pub zerlog_producer_actor: Addr<ZerLogProducerActor>
 }
 
 impl Actor for HoopAccessorActor{
@@ -50,8 +51,8 @@ impl Actor for HoopAccessorActor{
 
 impl HoopAccessorActor{
 
-    pub fn new(app_storage: std::option::Option<Arc<Storage>>) -> Self{
-        Self { app_storage }
+    pub fn new(app_storage: std::option::Option<Arc<Storage>>, zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
+        Self { app_storage, zerlog_producer_actor }
     }
 
     pub async fn fetch(&self){

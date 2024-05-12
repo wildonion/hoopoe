@@ -11,6 +11,7 @@ use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::entities::hoops;
 use crate::actors::producers::notif::ProduceNotif;
 use crate::models::event::NotifData;
+use crate::plugins::passport;
 use crate::s3::Storage;
 use crate::consts::{self, PING_INTERVAL};
 use serde_json::json;
@@ -79,7 +80,7 @@ impl NotifMutatorActor{
         let mut new_notif: notifs::ActiveModel = Default::default();
         let _ = match new_notif.set_from_json(json!(
             {
-                "receiver": notif_data.receiver_info,
+                "receiver_info": notif_data.receiver_info,
                 "nid": notif_data.id,
                 "action_data": notif_data.action_data,
                 "actioner_info": notif_data.actioner_info,
@@ -162,6 +163,17 @@ impl NotifMutatorActor{
             }
         }
 
+    }
+
+    pub async fn update(&mut self, notif_id: i32){
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let redis_pool = storage.get_redis_pool().await.unwrap();
+
+        // probably true the is_seen flag
+        // ...
+        
     }
 
     pub async fn delete(&mut self, notif_id: i32){

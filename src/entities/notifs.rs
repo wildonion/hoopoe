@@ -9,10 +9,10 @@ pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
-    pub receiver: Json,
+    pub receiver_info: String,
     pub nid: String,
     pub action_data: Json,
-    pub actioner_info: Json,
+    pub actioner_info: String,
     pub action_type: String,
     pub fired_at: DateTime,
     pub is_seen: bool,

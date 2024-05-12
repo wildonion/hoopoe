@@ -10,7 +10,7 @@ pub use super::*;
         or start consuming in the background, look at the postman
         collection for more details.
 */
-#[post("/register")]
+#[post("/notif/register")]
 pub(self) async fn register_notif(
     req: HttpRequest,
     register_notif: web::Json<models::event::RegisterNotif>,

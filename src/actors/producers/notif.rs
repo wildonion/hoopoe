@@ -22,7 +22,7 @@ use super::zerlog::ZerLogProducerActor;
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
 #[rtype(result = "()")]
 pub struct ProduceNotif{
-    pub local_spawn: bool,
+    pub local_spawn: bool, // either spawn in actor context or tokio threadpool
     pub notif_data: NotifData,
     pub exchange_name: String,
     pub exchange_type: String,
@@ -121,6 +121,7 @@ impl NotifProducerActor{
 
                                 };
 
+                            // publish in the background in a free thread
                             tokio::spawn(async move{
 
                                 // -ˋˏ✄┈┈┈┈ publishing to exchange from this channel,
@@ -156,10 +157,6 @@ impl NotifProducerActor{
 
                                                 return;
                                             };
-
-                                            if confirmation.is_ack(){
-                                                log::info!("publisher sent data");
-                                            }
 
                                         },
                                         Err(e) => {

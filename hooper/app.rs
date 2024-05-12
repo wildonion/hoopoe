@@ -193,6 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     let fresh = args.fresh;
     if fresh{
         Migrator::fresh(&connection).await.unwrap();
+        Migrator::refresh(&connection).await.unwrap();
     } else{
         Migrator::up(&connection, None).await.unwrap(); // executing database tasks like creating tables on startup
     }

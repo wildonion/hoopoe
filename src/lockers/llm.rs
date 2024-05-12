@@ -210,6 +210,11 @@ impl ProductExt for Product{
     arc mutex type however can be mutated across all scopes and threads in the app safely 
     without using channels. in the context of http routers we can use Data<Arc<Mutex<
     to share data between routers' threads safely
+
+    step1) first acquire the lock inside tokio::spawn to avoid blocking 
+    step2) second check the id is already inside the lock_ids or not 
+    step3) if it's in there then we must reject the request
+    step4) otherwise we can proceed to minting process
 */
 pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
 
@@ -252,9 +257,9 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
             async move{
                 let mut write_lock = lock_ids.lock().await;
                 if (*write_lock).contains(&pid){
-                    log::info!("rejecting client request another one is minting it!");
+                    log::info!("rejecting client request, the id is being minted!");
                     // reject the request since the product is being minted
-                    tx.send(true).await;
+                    tx.send(true).await; // sending the true flag as rejecting the request
                 } else{
                     (*write_lock).push(pid); // save the id for later readers to reject their request during the minting process
                 }
@@ -328,13 +333,12 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
     */
     tokio::select! {
         // if this branch is selected means the product minting
-        // process is not finished or not started to mint yet
-        Some(flag) = rx.recv() => {
-            if flag{
-                return (true, preceiver); // product is being minted
-            } else{
-                return (false, preceiver); // no one is minting the product
-            }
+        // process is not finished or not started to mint yet,
+        // if we receive something from the channel we know 100 percent 
+        // it's a true flag or a rejecting flag cause we're only sending 
+        // true flag to the channel.
+        _ = rx.recv() => {
+            return (true, preceiver); // product is being minted
         },
         // if this branch is selected means the product is inside 
         // the minting process and we should release the lock after

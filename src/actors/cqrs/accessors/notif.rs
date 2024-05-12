@@ -1,28 +1,46 @@
 
 
 
+use std::error::Error;
+use std::net;
 use std::str::FromStr;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context, Handler};
+use actix_web::ResponseError;
 use chrono::{DateTime, FixedOffset};
+use consts::STORAGE_IO_ERROR_CODE;
 use deadpool_redis::{Connection, Manager, Pool};
 use redis::{AsyncCommands, Commands};
-use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Statement, Value};
+use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, Value};
+use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::{actors::consumers, models::event::NotifData};
 use crate::types::RedisPoolConnection;
 use crate::s3::Storage;
 use crate::consts::PING_INTERVAL;
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
-use crate::consts;
-
-
+use crate::{consts, entities};
+use crate::entities::notifs::{
+    self, Model as NotifModel, Column as NotifColumn,
+    ActiveModel as NotifActiveModel, 
+    Entity as NotifEntity
+}; // import notif itself and the Entity model
 
 
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "ResponseNotifData")]
 pub struct RequestNotifData{
-    pub owner: Option<String>
+    pub owner: Option<String>,
+    pub page_size: Option<u64>,
+}
+
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct NotifDataResponse{
+    pub notifs: Vec<notifs::Model>,
+    pub items: u64,
+    pub pages: u64, 
+    pub current_page: u64
 }
 
 /*
@@ -31,11 +49,12 @@ pub struct RequestNotifData{
     so the return type would be: Box::pin(async move{});
 */
 #[derive(MessageResponse)]
-pub struct ResponseNotifData(pub std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<NotifData>>> + Send + Sync + 'static>>);
+pub struct ResponseNotifData(pub std::pin::Pin<Box<dyn std::future::Future<Output = Option<Option<NotifDataResponse>>> + Send + Sync + 'static>>);
 
 #[derive(Clone)]
 pub struct NotifAccessorActor{
     pub app_storage: std::option::Option<Arc<Storage>>,
+    pub zerlog_producer_actor: Addr<ZerLogProducerActor>
 }
 
 impl Actor for NotifAccessorActor{
@@ -64,18 +83,86 @@ impl Actor for NotifAccessorActor{
 
 impl NotifAccessorActor{
 
-    pub fn new(app_storage: std::option::Option<Arc<Storage>>) -> Self{
-        Self { app_storage }
+    pub fn new(app_storage: std::option::Option<Arc<Storage>>, zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
+        Self { app_storage, zerlog_producer_actor }
     }
 
     
-    pub async fn get(&self, report_info: RequestNotifData) -> Vec<NotifData>{
+    pub async fn get(&self, report_info: RequestNotifData) -> Option<NotifDataResponse>{
 
-        // get notifs for the passed in owner
-        // ...
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let redis_pool = storage.get_redis_pool().await.unwrap();
+        let zerlog_producer_actor = self.clone().zerlog_producer_actor;
 
-        vec![NotifData::default()]
-        
+        let page_size = report_info.page_size.unwrap_or(10);
+        let owner = report_info.owner.unwrap_or_default();
+
+        let mut notifs = NotifEntity::find()
+            .filter(NotifColumn::ReceiverInfo.contains(&owner))
+            .order_by_desc(NotifColumn::FiredAt)
+            .paginate(db, page_size);
+
+        let items_pages = match notifs.num_items_and_pages().await{
+            Ok(itpg) => itpg,
+            Err(e) => {
+                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                let err_instance = crate::error::HoopoeErrorResponse::new(
+                    *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                    crate::error::ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // the actual source of the error caused at runtime
+                    &String::from("NotifAccessorActor.get.num_items_and_pages"), // current method name
+                    Some(&zerlog_producer_actor)
+                ).await;
+                return None;
+            }
+        };
+
+        let mut notif_data = vec![];
+        while let Some(notifs) = notifs.fetch_and_next().await.unwrap(){
+            notif_data = notifs;
+        }
+
+        match redis_pool.get().await{
+            Ok(mut redis_conn) => {
+
+                let resp = Some(
+                    NotifDataResponse{
+                        notifs: notif_data,
+                        items: items_pages.number_of_items,
+                        pages: items_pages.number_of_pages,
+                        current_page: notifs.cur_page()
+                    }
+                );
+
+                let redis_notif_key = format!("notif_owner_api_resp:{}", &owner);
+                let is_key_there: bool = redis_conn.exists(&redis_notif_key).await.unwrap();
+                if is_key_there{
+                    let _: () = redis_conn.set(redis_notif_key, serde_json::to_string(&resp).unwrap()).await.unwrap();
+                } else{
+                    let _: () = redis_conn.set_ex(
+                        redis_notif_key, 
+                        serde_json::to_string(&resp).unwrap(), 
+                        std::env::var("REDIS_SESSION_EXP_KEY").unwrap().parse::<u64>().unwrap()
+                    ).await.unwrap();
+                }
+
+                resp
+
+            },
+            Err(e) => {
+                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                let err_instance = crate::error::HoopoeErrorResponse::new(
+                    *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                    crate::error::ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // the actual source of the error caused at runtime
+                    &String::from("get_notif.redis_pool"), // current method name
+                    Some(&zerlog_producer_actor)
+                ).await;
+                return None;
+            }
+        }
+
     }
     
 }
@@ -93,7 +180,7 @@ impl Handler<RequestNotifData> for NotifAccessorActor{
         } = msg.clone();
 
         let this = self.clone();
-        
+
         // since we need to use async channels to get the resp of this.get() method
         // we need to be inside an async context, that's why we're returning an async
         // object from the method. async objects are future objects they're self-ref types 
@@ -103,7 +190,7 @@ impl Handler<RequestNotifData> for NotifAccessorActor{
             Box::pin(
                 async move{
                     let (tx, mut rx) 
-                        = tokio::sync::mpsc::channel::<Vec<NotifData>>(1024);
+                        = tokio::sync::mpsc::channel::<Option<NotifDataResponse>>(1024);
                     tokio::spawn(async move{
                         let notfis = this.get(msg).await;
                         tx.send(notfis).await;

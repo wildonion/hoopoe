@@ -19,4 +19,3 @@ use crate::cookie::Cookie;
 
 pub mod get;
 pub mod set;
-pub mod update;

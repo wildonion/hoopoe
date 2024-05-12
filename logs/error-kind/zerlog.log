@@ -84,3 +84,25 @@ code: 65535 | message: protocol error: AMQP hard error: CONNECTION-FORCED: CONNE
  | time: 1715452894696 | method name: NotifConsumerActor.consume_getting_delivery
 code: 65535 | message: Error occurred while creating a new object: IO error: connection aborted | due to: Redis, RMQ or Seaorm Error
  | time: 1715452894725 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: Response was of incompatible type - TypeError: "Response type not string compatible." (response was nil) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523747276 | method name: NotifConsumerActor.redis_get
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523747316 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523748124 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523748642 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523749028 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523750119 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523750518 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523751024 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523751325 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523752444 | method name: notif_active_model.set_from_json
+code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
+ | time: 1715523824590 | method name: notif_active_model.set_from_json

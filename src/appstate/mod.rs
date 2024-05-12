@@ -1,6 +1,8 @@
 
 use std::collections::HashMap;
 use actix::{Actor, Addr};
+use crate::actors::cqrs::accessors::hoop::HoopAccessorActor;
+use crate::actors::cqrs::mutators::hoop::HoopMutatorActor;
 use crate::actors::cqrs::mutators::notif::NotifMutatorActor;
 use crate::actors::cqrs::accessors::notif::NotifAccessorActor;
 use crate::config::{Env as ConfigEnv, Context};
@@ -35,11 +37,13 @@ pub struct ProducerActors{
 #[derive(Clone)]
 pub struct MutatorActors{
     pub notif_mutator_actor: Addr<NotifMutatorActor>,
+    pub hoop_mutator_actor: Addr<HoopMutatorActor>,
 }
 
 #[derive(Clone)]
 pub struct AccessorActors{
     pub notif_accessor_actor: Addr<NotifAccessorActor>,
+    pub hoop_accessor_actor: Addr<HoopAccessorActor>
 }
 
 #[derive(Clone)]
@@ -94,11 +98,15 @@ impl AppState{
         */
         let hoop_ws_server_instance = HoopServer::new(app_storage.clone()).start();
         let zerlog_producer_actor = ZerLogProducerActor::new(app_storage.clone()).start();
+        
         let notif_producer_actor = NotifProducerActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_mutator_actor = NotifMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone()).start();
+        let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_consumer_actor = NotifConsumerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone()).start();
         
+        let hoop_mutator_actor = HoopMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+        let hoop_accessor_actor = HoopAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+
         let actor_instances = ActorInstaces{
             consumer_actors: ConsumerActors{
                 notif_actor: notif_consumer_actor.clone()
@@ -112,10 +120,12 @@ impl AppState{
             },
             cqrs_actors: CqrsActors{
                 mutators: MutatorActors{
-                    notif_mutator_actor: notif_mutator_actor.clone()
+                    notif_mutator_actor: notif_mutator_actor.clone(),
+                    hoop_mutator_actor: hoop_mutator_actor.clone()
                 },
                 accessors: AccessorActors{
-                    notif_accessor_actor: notif_accessor_actor.clone()
+                    notif_accessor_actor: notif_accessor_actor.clone(),
+                    hoop_accessor_actor: hoop_accessor_actor.clone()
                 },
             },
         };

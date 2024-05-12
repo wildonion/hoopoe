@@ -35,14 +35,34 @@ pub struct ConsumeNotif{
     pub queue: String,
     pub exchange_name: String,
     /* -ˋˏ✄┈┈┈┈ 
-        pattern for the exchange, any queue that is bounded to this exchange 
-        routing key receives the message enables the consumer to consume the 
-        message
+        routing_key in ConsumeNotif can be the same as in ProduceNotif struct
+        but also it can be different than that cause:
+        pattern for the exchange to route the messages to the bounded queue, 
+        any queue that is bounded to this exchange routing key will receive 
+        all the messages that follows the pattern inside the routing_key.
+        a message can be sent from producer to an exchange in a topic way with 
+        an sepecific routing key which tells the exchange this is the way of 
+        receiving messages that a bounded queue can does since we might have 
+        sent messages to the same exchange with multiple different routing 
+        keys per each message and for a queue that is bounded to the exchange 
+        with the passed in routing key can only receives the messages that 
+        follow the pattern in the selected routing key. so the routing key in 
+        consumer is patterns for this queue to tell exchange to what messages 
+        this queue is interested in:
+
+                                 ------> routing_key1           --------
+                                |                              | queue1 | ----
+                    -----------------> routing_key2 <-------------------      |         ---------
+  messages ------> | exchange|                                                | <----- |consumer1|
+                    -----------------> routing_key3              --------     |         ---------
+                                |                               | queue2 | ---
+                                ------> routing_key4 <-------------------
+
     */
-    pub routing_key: String,
+    pub routing_key: String, // patterns for this queue to tell exchange to what messages this queue is interested in
     pub tag: String,
     pub redis_cache_exp: u64,
-    pub local_spawn: bool
+    pub local_spawn: bool // either spawn in actor context or tokio threadpool
 }
 
 #[derive(Clone)]
@@ -88,7 +108,7 @@ impl NotifConsumerActor{
 
     pub async fn consume(&self, exp_seconds: u64,
         consumer_tag: &str, queue: &str, 
-        routing_key: &str, exchange: &str
+        binding_key: &str, exchange: &str
     ){
 
         let storage = self.app_storage.clone();
@@ -126,10 +146,10 @@ impl NotifConsumerActor{
                                 Some(&zerlog_producer_actor)
                             ).await;
 
-                            return; // cancel streaming over consumer and terminate the caller
+                            return; // terminate the caller
                         };
 
-                        // binding the queue to the exchange routing key
+                        // binding the queue to the exchange routing key to receive messages it interested in
                         /* -ˋˏ✄┈┈┈┈ 
                             if the exchange is not direct or is fanout or topic we should bind the 
                             queue to the exchange to consume the messages from the queue. binding 
@@ -138,32 +158,28 @@ impl NotifConsumerActor{
                             which is the same as the queue name, the direct exchange is "" and 
                             rmq doesn't allow to bind any queue to that manually
                         */
-                        // it's either fanout, topic or headers, we need to bind the queue 
-                        // since the way of consuming messages wouldn't be direct
-                        if exchange != ""{ 
-                            match chan
-                                .queue_bind(q.name().as_str(), &exchange, &routing_key, 
-                                    QueueBindOptions::default(), FieldTable::default()
-                                )
-                                .await
-                                {
-                                    Ok(_) => {},
-                                    Err(e) => {
-                                        use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                        let error_content = &e.to_string();
-                                        let error_content = error_content.as_bytes().to_vec();
-                                        let mut error_instance = HoopoeErrorResponse::new(
-                                            *consts::STORAGE_IO_ERROR_CODE, // error code
-                                            error_content, // error content
-                                            ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
-                                            "NotifConsumerActor.queue_bind", // method
-                                            Some(&zerlog_producer_actor)
-                                        ).await;
+                        match chan
+                            .queue_bind(q.name().as_str(), &exchange, &binding_key, 
+                                QueueBindOptions::default(), FieldTable::default()
+                            )
+                            .await
+                            { // trying to bind the queue to the exchange
+                                Ok(_) => {},
+                                Err(e) => {
+                                    use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                    let error_content = &e.to_string();
+                                    let error_content = error_content.as_bytes().to_vec();
+                                    let mut error_instance = HoopoeErrorResponse::new(
+                                        *consts::STORAGE_IO_ERROR_CODE, // error code
+                                        error_content, // error content
+                                        ErrorKind::Storage(crate::error::StorageError::Rmq(e)), // error kind
+                                        "NotifConsumerActor.queue_bind", // method
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
 
-                                        return; // cancel streaming over consumer and terminate the caller
-                                    }
+                                    return; // terminate the caller
                                 }
-                        }
+                            }
 
                         // since &str is not lived long enough to be passed to the tokio spawn
                         // if it was static it would be good however we're converting them to
@@ -213,7 +229,7 @@ impl NotifConsumerActor{
 
                                                                         // key  : String::from(notif_receiver.id)
                                                                         // value: Vec<NotifData>
-                                                                        let redis_notif_key = format!("notif_owner:{}", serde_json::to_string(&notif_event.receiver_info).unwrap());
+                                                                        let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
                                                                         
                                                                         // -ˋˏ✄┈┈┈┈ extend notifs
                                                                         let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
@@ -237,7 +253,7 @@ impl NotifConsumerActor{
                                                                                             Some(&zerlog_producer_actor)
                                                                                         ).await;
 
-                                                                                        return; // cancel streaming over consumer and terminate the caller
+                                                                                        return; // terminate the caller
                                                                                     }
                                                                                 }
                                                                 
@@ -331,7 +347,7 @@ impl NotifConsumerActor{
                                                                             "NotifConsumerActor.redis_pool", // method
                                                                             Some(&zerlog_producer_actor)
                                                                         ).await;
-                                                                        return; // cancel streaming over consumer and terminate the caller
+                                                                        return; // terminate the caller
                                                                     }
                                                                 }
 
@@ -348,7 +364,7 @@ impl NotifConsumerActor{
                                                                     Some(&zerlog_producer_actor)
                                                                 ).await;
 
-                                                                return; // cancel streaming over consumer and terminate the caller
+                                                                return; // terminate the caller
                                                             }
                                                         }
                                                     },
@@ -364,7 +380,7 @@ impl NotifConsumerActor{
                                                             Some(&zerlog_producer_actor)
                                                         ).await;
 
-                                                        return; // cancel streaming over consumer and terminate the caller
+                                                        return; // terminate the caller
                                                     }
                                                 }
                     
@@ -381,7 +397,7 @@ impl NotifConsumerActor{
                                                     Some(&zerlog_producer_actor)
                                                 ).await;
 
-                                                return; // cancel streaming over consumer and terminate the caller 
+                                                return; // terminate the caller 
                                             }
                                         }
                                     }
@@ -398,7 +414,7 @@ impl NotifConsumerActor{
                                         Some(&zerlog_producer_actor)
                                     ).await;
 
-                                    return; // cancel streaming over consumer and terminate the caller 
+                                    return; // terminate the caller 
                                 }
                             }
 
@@ -417,7 +433,7 @@ impl NotifConsumerActor{
                             Some(&zerlog_producer_actor)
                         ).await;
 
-                        return; // cancel streaming over consumer and terminate the caller   
+                        return; // terminate the caller   
                     }
                 }
 
@@ -434,7 +450,7 @@ impl NotifConsumerActor{
                     Some(&zerlog_producer_actor)
                 ).await;
 
-                return; // cancel streaming over consumer and terminate the caller
+                return; // terminate the caller
             }
         };
 
@@ -472,7 +488,7 @@ impl Handler<ConsumeNotif> for NotifConsumerActor{
             });
         }
 
-        return; // cancel streaming over consumer and terminate the caller
+        return; // terminate the caller
 
     }
 
