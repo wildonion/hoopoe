@@ -11,7 +11,7 @@ use chrono::{DateTime, FixedOffset};
 use consts::STORAGE_IO_ERROR_CODE;
 use deadpool_redis::{Connection, Manager, Pool};
 use redis::{AsyncCommands, Commands};
-use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Statement, Value};
+use sea_orm::{ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Statement, Value};
 use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::{actors::consumers, models::event::NotifData};
 use crate::types::RedisPoolConnection;
@@ -31,6 +31,8 @@ use crate::entities::notifs::{
 #[rtype(result = "ResponseNotifData")]
 pub struct RequestNotifData{
     pub owner: Option<String>,
+    pub from: Option<u64>,
+    pub to: Option<u64>,
     pub page_size: Option<u64>,
 }
 
@@ -97,10 +99,18 @@ impl NotifAccessorActor{
 
         let page_size = report_info.page_size.unwrap_or(10);
         let owner = report_info.owner.unwrap_or_default();
+        let from = report_info.from.unwrap_or(0);
+        let to = report_info.to.unwrap_or(10);
+
+        if from > to{
+            return None;
+        }
 
         let mut notifs = NotifEntity::find()
             .filter(NotifColumn::ReceiverInfo.contains(&owner))
             .order_by_desc(NotifColumn::FiredAt)
+            .limit((to - from) + 1)
+            .offset(from)
             .paginate(db, page_size);
 
         let items_pages = match notifs.num_items_and_pages().await{

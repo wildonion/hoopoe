@@ -105,7 +105,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use actix_web::web::route;
 use serde::{Deserialize, Serialize};
-use plugins::purchase::ProductExt;
+use interfaces::purchase::ProductExt;
 use crate::{consts::PURCHASE_DEMO_LOCK_MUTEX, *};
 
 

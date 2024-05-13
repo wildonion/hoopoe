@@ -64,8 +64,6 @@ impl HoopMutatorActor{
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
 
         /* -ˋˏ✄┈┈┈┈ saving using active model */
-        // https://www.sea-ql.org/SeaORM/docs/generate-entity/entity-structure/#active-model-behavior
-        // https://www.sea-ql.org/SeaORM/docs/generate-entity/entity-structure/
         let mut hoop_active_model: hoops::ActiveModel = Default::default();
         let _ = match hoop_active_model.set_from_json(
             json!({

@@ -24,5 +24,6 @@ pub fn init(config: &mut web::ServiceConfig){
     config.service(apis::http::v1::health::index::exports::test_stream);
     config.service(apis::http::v1::health::index::exports::check);
     config.service(apis::http::v1::health::index::exports::mint_demo);
+    config.service(apis::http::v1::health::auth::exports::generate_access_token);
 
 }

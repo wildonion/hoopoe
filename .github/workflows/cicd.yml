@@ -18,8 +18,8 @@ jobs:
       - name: Login to DockerHub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin docker.youwho.club
       - name: Build and Push
-        run: |
-          docker compose -f "docker-compose.yml" build
+        run: | # 1 - build services | 2 - push services to the custom registry
+          docker compose -f "docker-compose.yml" build 
           docker compose -f "docker-compose.yml" push
   pull-on-server:
     runs-on: ubuntu-latest
@@ -31,7 +31,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          script: | # for none root user the default current directory is /home
+          script: | # 1 - pull services from the custom registry (each image in dockercompose file prefixed with registry name) | 2 - up all the services
             cd /root/hoopoe
             docker compose -f "docker-compose.yml" pull
             docker compose -f "docker-compose.yml" up -d

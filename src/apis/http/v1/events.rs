@@ -12,7 +12,7 @@ use std::error::Error; // loading the Error trait allows us to call the source()
 use bytes::Buf;
 use appstate::AppState;
 use types::HoopoeHttpResponse;
-use plugins::passport::Passport;
+use interfaces::passport::Passport;
 use actix_web::http::StatusCode;
 use crate::cookie::Cookie;
 

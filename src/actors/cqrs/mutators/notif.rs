@@ -11,7 +11,7 @@ use crate::actors::producers::zerlog::ZerLogProducerActor;
 use crate::entities::hoops;
 use crate::actors::producers::notif::ProduceNotif;
 use crate::models::event::NotifData;
-use crate::plugins::passport;
+use crate::interfaces::passport;
 use crate::s3::Storage;
 use crate::consts::{self, PING_INTERVAL};
 use serde_json::json;

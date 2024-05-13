@@ -67,8 +67,8 @@ services:
       - hoopoe
 
   timescaledb:
-    container_name: timescaledb
-    image: timescale/timescaledb-ha:pg16
+    container_name: postgres
+    image: postgres
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}

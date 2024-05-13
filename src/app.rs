@@ -128,7 +128,7 @@ use migration::{Migrator, MigratorTrait};
 // like use crate::macro_name;
 
 mod actors;
-mod plugins;
+mod interfaces;
 mod s3;
 mod config;
 mod consts;

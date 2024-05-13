@@ -2,7 +2,7 @@
 
 
 /* 
-    actor worker based components:
+    app components based on actor worker:
     we have producer and consumer actors per each data streamer 
     we have mutator and accessor actors per each db model
     we have ws session and server actors per each route

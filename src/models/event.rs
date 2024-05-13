@@ -8,6 +8,8 @@ use crate::*;
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct NotifQuery{
     pub owner: Option<String>,
+    pub from: Option<u64>,
+    pub to: Option<u64>,
     pub page_size: Option<u64>,
 }
 
@@ -35,16 +37,6 @@ pub struct HoopEvent{
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ReceiverInfo{
-    pub id: i32, // a unique identity
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
-pub struct ActionerInfo{
-    pub id: i32, // a unique identity
-}
-
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub enum ActionType{ // all the action type that causes the notif to get fired
     #[default]
     ProductPurchased, // or minted
@@ -52,8 +44,6 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
     EventCreated,
     EventExpired,
     EventLocked,
-    // probably other system notifs
-    // ...
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]

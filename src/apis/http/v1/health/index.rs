@@ -14,7 +14,7 @@ use actix_web::{cookie::Cookie, http::StatusCode};
 use futures::StreamExt;
 use lockers::llm::Product;
 use log::error;
-use plugins::purchase::ProductExt; // load traits to use the methods on the object who impls the trait already!
+use interfaces::purchase::ProductExt; // load traits to use the methods on the object who impls the trait already!
 pub use super::*;
 use crate::error::*; // :: refers to all crates loaded in Cargo.toml
 

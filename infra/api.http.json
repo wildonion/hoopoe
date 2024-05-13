@@ -17,7 +17,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": { \"id\": 1 },\n                \"id\": \"unqie-id\",\n                \"action_data\": {\n                    \"pid\": 200\n                }, \n                \"actioner_info\": { \"id\": 2 }, \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"wildonionExchange\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
+							"raw": "{\n    // \"producer_info\": {\n    //     \"info\":{\n    //         \"local_spawn\": true,\n    //         \"notif_data\": { \n    //             \"receiver_info\": \"1\",\n    //             \"id\": \"unqie-id0\",\n    //             \"action_data\": {\n    //                 \"pid\": 200.4\n    //             }, \n    //             \"actioner_info\": \"2\", \n    //             \"action_type\": \"ProductPurchased\", \n    //             \"fired_at\": 1714316645, \n    //             \"is_seen\": false\n    //         }, \n    //         \"exchange_name\": \"wildonionExchange\",\n    //         \"exchange_type\": \"fanout\", // amq.topic for pubsub\n    //         \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n    //     }\n    // },\n    \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -56,7 +56,7 @@
 							}
 						},
 						"url": {
-							"raw": "{{events-v1}}/notif/get/?owner=1&page_size=10",
+							"raw": "{{events-v1}}/notif/get/?owner=1&page_size=10&from=0&to=20",
 							"host": [
 								"{{events-v1}}"
 							],
@@ -73,6 +73,14 @@
 								{
 									"key": "page_size",
 									"value": "10"
+								},
+								{
+									"key": "from",
+									"value": "0"
+								},
+								{
+									"key": "to",
+									"value": "20"
 								}
 							]
 						},
@@ -106,6 +114,37 @@
 							],
 							"path": [
 								"mint-demo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Access Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "secret_key",
+								"value": "{{secret_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pid\": 1,\n    \"is_minted\": false,\n    \"buyer_id\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{health-v1}}/generate-access-token",
+							"host": [
+								"{{health-v1}}"
+							],
+							"path": [
+								"generate-access-token"
 							]
 						}
 					},
@@ -174,6 +213,11 @@
 		{
 			"key": "health-v1",
 			"value": "http://localhost:2344/v1/health",
+			"type": "string"
+		},
+		{
+			"key": "secret_key",
+			"value": "insecure-krm2s^^bo1n*-nvy",
 			"type": "string"
 		}
 	]

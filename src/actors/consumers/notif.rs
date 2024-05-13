@@ -15,7 +15,7 @@ use async_std::stream::StreamExt;
 use deadpool_lapin::lapin::options::{BasicAckOptions, BasicConsumeOptions, QueueBindOptions, QueueDeclareOptions};
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::lapin::{message, BasicProperties};
-use crate::plugins::notif::NotifExt;
+use crate::interfaces::notif::NotifExt;
 use crate::s3::Storage;
 use crate::consts::{self, MAILBOX_CHANNEL_ERROR_CODE, PING_INTERVAL};
 use serde::{Serialize, Deserialize};

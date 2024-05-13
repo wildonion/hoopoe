@@ -10,3 +10,4 @@ use types::HoopoeHttpResponse;
 
 
 pub mod index;
+pub mod auth;

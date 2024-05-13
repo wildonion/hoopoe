@@ -11,8 +11,8 @@ use deadpool_lapin::lapin::options::{ExchangeDeclareOptions, QueueBindOptions, Q
 use deadpool_lapin::lapin::protocol::exchange;
 use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::lapin::BasicProperties;
-use plugins::*;
-use plugins::notif::NotifExt;
+use interfaces::*;
+use interfaces::notif::NotifExt;
 use std::sync::Arc;
 use crate::models::event::*;
 

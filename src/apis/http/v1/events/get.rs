@@ -12,18 +12,6 @@ pub(self) async fn get_hoop(
     app_state: web::Data<AppState>,
 ) -> HoopoeHttpResponse{
 
-    // first try to fetch data from the redis cache if the key is not expired yet
-    // otherwise try to get hoop by sending message to accessor which directly fetch from db
-    // eventually cache the response into redis with an expirable key
-    // ...
-    
-    // the order of async tasks exeuction inside tokio spawn is asyncly
-    // and completely are indepndent from each other.
-    tokio::spawn(async move{
-        // spawn async tasks to avoid blocking
-        // ...
-    });
-    
     todo!()
 
 }
@@ -40,11 +28,11 @@ pub(self) async fn get_notif(
     let notif_accessor_actor = actors.cqrs_actors.accessors.notif_accessor_actor;
     let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
     
-    
     let notif_query = notif_query.to_owned().0;
     
     match redis_pool.get().await{
         Ok(mut redis_conn) => {
+
             
             // by default every incoming notif from the producer will be cached in redis 
             // while the consumer consumes them so we first try to get owner notif from redis
@@ -71,13 +59,15 @@ pub(self) async fn get_notif(
                 match notif_accessor_actor.send(
                     RequestNotifData{
                         owner: notif_query.owner,
+                        from: notif_query.from,
+                        to: notif_query.to,
                         page_size: notif_query.page_size
                     }
                 ).await
                 {
                     Ok(get_notifs) => {
                         
-                        let notifs = get_notifs.0.await;
+                        let notifs = get_notifs.0.await; 
 
                         resp!{
                             Option<Option<NotifDataResponse>>,
@@ -91,7 +81,6 @@ pub(self) async fn get_notif(
                             StatusCode::OK,
                             None::<Cookie<'_>>,
                         }
-                        
                     },
                     Err(e) => {
                         let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object

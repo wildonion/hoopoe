@@ -70,6 +70,14 @@
     ----------------------------------------------------------------------
                     blocking and none blocking execution
 
+    when you await on acquiring the lock of the mutex the os can decide to switch to another task that's ready to run.
+    await doesn't block the current thread, awaitng allows another thread to be scheduled by the os to be run, awaiting 
+    returns a future placeholder which can be used by other parts until the actual value is resolved:
+        - The CPU doesn't waste time waiting for get_num() to complete as long as there are other tasks to run.
+        - The placeholder acts as a reminder that the final value needs to be plugged in later.
+        - while the final answer relies on the resolved value from get_num(), the CPU avoids waiting idly. 
+        - The await keyword allows other tasks to take advantage of the waiting time until the asynchronous operation finishes.
+
     a future object is like a placeholder that need to be await to suspend the function execution until the result 
     gets polled by the waker, this allows other codes get executed and compiled at the same time and there would be 
     no disruption in code order execution later the placeholder gets filled with the solved value.
