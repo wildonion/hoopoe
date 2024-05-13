@@ -188,6 +188,8 @@ pub enum ErrorKind{
     File(FileEror),
     #[error("Serde Error")]
     Codec(CodecError),
+    #[error("Themis Error")]
+    Crypter(CrypterError),
     #[error("Actix HTTP or WS Server Error")]
     Server(ServerError), // actix server io 
     #[error("Redis, RMQ or Seaorm Error")]
@@ -219,6 +221,12 @@ pub enum FileEror{
 pub enum CodecError{
     #[error("[CODEC] - failed to do codec operations")]
     Serde(#[from] serde_json::Error) 
+}
+
+#[derive(Error)]
+pub enum CrypterError{
+    #[error("[CRYPTER] - failed to do cryptography operations")]
+    Themis(#[from] themis::Error) 
 }
 
 #[derive(Error)]
@@ -299,6 +307,16 @@ impl std::fmt::Debug for FileEror{
 }
 
 impl std::fmt::Debug for CodecError{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self)?; // writing the self into the mutable buffer
+        if let Some(source) = self.source(){
+            writeln!(f, "Caused by: \n\t{}", source)?; // writing the source of the error into the mutable buffer
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for CrypterError{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self)?; // writing the self into the mutable buffer
         if let Some(source) = self.source(){
@@ -404,6 +422,7 @@ impl actix_web::ResponseError for HoopoeErrorResponse{
     fn status_code(&self) -> StatusCode{
         match &self.kind{
             ErrorKind::Codec(CodecError::Serde(s)) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::Crypter(CrypterError::Themis(s)) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Time(TimeError::Chrono(s)) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Server(ServerError::ActixWeb(s)) => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorKind::Server(ServerError::Ws(s)) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -513,6 +532,17 @@ impl From<actix_redis::Error> for HoopoeErrorResponse{
     }
 }
 
+impl From<themis::Error> for HoopoeErrorResponse{
+    fn from(error: themis::Error) -> Self {
+        Self{ 
+            code: 0, 
+            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            kind: ErrorKind::Crypter(CrypterError::Themis(error)),
+            method_name: String::from("") 
+        }
+    }
+}
+
 impl From<redis_async::error::Error> for HoopoeErrorResponse{
     fn from(error: redis_async::error::Error) -> Self {
         Self{ 
@@ -592,6 +622,8 @@ impl HoopoeErrorResponse{
         
         let string_kind = &kind.to_string();
         let mut err = HoopoeErrorResponse::from((msg.clone(), code, kind, method_name.to_string()));
+        
+        // write into the file
         err.wirte_async().await;
         
 

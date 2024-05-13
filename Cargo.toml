@@ -67,6 +67,8 @@ sea-orm = { version = "0.12", features = [
 trait-variant = "0.1"
 prost = "0.12"
 prost-types = "0.12"
+themis = "0.14.0"
+base58 = "0.2.0"
 
 [[bin]]
 name = "hoopoe"

@@ -106,3 +106,7 @@ code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis
  | time: 1715523752444 | method name: notif_active_model.set_from_json
 code: 65535 | message: Json Error: missing field `receiver_info` | due to: Redis, RMQ or Seaorm Error
  | time: 1715523824590 | method name: notif_active_model.set_from_json
+code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715623639095 | method name: NotifConsumerActor.queue_bind
+code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715623705678 | method name: NotifConsumerActor.queue_bind

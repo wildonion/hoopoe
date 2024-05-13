@@ -13,6 +13,20 @@ pub struct NotifQuery{
     pub page_size: Option<u64>,
 }
 
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct GenerateTokenTimeQuery{
+    pub exp_time: Option<u64>, // in seconds
+    pub scope: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub enum TokenTimeScope{
+    #[default]
+    Write,
+    Read
+}
+
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ProduceNotifInfo{
     pub info: ProduceNotif,
