@@ -103,10 +103,13 @@
 */
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use actix::Addr;
 use actix_web::web::route;
 use serde::{Deserialize, Serialize};
 use interfaces::purchase::ProductExt;
 use crate::{consts::PURCHASE_DEMO_LOCK_MUTEX, *};
+
+use self::actors::producers::notif::NotifProducerActor;
 
 
 
@@ -136,10 +139,10 @@ pub struct Product{
 
 impl ProductExt for Product{
     type Product = Self;
-    async fn atomic_purchase_status(&self) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>) {
-        start_minting(self.clone()).await
+    async fn atomic_purchase_status(&self, notif_producer_actor: Addr<NotifProducerActor>) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>) {
+        start_minting(self.clone(), notif_producer_actor).await
     }
-    async fn mint(&mut self) -> (bool, Product){ 
+    async fn mint(&mut self, notif_producer_actor: Addr<NotifProducerActor>) -> (bool, Product){ 
         
         let Product{pid, buyer_id, is_minted} = self.clone();
         log::info!("minting product with id {}", pid);
@@ -150,28 +153,48 @@ impl ProductExt for Product{
         // is over
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
-        /*  https://github.com/wildonion/nftport-minter-service-actor
-            step0) up and run the nftport-minter-service-actor service actor
-            step1) in main service: send product info to notif producer actor to send to rmq
-            step2) in mint service: 
-                notif consumer actor receives the product info and starts the minting process
-                once it finishes with the process the result will be sent to rmq using its
-                notif producer actor
-            step3) in main service: 
-                notif consumer actor begins to start consuming in the background it can be either
-                where the http server is being started, by callig an api to register it or inside
-                a loop{} to keep the app running constantly to receive messages from the queue as
-                they're generating by the producer in meanwhile, however in either way we know the 
-                queue! as soon as its actor gets started, it receives all products constantly from 
-                the rmq, if the product was minted or there was any error then we release the id 
-                from the locker
-            t1 => every locking process on the ids must be inside tokio spawn to avoid blocking
-            t2 => get notif_owner:{} key which contains all notif data values for the owner
-            t3 => notify client with short polling
-        */
+        tokio::spawn(async move{
+
+            // // sending a notif data contains the product info into the rmq exchange
+            // // nftport-minter-service-actor will consume it to start the minting process
+            // notif_producer_actor.send(
+            //     ProduceNotif{
+            //         local_spawn: todo!(),
+            //         notif_data: todo!(),
+            //         exchange_name: todo!(),
+            //         exchange_type: todo!(),
+            //         routing_key: todo!(),
+            //     }
+            // ).await;
+            
+            // -----------------------
+            //// FUTURE IMPROVEMENTS
+            // -----------------------
+            /*  https://github.com/wildonion/nftport-minter-service-actor
+                step0) up and run the nftport-minter-service-actor service actor
+                step1) in main service: send product info to notif producer actor to send to rmq
+                step2) in mint service: 
+                    notif consumer actor receives the product info and starts the minting process
+                    once it finishes with the process the result will be sent to rmq using its
+                    notif producer actor
+                step3) in main service: 
+                    notif consumer actor begins to start consuming in the background it can be either
+                    where the http server is being started, by callig an api to register it or inside
+                    a loop{} to keep the app running constantly to receive messages from the queue as
+                    they're generating by the producer in meanwhile, however in either way we know the 
+                    queue! as soon as its actor gets started, it receives all products constantly from 
+                    the rmq, if the product was minted or there was any error then we release the id 
+                    from the locker
+                t1 => every locking process on the ids must be inside tokio spawn to avoid blocking
+                t2 => get notif_owner:{} key which contains all notif data values for the owner
+                t3 => notify client with short polling
+            */
+            
+        });
 
         let pinfo = Product{pid, buyer_id, is_minted: false}; // some minted product info
         (false, pinfo)
+
     }
 }
 
@@ -216,7 +239,7 @@ impl ProductExt for Product{
     step3) if it's in there then we must reject the request
     step4) otherwise we can proceed to minting process
 */
-pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifProducerActor>) -> (bool, tokio::sync::mpsc::Receiver<Product>){
 
     let Product { pid, buyer_id, is_minted } = product;
 
@@ -267,7 +290,6 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         }
     );
 
-
     let (psender, preceiver) = 
         tokio::sync::mpsc::channel::<Product>(1024);
 
@@ -279,7 +301,7 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
             let mut product_info = product.clone();
             async move{
 
-                let (err, mut pinfo) = product_info.mint().await;
+                let (err, mut pinfo) = product_info.mint(notif_producer).await;
                 
                 // set the minting flag to true, if there was no error
                 if !err{

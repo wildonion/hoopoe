@@ -154,6 +154,8 @@ pub(self) async fn mint_demo(
 
     let product = pinfo.to_owned(); // received product info from user
 
+    let notif_producer_actor = app_state.as_ref().actors.clone().unwrap().producer_actors.notif_actor;
+
     tokio::spawn(async move{
         
         // some lock-free logics: 
@@ -163,7 +165,7 @@ pub(self) async fn mint_demo(
 
     });
     
-    let (minting_exclusion, mut product_receiver) = product.atomic_purchase_status().await;
+    let (minting_exclusion, mut product_receiver) = product.atomic_purchase_status(notif_producer_actor).await;
 
     match minting_exclusion{
         true => { // product is being minted and is locked

@@ -77,7 +77,14 @@
         - The placeholder acts as a reminder that the final value needs to be plugged in later.
         - while the final answer relies on the resolved value from get_num(), the CPU avoids waiting idly. 
         - The await keyword allows other tasks to take advantage of the waiting time until the asynchronous operation finishes.
-
+        - in the following example even though the CPU doesn't actively wait, await ensures that the info! line runs only 
+          after the value from get_num is available. This maintains the order of execution within the same thread:
+          async fn get_num() { 32}
+          let num = 10 + get_num().await;
+          info!("num: {}", num);
+          // other code blocks and logics
+          // ...
+          
     a future object is like a placeholder that need to be await to suspend the function execution until the result 
     gets polled by the waker, this allows other codes get executed and compiled at the same time and there would be 
     no disruption in code order execution later the placeholder gets filled with the solved value.

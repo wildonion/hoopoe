@@ -8,14 +8,16 @@ use wallexerr::misc::Wallet;
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};
 use log::*;
 
-// future objects must be pinned to use them as object safe trait along with dynamic dispatching
-// response stream contains an item of type Result<EventResponse, Status>, the stream response 
-// is a pinned future trait object which sendable, think of response stream as an iterator object 
-// contains multiple future objects of pack of u8 bytes that must get streamed over each by calling
-// next() method so this is called streaming over future objects.
-// if Future<Output = T> is an asynchronous version of T, then Stream<Item = T> is an asynchronous 
-// version of Iterator<Item = T>. A stream represents a sequence of value-producing events that occur 
-// asynchronously to the caller.
+/* -ˋˏ✄┈┈┈┈
+    future objects must be pinned to use them as object safe trait along with dynamic dispatching
+    response stream contains an item of type Result<EventResponse, Status>, the stream response 
+    is a pinned future trait object which sendable, think of response stream as an iterator object 
+    contains multiple future objects of pack of u8 bytes that must get streamed over each by calling
+    next() method so this is called streaming over future objects.
+    if Future<Output = T> is an asynchronous version of T, then Stream<Item = T> is an asynchronous 
+    version of Iterator<Item = T>. A stream represents a sequence of value-producing events that occur 
+    asynchronously to the caller.
+*/
 type ResponseStream = std::pin::Pin<Box<dyn Stream<Item = Result<EventResponse, Status>> + Send >>;
 type EventResult<T> = Result<TonicResponse<T>, Status>;
 
@@ -48,6 +50,10 @@ impl EventServer{
 
     fn restart() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{
 
+        // if there was an already server is started 
+        // then restart it
+        // ...
+        
         Ok(())
 
     }

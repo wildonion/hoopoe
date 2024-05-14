@@ -11,7 +11,7 @@ i'm hoopoe, the social event platform to hoop!
 > [!TIP]
 > any notification coming from different components or other service actor workers must be done accroding to the following steps:
 
-- **step0)** a register notif api call can be written to register either a producer or a consumer in the bakcground.
+- **step0)** a register notif api can be written to register either a producer or a consumer in the bakcground.
 
 - **step1)** producer service actor sends `NotifData` to exchange.
 
@@ -198,7 +198,7 @@ cargo run --bin hooper -- --help
 
 - **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
-> **current hub registry is set to `docker.youwho.club`.**
+> **current hub registry is set to `docker.youwho.club` and the `infra` folder on the VPS would be the place where the `docker-compose.yml` file is in**
 
 #### ☕ What's happening inside the `cicd.yml` file?
 

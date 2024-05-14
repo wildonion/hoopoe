@@ -240,7 +240,7 @@ macro_rules! bootstrap_tcp {
                 data decryption we can accept the client connections cause it's
                 secure and safe.
             */
-            tokio::spawn(async move{
+
                 let (mut secure_cell, wallet) = consts::SECURECELLCONFIG_TCPWALLET.to_owned(); // this must be shared between clients and server to stablish a secure connection
                 let tcp_addr = format!(
                         "{}:{}",
@@ -255,8 +255,8 @@ macro_rules! bootstrap_tcp {
                 // let tcp_listener_actor_address = listener_actor.start(); // this will be run but shows the above error
                 // --------------------
                 listener_actor.start_streaming().await;
-            });
 
+            // keep the app constantly running
             loop{}
         }
     };

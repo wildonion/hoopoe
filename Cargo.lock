@@ -1446,17 +1446,6 @@ dependencies = [
 
 [[package]]
 name = "deadpool"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff0fc28638c21092aba483136debc6e177fff3dace8c835d715866923b03323e"
-dependencies = [
- "deadpool-runtime",
- "num_cpus",
- "tokio",
-]
-
-[[package]]
-name = "deadpool"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6541a3916932fe57768d4be0b1ffb5ec7cbf74ca8c903fdfd5c0fe8aa958f0ed"
@@ -1473,7 +1462,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33c7b14064f854a3969735e7c948c677a57ef17ca7f0bc029da8fe2e5e0fc1eb"
 dependencies = [
- "deadpool 0.12.1",
+ "deadpool",
  "lapin",
  "serde",
  "tokio-executor-trait",
@@ -1481,11 +1470,11 @@ dependencies = [
 
 [[package]]
 name = "deadpool-redis"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2244d421c9514eab2e1ce1aa1e3c9d5c7cbb9cf3d9bbcac21a6b27e6a868d84"
+checksum = "7ff315fab2a7a42132352909afc81140d06b8bbfd1414b098ce278e3f95dd1b9"
 dependencies = [
- "deadpool 0.11.2",
+ "deadpool",
  "redis 0.25.3",
 ]
 
@@ -2243,7 +2232,6 @@ dependencies = [
  "trait-variant",
  "uuid",
  "wallexerr",
- "web3",
 ]
 
 [[package]]

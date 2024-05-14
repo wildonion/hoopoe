@@ -163,8 +163,8 @@ async fn main() -> std::io::Result<()>{
     dotenv::dotenv().expect("expected .env file be there!");
     env::set_var("RUST_LOG", "trace");
     env_logger::init_from_env(Env::default().default_filter_or("info"));
-    // env::set_var("RUST_LOG", "actix_web=debug");
 
+    
     /* -ˋˏ✄┈┈┈┈ initializing appstate actor workers
         >_ run actor workers, app_state contains the whole app data 
         which will be used globally during the execution of the app
@@ -187,7 +187,8 @@ async fn main() -> std::io::Result<()>{
     } else{
         Migrator::up(&connection, None).await.unwrap();
     }
-            
+
+
     /* -ˋˏ✄┈┈┈┈ bootstrapping http server
         >_ 
     */
@@ -197,7 +198,7 @@ async fn main() -> std::io::Result<()>{
         chrono::Local::now().naive_local());
 
     bootsteap_http!{
-        app_state.clone(),
+        app_state.clone(), // sharing the whole app state data between actix threads and apis
     }
         
 

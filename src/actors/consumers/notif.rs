@@ -89,7 +89,7 @@ impl Actor for NotifConsumerActor{
                 // check something constantly, schedule to be executed 
                 // at a certain time in the background
                 // ...
-                
+
             });
 
         });
@@ -223,12 +223,10 @@ impl NotifConsumerActor{
                                                         match get_notif_event{
                                                             Ok(notif_event) => {
 
-                                                                // caching in redis
                                                                 match redis_pool.get().await{
                                                                     Ok(mut redis_conn) => {
 
-                                                                        // key  : String::from(notif_receiver.id)
-                                                                        // value: Vec<NotifData>
+                                                                        // key: String::from(notif_receiver.id) | value: Vec<NotifData>
                                                                         let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
                                                                         
                                                                         // -ˋˏ✄┈┈┈┈ extend notifs
@@ -252,7 +250,6 @@ impl NotifConsumerActor{
                                                                                             "NotifConsumerActor.decode_serde_redis", // method
                                                                                             Some(&zerlog_producer_actor)
                                                                                         ).await;
-
                                                                                         return; // terminate the caller
                                                                                     }
                                                                                 }
@@ -270,7 +267,6 @@ impl NotifConsumerActor{
                                                                                     Some(&zerlog_producer_actor)
                                                                                 ).await;
 
-                                                                                
                                                                                 // we can't get the key means this is the first time we're creating the key
                                                                                 // or the key is expired already, we'll create a new key either way and put
                                                                                 // the init message in there.
@@ -318,7 +314,7 @@ impl NotifConsumerActor{
                                                                                         })
                                                                                         .await
                                                                                         {
-                                                                                            Ok(_) => {},
+                                                                                            Ok(_) => { () },
                                                                                             Err(e) => {
                                                                                                 let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                                                                                                 let err_instance = crate::error::HoopoeErrorResponse::new(

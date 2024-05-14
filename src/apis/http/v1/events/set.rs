@@ -6,7 +6,7 @@ pub use super::*;
 
 
 /* -ˋˏ✄┈┈┈┈
-    >_  this route is used to either produce a data to RMQ exchange 
+    >_  this route is used mainly to either produce a data to RMQ exchange 
         or start consuming in the background, look at the postman
         collection for more details.
 */
@@ -22,7 +22,6 @@ pub(self) async fn register_notif(
     let register_notif_req = register_notif.to_owned();
     let get_producer_info = register_notif_req.clone().producer_info;
     let get_consumer_info = register_notif_req.clone().consumer_info;
-
 
     match req.check_token_time(app_state.clone(), "write").await{
         Ok(token_time) => {
@@ -49,7 +48,7 @@ pub(self) async fn register_notif(
                             match cloned_app_state.clone().actors.as_ref().unwrap()
                                     .producer_actors.notif_actor.send(cloned_notif).await
                                 {
-                                    Ok(_) => {},
+                                    Ok(_) => { () },
                                     Err(e) => {
                                         let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                                         let err_instance = crate::error::HoopoeErrorResponse::new(
@@ -94,7 +93,7 @@ pub(self) async fn register_notif(
                             match cloned_app_state.clone().actors.as_ref().unwrap()
                                     .consumer_actors.notif_actor.send(cloned_notif).await
                                 {
-                                    Ok(_) => {},
+                                    Ok(_) => { () },
                                     Err(e) => {
                                         let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                                         let err_instance = crate::error::HoopoeErrorResponse::new(
@@ -133,7 +132,6 @@ pub(self) async fn register_notif(
                     StatusCode::NOT_ACCEPTABLE,
                     None::<Cookie<'_>>,
                 }
-        
             }
 
         },
