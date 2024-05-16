@@ -1,6 +1,14 @@
 
 
 
+/* -ˋˏ✄┈┈┈┈
+    the producing task has been started by sending the ProduceNotif message 
+    to this actor which will execute the publishing process to the exchange 
+    in either the notif producer actor context itself or the tokio spawn thread:
+
+    notif producer -----payload-----> Exchange
+*/
+
 use crate::*;
 use actix::prelude::*;
 use actix::{AsyncContext, Context};
@@ -244,7 +252,7 @@ impl Handler<ProduceNotif> for NotifProducerActor{
                 this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
             }
             .into_actor(self)
-            .spawn(ctx);
+            .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
                 this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;

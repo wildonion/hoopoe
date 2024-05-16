@@ -164,7 +164,7 @@ async fn main() -> std::io::Result<()>{
     env::set_var("RUST_LOG", "trace");
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
-    
+
     /* -ˋˏ✄┈┈┈┈ initializing appstate actor workers
         >_ run actor workers, app_state contains the whole app data 
         which will be used globally during the execution of the app

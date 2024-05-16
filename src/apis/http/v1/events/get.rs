@@ -91,7 +91,7 @@ pub(self) async fn get_notif(
                             &String::from("register_notif.producer_actors.notif_actor.send"), // current method name
                             Some(&zerlog_producer_actor)
                         ).await;
-                        return Ok(err_instance.error_response());
+                        return Err(err_instance);
                     }
                 }
                 
@@ -107,7 +107,7 @@ pub(self) async fn get_notif(
                 &String::from("get_notif.redis_pool"), // current method name
                 Some(&zerlog_producer_actor)
             ).await;
-            return Ok(err_instance.error_response());
+            return Err(err_instance);
         }
     }
     

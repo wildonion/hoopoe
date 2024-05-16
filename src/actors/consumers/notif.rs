@@ -1,6 +1,14 @@
 
 
 
+/* -ˋˏ✄┈┈┈┈
+    the consuming task has been started by sending the ConsumeNotif message 
+    to this actor which will execute the streaming loop over the queue in 
+    either the notif consumer actor context itself or the tokio spawn thread:
+
+    notif consumer -----Q-----> Exchange -----notif mutator-----> Redis cache & CQRS writer 
+*/
+
 use actix::prelude::*;
 use deadpool_lapin::lapin::protocol::exchange;
 use crate::actors::cqrs::mutators::notif::*;
@@ -67,9 +75,9 @@ pub struct ConsumeNotif{
 
 #[derive(Clone)]
 pub struct NotifConsumerActor{
-    pub app_storage: std::option::Option<Arc<Storage>>,
-    pub notif_mutator_actor: Addr<NotifMutatorActor>,
-    pub zerlog_producer_actor: Addr<ZerLogProducerActor>
+    pub app_storage: std::option::Option<Arc<Storage>>, // REQUIRED: communicating with third party storage
+    pub notif_mutator_actor: Addr<NotifMutatorActor>, // REQUIRED: communicating with mutator actor to write into redis and db 
+    pub zerlog_producer_actor: Addr<ZerLogProducerActor> // REQUIRED: send any error log to the zerlog queue
 }
 
 impl Actor for NotifConsumerActor{
@@ -90,6 +98,8 @@ impl Actor for NotifConsumerActor{
                 // at a certain time in the background
                 // ...
 
+                this.check_health().await;
+
             });
 
         });
@@ -99,6 +109,10 @@ impl Actor for NotifConsumerActor{
 }
 
 impl NotifConsumerActor{
+
+    pub async fn check_health(&self){
+
+    }
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, 
             notif_mutator_actor: Addr<NotifMutatorActor>,
@@ -145,7 +159,6 @@ impl NotifConsumerActor{
                                 "NotifConsumerActor.queue_declare", // method
                                 Some(&zerlog_producer_actor)
                             ).await;
-
                             return; // terminate the caller
                         };
 
@@ -176,7 +189,6 @@ impl NotifConsumerActor{
                                         "NotifConsumerActor.queue_bind", // method
                                         Some(&zerlog_producer_actor)
                                     ).await;
-
                                     return; // terminate the caller
                                 }
                             }
@@ -249,7 +261,7 @@ impl NotifConsumerActor{
                                                                                             ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
                                                                                             "NotifConsumerActor.decode_serde_redis", // method
                                                                                             Some(&zerlog_producer_actor)
-                                                                                        ).await;
+                                                                                    ).await;
                                                                                         return; // terminate the caller
                                                                                     }
                                                                                 }
@@ -342,7 +354,7 @@ impl NotifConsumerActor{
                                                                             ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
                                                                             "NotifConsumerActor.redis_pool", // method
                                                                             Some(&zerlog_producer_actor)
-                                                                        ).await;
+                                                                    ).await;
                                                                         return; // terminate the caller
                                                                     }
                                                                 }
@@ -359,7 +371,6 @@ impl NotifConsumerActor{
                                                                     "NotifConsumerActor.decode_serde", // method
                                                                     Some(&zerlog_producer_actor)
                                                                 ).await;
-
                                                                 return; // terminate the caller
                                                             }
                                                         }
@@ -375,7 +386,6 @@ impl NotifConsumerActor{
                                                             "NotifConsumerActor.consume_ack", // method
                                                             Some(&zerlog_producer_actor)
                                                         ).await;
-
                                                         return; // terminate the caller
                                                     }
                                                 }
@@ -392,7 +402,6 @@ impl NotifConsumerActor{
                                                     "NotifConsumerActor.consume_getting_delivery", // method
                                                     Some(&zerlog_producer_actor)
                                                 ).await;
-
                                                 return; // terminate the caller 
                                             }
                                         }
@@ -409,7 +418,6 @@ impl NotifConsumerActor{
                                         "NotifConsumerActor.consume_basic_consume", // method
                                         Some(&zerlog_producer_actor)
                                     ).await;
-
                                     return; // terminate the caller 
                                 }
                             }
@@ -428,7 +436,6 @@ impl NotifConsumerActor{
                             "NotifConsumerActor.consume_create_channel", // method
                             Some(&zerlog_producer_actor)
                         ).await;
-
                         return; // terminate the caller   
                     }
                 }
@@ -445,7 +452,6 @@ impl NotifConsumerActor{
                     "NotifConsumerActor.consume_pool", // method
                     Some(&zerlog_producer_actor)
                 ).await;
-
                 return; // terminate the caller
             }
         };
@@ -471,19 +477,18 @@ impl Handler<ConsumeNotif> for NotifConsumerActor{
         
         let this = self.clone();
         
-        // spawn the future in the background into the give actor context
+        // spawn the future in the background into the given actor context
         if local_spawn{
             async move{
                 this.consume(redis_cache_exp, &tag, &queue, &routing_key, &exchange_name).await;
             }
             .into_actor(self)
-            .spawn(ctx);
+            .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
                 this.consume(redis_cache_exp, &tag, &queue, &routing_key, &exchange_name).await;
             });
         }
-
         return; // terminate the caller
 
     }

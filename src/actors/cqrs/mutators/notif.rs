@@ -210,7 +210,7 @@ impl Handler<StoreNotifEvent> for NotifMutatorActor{
                 }).await;
             }
             .into_actor(self)
-            .spawn(ctx);
+            .spawn(ctx); // spawn the future object into this actor context thread
         } else{
             tokio::spawn(async move{
                 this.store(NotifInfo{

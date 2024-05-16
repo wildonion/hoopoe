@@ -110,3 +110,11 @@ code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - n
  | time: 1715623639095 | method name: NotifConsumerActor.queue_bind
 code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
  | time: 1715623705678 | method name: NotifConsumerActor.queue_bind
+code: 65535 | message: protocol error: AMQP soft error: NOT-FOUND: NOT_FOUND - no exchange 'wildonionExchange' in vhost '/' | due to: Redis, RMQ or Seaorm Error
+ | time: 1715762943135 | method name: NotifConsumerActor.queue_bind
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715871574480 | method name: get_notif.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715871583576 | method name: get_notif.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1715871583957 | method name: get_notif.redis_pool

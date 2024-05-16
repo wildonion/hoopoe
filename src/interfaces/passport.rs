@@ -21,7 +21,7 @@ pub trait Passport{
 
     async fn get_user(&self) -> Result<UserData, HoopoeHttpResponse>;
     async fn get_secret(&self, app_state: web::Data<AppState>) -> Result<String, HoopoeHttpResponse>;
-    async fn check_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>;
+    async fn verify_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>;
 }
 
 // only traits defined in the current crate can be implemented for types defined outside of the crate
@@ -90,7 +90,7 @@ impl Passport for actix_web::HttpRequest{
 
     }
 
-    async fn check_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>{
+    async fn verify_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>{
 
         let req = self;
         let redis_pool = app_state.clone().app_storage.clone().unwrap().get_redis_pool().await.unwrap();
@@ -138,6 +138,30 @@ impl Passport for actix_web::HttpRequest{
                         );
             
                     } else{
+
+                        /*  -ˋˏ✄┈┈┈┈
+                            this is not necessary to be checked cause we're using redis set_ex key
+                            to set an expirable token time and if we couldn't get the token time from 
+                            redis means it has been expired
+                        */
+                        let now = chrono::Local::now().timestamp();
+                        let parsed_token_time = token_time.parse::<i64>().unwrap_or_default();
+                        if now > parsed_token_time{
+                            let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
+                                Response::<'_, &[u8]>{
+                                    data: Some(&[]),
+                                    message: &format!("ERROR: ahead of time for token time"),
+                                    status: StatusCode::FORBIDDEN.as_u16(),
+                                    is_error: true,
+                                    meta: None
+                                }
+                            );
+                            return Err(
+                                Ok(res)
+                            );
+                        }
+                        // -ˋˏ✄┈┈┈┈
+
                         return Ok(token_time);
                     }
 

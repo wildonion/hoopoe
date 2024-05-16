@@ -31,7 +31,7 @@ pub(self) async fn generate_access_token(
                 Ok(sec) => {
         
                     let now = chrono::Local::now();
-                    let token_time_with_exp = now + chrono::Duration::seconds(generate_token_query.exp_time.unwrap_or(300) as i64);
+                    let token_time_with_exp = now + chrono::Duration::seconds(generate_token_query.exp_time.unwrap_or(300) as i64); // 5 mins or longer expiration time
                     let token_time = token_time_with_exp.timestamp();
 
                     let mut secure_cell_config = SecureCellConfig{ 
@@ -70,7 +70,7 @@ pub(self) async fn generate_access_token(
                                 &String::from("register_notif.producer_actors.notif_actor.send"), // current method name
                                 Some(&zerlog_producer_actor)
                             ).await;
-                            return Ok(err_instance.error_response());
+                            return Err(err_instance);
                         }
                     }
         
@@ -87,7 +87,7 @@ pub(self) async fn generate_access_token(
                 &String::from("generate_access_token.redis_pool"), // current method name
                 Some(&zerlog_producer_actor)
             ).await;
-            return Ok(err_instance.error_response());
+            return Err(err_instance);
         }
     }
 

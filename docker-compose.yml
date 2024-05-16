@@ -67,8 +67,8 @@ services:
       - hoopoe
 
   timescaledb:
-    container_name: postgres
-    image: postgres
+    container_name: timescaledb
+    image: timescale/timescaledb-ha:pg16
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -78,7 +78,7 @@ services:
     volumes:
       - ./infra/data/timescaledb:/home/postgres/pgdata/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432" # this local binding only avoid the container eating cpu constantly due having kinsing virus in this timescaledb container
     networks:
       - hoopoe
     healthcheck:

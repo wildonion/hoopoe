@@ -23,7 +23,7 @@ pub(self) async fn register_notif(
     let get_producer_info = register_notif_req.clone().producer_info;
     let get_consumer_info = register_notif_req.clone().consumer_info;
 
-    match req.check_token_time(app_state.clone(), "write").await{
+    match req.verify_token_time(app_state.clone(), "write").await{
         Ok(token_time) => {
 
             if get_producer_info.is_some(){
@@ -36,7 +36,7 @@ pub(self) async fn register_notif(
                         like sending gps data contains lat and long into the
                         exchange so other consumers be able to consume constantly
                         as the data coming at a same time, kindly put the sending
-                        message logic to actor inside a loop{}
+                        message logic to actor inside a loop{}.
                 */
                 tokio::spawn( // running the producing notif job in the background in a free thread
                     {
@@ -82,6 +82,10 @@ pub(self) async fn register_notif(
                 
                 /* -ˋˏ✄┈┈┈┈
                     >_ start consuming in the background
+                        if you know the RMQ info you may want to start consuming in the 
+                        background exactly when the server is being started otherwise 
+                        you would have to send message to its actor to start it as an 
+                        async task in the background.
                 */
                 tokio::spawn( // running the consuming notif job in the background in a free thread
                     {
