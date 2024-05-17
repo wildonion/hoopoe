@@ -6,7 +6,7 @@ use crate::*;
 
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct NotifQuery{
+pub struct EventQuery{
     pub owner: Option<String>,
     pub from: Option<u64>,
     pub to: Option<u64>,

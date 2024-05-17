@@ -1,7 +1,7 @@
 
 
 
-use crate::{actors::cqrs::accessors::notif::NotifDataResponse, models::event::{NotifData, NotifQuery}};
+use crate::{actors::cqrs::accessors::notif::NotifDataResponse, models::event::{NotifData, EventQuery}};
 use redis::AsyncCommands;
 pub use super::*;
 
@@ -9,17 +9,44 @@ pub use super::*;
 #[get("/hoop/get/")]
 pub(self) async fn get_hoop(
     req: HttpRequest,
+    hoop_query: web::Query<EventQuery>,
     app_state: web::Data<AppState>,
 ) -> HoopoeHttpResponse{
 
-    todo!()
+    let redis_pool = app_state.clone().app_storage.clone().unwrap().get_redis_pool().await.unwrap();
+    let actors = app_state.clone().actors.clone().unwrap();
+    let hoop_accessor_actor = actors.cqrs_actors.accessors.hoop_accessor_actor;
+    let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
+
+    match redis_pool.get().await{
+        Ok(redis_conn) => {
+
+            // try to get from redis cache
+            // otherwise send message to its accessor actor 
+            // ...
+
+            todo!()
+
+        },
+        Err(e) => {
+            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+            let err_instance = crate::error::HoopoeErrorResponse::new(
+                *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                crate::error::ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // the actual source of the error caused at runtime
+                &String::from("get_hoop.redis_pool"), // current method name
+                Some(&zerlog_producer_actor)
+            ).await;
+            return Err(err_instance);
+        }
+    }
 
 }
 
 #[get("/notif/get/")]
 pub(self) async fn get_notif(
     req: HttpRequest,
-    notif_query: web::Query<NotifQuery>,
+    notif_query: web::Query<EventQuery>,
     app_state: web::Data<AppState>,
 ) -> HoopoeHttpResponse{
 
@@ -33,7 +60,7 @@ pub(self) async fn get_notif(
     match redis_pool.get().await{
         Ok(mut redis_conn) => {
 
-            
+
             // by default every incoming notif from the producer will be cached in redis 
             // while the consumer consumes them so we first try to get owner notif from redis
             // otherwise we send message to accessor actor to fetch them from db.

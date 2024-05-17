@@ -56,6 +56,58 @@ i'm hoopoe, the social event platform to hoop!
     <img src="https://github.com/wildonion/hoopoe/blob/main/infra/arch.png">
 </p>
 
+### proper way to write and handle async task execution! 
+
+> [!IMPORTANT]
+> every async task must be spawned in a free thread in the background which can be done via `tokio::spawn()`, it's like creating a worker per each async task.
+
+```rust
+async fn heavy_process(){
+    // it can be one of the following tasks:
+    // --> consuming task: send consume message to consumer actor
+    // --> producing task: send produce message to producer actor
+    // --> storing in db: send data to mutator actor 
+    // --> storing in redis: cache on redis with exp key
+    // --> locking logic 
+}
+
+let (tx, rx) = channel::<()>();
+let tx = tx.clone();
+// spawn in the background and use channel to receive 
+// data whenever the data is sent to the channel
+tokio::spawn(async move{
+    let res = heavy_process().await;
+    tx.send(res).await;
+});
+while let Some(data) = rx.recv().await{
+    // rest of the logics whenever we receive data
+    // ...
+}
+
+// ------------
+//      or 
+// ------------
+
+// spawn in the background but wait to gets solved 
+// and once it's solved we then proceed with the rest
+// of flow and cacnel other branches or async tasks
+let task = tokio::spawn(async move{
+    let res = heavy_process().await;
+    tx.send(res).await;
+});
+
+tokio::select! {
+    _ = task => {
+        // proceed with this flow
+        // ...
+    }, 
+    data = rx.recv() => {
+        // proceed with this flow
+        // ...
+    }
+}
+```
+
 ## routes and apis
 
 ```bash

@@ -11,6 +11,7 @@
 // be as easy as drinking water with thiserror.
 
 use actix_web::{cookie::Cookie, http::StatusCode};
+use consts::STORAGE_IO_ERROR_CODE;
 use futures::StreamExt;
 use lockers::llm::Product;
 use log::error;
@@ -131,6 +132,54 @@ pub(self) async fn check(
     // probably web::Path, web::Json, web::Query params
     // ...
 ) -> HoopoeHttpResponse{
+
+    let app_storage = app_state.clone().app_storage.clone().unwrap();
+    let redis_conn = app_storage.get_redis_pool().await.unwrap().get().await;
+    let rmq_conn = app_storage.get_lapin_pool().await.unwrap().get().await;
+    let searom_pool = app_storage.get_seaorm_pool().await.unwrap();
+    let actors = app_state.clone().actors.clone().unwrap();
+    let db_ping = searom_pool.ping().await;
+    let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
+
+    // check db health
+    if db_ping.is_err(){
+        let e = db_ping.unwrap_err();
+        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let err_instance = crate::error::HoopoeErrorResponse::new(
+            *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+            crate::error::ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // the actual source of the error caused at runtime
+            &String::from("check.db_ping"), // current method name
+            Some(&zerlog_producer_actor)
+        ).await;
+        return Err(err_instance);
+    }
+
+    // check redis health
+    if let Err(e) = redis_conn{
+        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let err_instance = crate::error::HoopoeErrorResponse::new(
+            *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+            crate::error::ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // the actual source of the error caused at runtime
+            &String::from("check.redis_pool"), // current method name
+            Some(&zerlog_producer_actor)
+        ).await;
+        return Err(err_instance);
+    }
+
+    // check rmq health 
+    if let Err(e) = rmq_conn{
+        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let err_instance = crate::error::HoopoeErrorResponse::new(
+            *STORAGE_IO_ERROR_CODE, // error hex (u16) code
+            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+            crate::error::ErrorKind::Storage(crate::error::StorageError::RmqPool(e)), // the actual source of the error caused at runtime
+            &String::from("check.rmq_pool"), // current method name
+            Some(&zerlog_producer_actor)
+        ).await;
+        return Err(err_instance);
+    }
 
     resp!{
         &[u8],
