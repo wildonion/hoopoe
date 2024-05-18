@@ -109,7 +109,7 @@ use serde::{Deserialize, Serialize};
 use interfaces::purchase::ProductExt;
 use crate::{consts::PURCHASE_DEMO_LOCK_MUTEX, *};
 
-use self::actors::producers::notif::NotifProducerActor;
+use self::workers::producers::notif::NotifProducerActor;
 
 
 

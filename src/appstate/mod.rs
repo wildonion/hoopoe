@@ -1,21 +1,21 @@
 
 use std::collections::HashMap;
 use actix::{Actor, Addr};
-use crate::actors::cqrs::accessors::hoop::HoopAccessorActor;
-use crate::actors::cqrs::mutators::hoop::HoopMutatorActor;
-use crate::actors::cqrs::mutators::notif::NotifMutatorActor;
-use crate::actors::cqrs::accessors::notif::NotifAccessorActor;
+use crate::workers::cqrs::accessors::hoop::HoopAccessorActor;
+use crate::workers::cqrs::mutators::hoop::HoopMutatorActor;
+use crate::workers::cqrs::mutators::notif::NotifMutatorActor;
+use crate::workers::cqrs::accessors::notif::NotifAccessorActor;
 use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::s3::Storage;
-use crate::actors::consumers::notif::NotifConsumerActor;
-use crate::actors::producers::notif::NotifProducerActor;
-use crate::actors::producers::zerlog::ZerLogProducerActor;
+use crate::workers::consumers::notif::NotifConsumerActor;
+use crate::workers::producers::notif::NotifProducerActor;
+use crate::workers::producers::zerlog::ZerLogProducerActor;
 use serde::{Serialize, Deserialize};
 use crate::types::*;
 use crate::consts::*;
 use crate::storage;
-use crate::actors::ws::servers::hoop::HoopServer;
+use crate::workers::ws::servers::hoop::HoopServer;
 
 
 #[derive(Clone)]

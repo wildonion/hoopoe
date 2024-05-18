@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use actix::{Actor, Addr, AsyncContext, Context};
-use crate::actors::ws::sessions::hoop::HoopSession;
+use crate::workers::ws::sessions::hoop::HoopSession;
 use crate::s3::Storage;
 use crate::consts::PING_INTERVAL;
 

@@ -1,7 +1,7 @@
 
 
 use crate::{
-    actors::cqrs::accessors::notif::{NotifAccessorActor, RequestNotifData}, 
+    workers::cqrs::accessors::notif::{NotifAccessorActor, RequestNotifData}, 
     consts::{STORAGE_IO_ERROR_CODE},
 };
 use crate::{

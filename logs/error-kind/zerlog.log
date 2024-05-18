@@ -118,3 +118,41 @@ code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or 
  | time: 1715871583576 | method name: get_notif.redis_pool
 code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
  | time: 1715871583957 | method name: get_notif.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035270529 | method name: check.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035272278 | method name: check.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035272837 | method name: check.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035273388 | method name: check.redis_pool
+code: 65535 | message: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035273792 | method name: check.redis_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035511246 | method name: check.redis_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035512974 | method name: check.redis_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035533122 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035533128 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035533976 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035533981 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035534466 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035534473 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035535337 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035535342 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035535957 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035535961 | method name: ZerLogProducerActor.produce_pool
+code: 65535 | message: REDIS: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035536652 | method name: check.redis_pool
+code: 65535 | message: Error occurred while creating a new object: IO error: Connection refused (os error 61) | due to: Redis, RMQ or Seaorm Error
+ | time: 1716035536656 | method name: ZerLogProducerActor.produce_pool

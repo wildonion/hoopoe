@@ -71,8 +71,8 @@ Coded by
 
 */
 
-use crate::actors::consumers::notif::ConsumeNotif;
-use crate::actors::producers::notif::ProduceNotif;
+use crate::workers::consumers::notif::ConsumeNotif;
+use crate::workers::producers::notif::ProduceNotif;
 use crate::consts::APP_NAME;
 use std::env;
 use std::net::SocketAddr;
@@ -127,7 +127,7 @@ use migration::{Migrator, MigratorTrait};
 // so accessing them from other crates and modules is
 // like use crate::macro_name;
 
-mod actors;
+mod workers;
 mod interfaces;
 mod s3;
 mod config;

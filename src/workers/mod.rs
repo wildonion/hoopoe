@@ -2,7 +2,8 @@
 
 
 /* 
-    app components based on actor worker:
+    background actor worker which execute async tasks atomically with
+    tokio spawn, select, rmq and mpsc jobq channels over mutex:
     we have producer and consumer actors per each data streamer 
     we have mutator and accessor actors per each db model
     we have ws session and server actors per each route

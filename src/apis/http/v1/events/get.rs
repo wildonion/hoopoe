@@ -1,7 +1,7 @@
 
 
 
-use crate::{actors::cqrs::accessors::notif::NotifDataResponse, models::event::{NotifData, EventQuery}};
+use crate::{workers::cqrs::accessors::notif::NotifDataResponse, models::event::{NotifData, EventQuery}};
 use redis::AsyncCommands;
 pub use super::*;
 
@@ -59,7 +59,6 @@ pub(self) async fn get_notif(
     
     match redis_pool.get().await{
         Ok(mut redis_conn) => {
-
 
             // by default every incoming notif from the producer will be cached in redis 
             // while the consumer consumes them so we first try to get owner notif from redis

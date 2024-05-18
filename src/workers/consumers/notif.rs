@@ -11,9 +11,9 @@
 
 use actix::prelude::*;
 use deadpool_lapin::lapin::protocol::exchange;
-use crate::actors::cqrs::mutators::notif::*;
-use crate::actors::producers::zerlog::ZerLogProducerActor;
-use crate::actors::producers::notif::ProduceNotif;
+use crate::workers::cqrs::mutators::notif::*;
+use crate::workers::producers::zerlog::ZerLogProducerActor;
+use crate::workers::producers::notif::ProduceNotif;
 use crate::models::event::NotifData;
 use redis::{AsyncCommands, RedisResult};
 use std::error::Error;

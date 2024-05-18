@@ -8,7 +8,7 @@ use chrono::{DateTime, FixedOffset};
 use deadpool_redis::{Connection, Manager, Pool};
 use redis::{AsyncCommands, Commands};
 use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Statement, Value};
-use crate::actors::{consumers, producers::zerlog::ZerLogProducerActor};
+use crate::workers::{consumers, producers::zerlog::ZerLogProducerActor};
 use crate::types::RedisPoolConnection;
 use crate::s3::Storage;
 use crate::consts::PING_INTERVAL;

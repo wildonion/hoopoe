@@ -129,8 +129,6 @@ pub(self) async fn test_stream(
 pub(self) async fn check(
     req: HttpRequest,
     app_state: web::Data<AppState>
-    // probably web::Path, web::Json, web::Query params
-    // ...
 ) -> HoopoeHttpResponse{
 
     let app_storage = app_state.clone().app_storage.clone().unwrap();
@@ -142,9 +140,8 @@ pub(self) async fn check(
     let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
 
     // check db health
-    if db_ping.is_err(){
-        let e = db_ping.unwrap_err();
-        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+    if let Err(e) = db_ping{
+        let source = format!("SEARORM: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -157,7 +154,7 @@ pub(self) async fn check(
 
     // check redis health
     if let Err(e) = redis_conn{
-        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let source = format!("REDIS: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -170,7 +167,7 @@ pub(self) async fn check(
 
     // check rmq health 
     if let Err(e) = rmq_conn{
-        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let source = format!("RMQ: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes

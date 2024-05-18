@@ -1,7 +1,7 @@
 
 
-use crate::actors;
-use crate::actors::producers::zerlog::ProduceNotif;
+use crate::workers;
+use crate::workers::producers::zerlog::ProduceNotif;
 use crate::consts::APP_NAME;
 use crate::models::http::Response;
 
@@ -618,7 +618,7 @@ impl From<(Vec<u8>, u16, ErrorKind, String)> for HoopoeErrorResponse{
 impl HoopoeErrorResponse{
 
     pub async fn new(code: u16, msg: Vec<u8>, kind: ErrorKind, method_name: &str, 
-            producer_actor: Option<&Addr<actors::producers::zerlog::ZerLogProducerActor>>) -> Self{
+            producer_actor: Option<&Addr<workers::producers::zerlog::ZerLogProducerActor>>) -> Self{
         
         let string_kind = &kind.to_string();
         let mut err = HoopoeErrorResponse::from((msg.clone(), code, kind, method_name.to_string()));

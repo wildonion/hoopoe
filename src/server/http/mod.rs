@@ -44,21 +44,21 @@ macro_rules! bootsteap_http {
                     .wrap(Logger::new("%a %{User-Agent}i %t %P %r %s %b %T %D"))
                     .wrap(middleware::Compress::default())
                     /*
-                        INIT WS SUBSCRIBE SERVICE
+                        INIT WS SUBSCRIBE SERVICE CONTROLLER
                     */
                     .service(
                         actix_web::web::scope("/v1/stream")
                             .configure(services::stream::init)
                     )
                     /*
-                        INIT HEALTH SERIVE
+                        INIT HEALTH SERIVE CONTROLLER
                     */
                     .service(
                         actix_web::web::scope("/v1/health")
                             .configure(services::health::init)
                     )
                     /*
-                        INIT EVENTS SERIVE
+                        INIT EVENTS SERIVE CONTROLLER
                     */
                     .service(
                         actix_web::web::scope("/v1/events")

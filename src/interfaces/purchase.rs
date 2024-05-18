@@ -2,7 +2,7 @@
 
 use actix::Addr;
 use crate::*;
-use self::actors::producers::notif::NotifProducerActor;
+use self::workers::producers::notif::NotifProducerActor;
 
 
 

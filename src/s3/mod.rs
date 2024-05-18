@@ -25,10 +25,9 @@ use self::types::{LapinPoolConnection, RedisPoolConnection};
    | shared state storage 
    |----------------------
    | redis
-   | redis async
-   | redis actor
+   | redis async pubsub conn
+   | redis actix actor
    | redis distlock (locker)
-   | diesel postgres
    | seaorm
    | rmq
    |
