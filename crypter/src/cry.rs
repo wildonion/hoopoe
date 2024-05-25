@@ -17,7 +17,7 @@ pub fn gen_random_chars(size: u32) -> String{
     }).collect()
 }
 
-pub fn get_random_elem<T: Clone + Send + Sync>(vec: Vec<T>) -> T{
+pub fn get_random_elem<T: Default + Clone + Send + Sync + Sized>(vec: Vec<T>) -> T{
     // making a high entropy seed to create the rng
     let random_chars = gen_random_chars(10);
     let hash_of_random_chars = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
@@ -48,7 +48,18 @@ pub mod wannacry{
 
     pub use super::*;
 
-    /* e2e and file and msg encryption using aes256 bits in wallexerr: see ed25519_aes256_test() test method
+    /* 
+
+        let path_on_server = "onion.png";
+        let dec_path_on_server = "onion.dec.png";
+
+        let (encrypted_buffer, mut secure_cell) = crypter::cry::wannacry::encrypt_file(path_on_server).await;
+        let decrypted_buffer = crypter::cry::wannacry::decrypt_file(dec_path_on_server, &mut secure_cell).await;
+        
+        let hex_file_sig = hex::encode(&encrypted_buffer);
+        let base58_file_sig = encrypted_buffer.to_base58();
+    
+        ------
 
         tools: RSA ed25519 ECC curve with aes256 hash in wallexerr, openssl and ring for RSA + KDF like sha256 and keccak256
         ransomewere, steganography and files encryption to generate unique assets by encrypting using 
@@ -72,15 +83,20 @@ pub mod wannacry{
         let file = tokio::fs::File::open(fpath).await;
     
         let mut buffer = vec![]; // file content in form of utf8
-        file.unwrap().read_to_end(&mut buffer).await; // await on it to fill the buffer
-    
-        let mut wallet = wallexerr::misc::Wallet::new_ed25519();
+        file.unwrap().read_to_end(&mut buffer).await; // await on it to fill the buffer    
         let mut default_secure_cell_config = &mut SecureCellConfig::default();
-        // secret key is the keccak256 hash of a random 64 bytes chars
+
         default_secure_cell_config.secret_key = {
             hex::encode(
-                wallet.self_generate_keccak256_hash_from(
-                    &gen_random_chars(64)
+                wallexerr::misc::Wallet::generate_keccak256_hash_from(
+                    &{
+                        // high entropy seed with god level security
+                        let random_chars = gen_random_chars(64);
+                        let hash_of_random_chars = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
+                        let mut crypto_seeded_rng = rand_chacha::ChaCha20Rng::from_seed(hash_of_random_chars);
+                        let seed = crypto_seeded_rng.get_seed();
+                        hex::encode(seed)
+                    }
                 )
             )
         };
@@ -93,7 +109,7 @@ pub mod wannacry{
         ).await;
         default_secure_cell_config.data = buffer;
     
-        let encrypted_data = wallet.self_secure_cell_encrypt(default_secure_cell_config).unwrap();
+        let encrypted_data = wallexerr::misc::Wallet::secure_cell_encrypt(default_secure_cell_config).unwrap();
         default_secure_cell_config.data = encrypted_data.clone(); //*** important part */
     
         let enc_file_path = format!("{}.enc", fpath);
@@ -108,8 +124,7 @@ pub mod wannacry{
     
         let file = tokio::fs::File::create(decpath).await;
     
-        let mut wallet = wallexerr::misc::Wallet::new_ed25519();
-        let decrypted_data = wallet.self_secure_cell_decrypt(default_secure_cell_config).unwrap();
+        let decrypted_data = wallexerr::misc::Wallet::secure_cell_decrypt(default_secure_cell_config).unwrap();
     
         file.unwrap().write_all(&decrypted_data).await;
     

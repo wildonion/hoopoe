@@ -30,6 +30,9 @@ pub(self) async fn index(
         buffer.extend_from_slice(&bytes)
     }
 
+    let actors = app_state.clone().actors.clone().unwrap();
+    let storage = app_state.clone().app_storage.clone();
+    let db = storage.unwrap().get_seaorm_pool().await.unwrap();
 
     // some user inputs validation
     // starting session actor probably!

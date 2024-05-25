@@ -52,7 +52,7 @@ impl Passport for actix_web::HttpRequest{
         let secret_key = &config.vars.SECRET_KEY;
 
         let headers = req.headers();
-        let get_secret_key = headers.get("secret_key");
+        let get_secret_key = headers.get("x-api-key");
         let Some(header_secret_key) = get_secret_key else{
             
             let res = HttpResponse::build(StatusCode::NOT_ACCEPTABLE).json(
@@ -97,7 +97,7 @@ impl Passport for actix_web::HttpRequest{
         let zerlog_producer_actor = app_state.as_ref().actors.clone().unwrap().producer_actors.zerlog_actor;
 
         let headers = req.headers();
-        let get_secret_key = headers.get("token_time");
+        let get_secret_key = headers.get("x-api-key");
         let Some(header_secret_key) = get_secret_key else{
             
             let res = HttpResponse::build(StatusCode::NOT_ACCEPTABLE).json(

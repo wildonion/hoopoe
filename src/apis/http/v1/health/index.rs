@@ -141,7 +141,7 @@ pub(self) async fn check(
 
     // check db health
     if let Err(e) = db_ping{
-        let source = format!("SEARORM: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let source = format!("SeaOrm: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -154,7 +154,7 @@ pub(self) async fn check(
 
     // check redis health
     if let Err(e) = redis_conn{
-        let source = format!("REDIS: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let source = format!("Redis: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -167,7 +167,7 @@ pub(self) async fn check(
 
     // check rmq health 
     if let Err(e) = rmq_conn{
-        let source = format!("RMQ: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+        let source = format!("Rmq: {}", &e.source().unwrap().to_string()); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
         let err_instance = crate::error::HoopoeErrorResponse::new(
             *STORAGE_IO_ERROR_CODE, // error hex (u16) code
             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -194,26 +194,26 @@ pub(self) async fn mint_demo(
     req: HttpRequest,
     app_state: web::Data<AppState>,
     pinfo: web::Json<lockers::llm::Product>,
-    // probably other web::Path, web::Json, web::Query params
-    // ...
 ) -> HoopoeHttpResponse{
 
     let product = pinfo.to_owned(); // received product info from user
-
-    let notif_producer_actor = app_state.as_ref().actors.clone().unwrap().producer_actors.notif_actor;
+    let notif_producer_actor = 
+        app_state.as_ref().actors
+            .clone().unwrap()
+            .producer_actors.notif_actor;
 
     tokio::spawn(async move{
         
         // some lock-free logics: 
         // check is already minted or purchased in db or not, if yes don't start the atomic_purchase_status process
-        // other never-trust-user-inputs validations
+        // never-trust-user-inputs validations
         // ...
 
     });
-    
-    let (minting_exclusion, mut product_receiver) = product.atomic_purchase_status(notif_producer_actor).await;
 
-    match minting_exclusion{
+    let (minting_exclusion_flag, mut product_receiver) = product.atomic_purchase_status(notif_producer_actor).await;
+
+    match minting_exclusion_flag{
         true => { // product is being minted and is locked
             resp!{
                 &[u8],

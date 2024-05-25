@@ -1,6 +1,7 @@
 
 
 
+use chrono::{DateTime, NaiveDateTime};
 use serde::{Serialize, Deserialize};
 use crate::*;
 
@@ -13,6 +14,25 @@ pub struct EventQuery{
     pub page_size: Option<u64>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct SingleNotifQuery{
+    pub notif_id: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct HoopQuery{
+    pub id: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct UpdateHoopRequest{
+
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct NewHoopRequest{
+    
+}
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct GenerateTokenTimeQuery{
@@ -64,9 +84,21 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
 pub struct NotifData{
     pub id: String,
     pub receiver_info: String,
-    pub action_data: serde_json::Value,
+    pub action_data: serde_json::Value, // you can map this to any structure you know!
     pub actioner_info: String,
     pub action_type: ActionType,
     pub fired_at: i64,
+    pub is_seen: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DbNotifData{
+    pub id: i32,
+    pub receiver_info: String,
+    pub nid: String,
+    pub action_data: serde_json::Value, // you can map this to any structure you know!
+    pub actioner_info: String,
+    pub action_type: String,
+    pub fired_at: NaiveDateTime,
     pub is_seen: bool,
 }

@@ -16,6 +16,5 @@ use interfaces::passport::Passport;
 use actix_web::http::StatusCode;
 use crate::cookie::Cookie;
 
-
-pub mod get;
-pub mod set;
+pub mod hoop;
+pub mod notif;

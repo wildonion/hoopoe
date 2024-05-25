@@ -11,6 +11,7 @@
 
 use actix::prelude::*;
 use deadpool_lapin::lapin::protocol::exchange;
+use tonic::IntoRequest;
 use crate::workers::cqrs::mutators::notif::*;
 use crate::workers::producers::zerlog::ZerLogProducerActor;
 use crate::workers::producers::notif::ProduceNotif;
@@ -91,16 +92,19 @@ impl Actor for NotifConsumerActor{
             
             let this = actor.clone();
             let address = ctx.address();
-            
-            tokio::spawn(async move{
-                
-                // check something constantly, schedule to be executed 
-                // at a certain time in the background
-                // ...
 
-                this.check_health().await;
+            if ctx.connected(){
+                tokio::spawn(async move{
+                    
+                    // check something constantly, schedule to be executed 
+                    // at a certain time in the background
+                    // ...
+    
+                    this.check_health().await;
+    
+                });
+            }
 
-            });
 
         });
 
@@ -111,7 +115,8 @@ impl Actor for NotifConsumerActor{
 impl NotifConsumerActor{
 
     pub async fn check_health(&self){
-
+        
+        log::info!("i'm still alive! son of bitches");
     }
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, 
@@ -292,25 +297,29 @@ impl NotifConsumerActor{
                                                                         };
 
                                                                         // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
-                                                                        let events_string = serde_json::to_string(&events).unwrap();
-                                                                        let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
-                                                                        if is_key_there{ // update only the value
-                                                                            let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
-                                                                        } else{
-                                                                            // initializing value for the expirable key 
-                                                                            /*
-                                                                                make sure you won't get the following error on set_ex():
-                                                                                called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
-                                                                                save RDB snapshots, but it's currently unable to persist to disk. Commands that
-                                                                                may modify the data set are disabled, because this instance is configured to 
-                                                                                report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
-                                                                                Please check the Redis logs for details about the RDB error. 
-                                                                                SOLUTION: restart redis :)
-                                                                            */
-                                                                            let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
-                                                                        }
+                                                                        // chaching in redis is an async task which will be executed 
+                                                                        // in the background with an expirable key
+                                                                        tokio::spawn(async move{
+                                                                            let events_string = serde_json::to_string(&events).unwrap();
+                                                                            let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
+                                                                            if is_key_there{ // update only the value
+                                                                                let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
+                                                                            } else{
+                                                                                // initializing value for the expirable key 
+                                                                                /*
+                                                                                    make sure you won't get the following error:
+                                                                                    called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
+                                                                                    save RDB snapshots, but it's currently unable to persist to disk. Commands that
+                                                                                    may modify the data set are disabled, because this instance is configured to 
+                                                                                    report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
+                                                                                    Please check the Redis logs for details about the RDB error. 
+                                                                                    SOLUTION: restart redis :)
+                                                                                */
+                                                                                let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
+                                                                            }
+                                                                        });
 
-                                                                        // -ˋˏ✄┈┈┈┈ store notif in db 
+                                                                        // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
                                                                         // sending StoreNotifEvent message to the notif event mutator actor
                                                                         // spawning the async task of storing data in db in the background
                                                                         tokio::spawn(
