@@ -67,7 +67,7 @@ services:
       - hoopoe
 
   timescaledb:
-    container_name: timescaledb
+    container_name: postgres
     image: timescale/timescaledb-ha:pg16
     restart: unless-stopped
     environment:

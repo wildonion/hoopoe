@@ -59,7 +59,7 @@ i'm hoopoe, the social event platform to hoop!
 ### proper way to write and handle async task execution! 
 
 > [!IMPORTANT]
-> every async task must be spawned in a free thread in the background which can be done via `tokio::spawn()`, it's like creating a worker per each async task.
+> every async task must be spawned in a free thread using a background worker which can be done via `tokio::spawn()`, it's like creating a worker per each async task.
 
 ```rust
 async fn heavy_process(){
@@ -71,7 +71,7 @@ async fn heavy_process(){
     // --> locking logic 
 }
 
-let (tx, rx) = channel::<()>();
+let (tx, rx) = channel::<String>(); // channel for stringified data
 let tx = tx.clone();
 // spawn in the background and use channel to receive 
 // data whenever the data is sent to the channel
@@ -80,7 +80,8 @@ tokio::spawn(async move{
     tx.send(res).await;
 });
 while let Some(data) = rx.recv().await{
-    // rest of the logics whenever we receive data
+    // do the rest of the logics in here 
+    // whenever we receive data
     // ...
 }
 
@@ -97,10 +98,12 @@ let task = tokio::spawn(async move{
 });
 
 tokio::select! {
+    // choose this if it can gets completed soon
     _ = task => {
         // proceed with this flow
         // ...
     }, 
+    // or if you think this gets completed soonly
     data = rx.recv() => {
         // proceed with this flow
         // ...
@@ -271,6 +274,7 @@ use postman to check the server health and register notif producer and consumer.
 
 ### When developing?!
 
+- `net.spec`
 - always update:
     - erd pictures every time you are finished with developing database tables
     - crates and Rust edition!

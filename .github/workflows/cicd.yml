@@ -18,7 +18,7 @@ jobs:
       - name: Login to DockerHub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin docker.youwho.club
       - name: Build and Push
-        run: | # 1 - build services | 2 - push services to the custom registry
+        run: | # 1 - build services | 2 - push services to the custom registry hosted on docker.youwho.club
           docker compose -f "docker-compose.yml" build 
           docker compose -f "docker-compose.yml" push
   pull-on-server:

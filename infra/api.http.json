@@ -16,8 +16,8 @@
 						"method": "POST",
 						"header": [
 							{
-								"key": "token_time",
-								"value": "124kUmD39YUwJRKxaQqTkKb6yjrU7PTkjZHT72xPxWW7JyxSnnGUdHqfSvzn1YUCHHWp63bTP"
+								"key": "x-api-key",
+								"value": "124kUmD39YUwJRKxaQqTkkMrFezWXtmhiNXZzX59xjCSS8WAyNk2tjGSrccnc8NhGJAckJyZk"
 							}
 						],
 						"body": {
@@ -130,7 +130,7 @@
 						"method": "POST",
 						"header": [
 							{
-								"key": "secret_key",
+								"key": "x-api-key",
 								"value": "{{secret_key}}"
 							}
 						],
