@@ -186,6 +186,7 @@ async fn main() -> std::io::Result<()>{
         Migrator::refresh(&connection).await.unwrap();
     } else{
         Migrator::up(&connection, None).await.unwrap();
+        Migrator::status(&connection).await.unwrap();
     }
 
 
