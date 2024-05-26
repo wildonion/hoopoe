@@ -280,11 +280,11 @@ pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifPro
             async move{
                 let mut write_lock = lock_ids.lock().await;
                 if (*write_lock).contains(&pid){
-                    log::info!("rejecting client request, the id is being minted!");
+                    log::info!("rejecting client request cause the id is being minted!");
                     // reject the request since the product is being minted
                     tx.send(true).await; // sending the true flag as rejecting the request
                 } else{
-                    (*write_lock).push(pid); // save the id for later readers to reject their request during the minting process
+                    (*write_lock).push(pid); // save the id for future minters to reject their request during the first minting process
                 }
             }
         }
@@ -331,7 +331,6 @@ pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifPro
                 */
                 let mut write_lock = lock_ids.lock().await;
                 (*write_lock).retain(|&p_id| p_id != pid); // product got minted, don't keep its id in the locks vector
-
             }
         }
     );

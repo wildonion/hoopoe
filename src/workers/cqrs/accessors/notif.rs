@@ -112,7 +112,7 @@ impl NotifAccessorActor{
             db_backend, 
             consts::queries::SELECT_BY_NOTIF_ID,
             [
-                Value::Int(Some(notif_id))
+                notif_id.into() // Value::Int(Some())
             ]
         );
 
@@ -142,7 +142,7 @@ impl NotifAccessorActor{
                     *consts::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
-                    "store_geo.db.execute", // method
+                    "get_by_notif_id.db.query_one", // method
                     Some(&zerlog_producer_actor)
                 ).await;
                 return None;
