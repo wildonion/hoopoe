@@ -129,7 +129,7 @@ impl NotifProducerActor{
 
                                 };
 
-                            // publish in the background in a free thread
+                            // async task: publish messages to exchange in the background in a free thread
                             tokio::spawn(async move{
 
                                 // -ˋˏ✄┈┈┈┈ publishing to exchange from this channel,

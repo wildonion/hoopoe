@@ -97,6 +97,7 @@ use crate::models::http::Response;
 */
 
 use actix::Addr;
+use actix_web::http::StatusCode;
 use crate::models::event::*;
 use serde::{Serialize, Deserialize};
 use std::error::Error;
@@ -104,7 +105,6 @@ use std::io::{Write, Read};
 use actix_web::cookie::Cookie;
 use actix_web::HttpResponse;
 use actix_web_actors::ws;
-use hyper::StatusCode;
 use thiserror::Error;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;

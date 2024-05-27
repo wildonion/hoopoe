@@ -7,6 +7,11 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
 
+        let db = manager.get_connection();
+        db.execute_unprepared("
+            SELECT CURRENT_DATE;
+        ").await.unwrap();
+
         let fired_at_index = Index::create()
             .if_not_exists()
             .index_type(sea_query::IndexType::BTree)

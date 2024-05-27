@@ -8,16 +8,16 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Request{
     path: String,
-    jwt: String,
+    auth_token: String,
     base_url: String,
 }
 
 impl Request{
 
-    pub fn builder(path: &str, jwt: &str, base_url: &str) -> Self{
+    pub fn builder(path: &str, auth_token: &str, base_url: &str) -> Self{
         Self{
             path: path.to_string(),
-            jwt: jwt.to_string(),
+            auth_token: auth_token.to_string(),
             base_url: base_url.to_string()
         }
     }

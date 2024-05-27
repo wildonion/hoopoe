@@ -7,7 +7,7 @@ use wallexerr::misc::{SecureCellConfig, Wallet};
 use crate::consts::CRYPTER_THEMIS_ERROR_CODE;
 use base58::{ToBase58, FromBase58};
 use self::models::event::GenerateTokenTimeQuery;
-
+use actix_web::http::StatusCode;
 pub use super::*;
 
 

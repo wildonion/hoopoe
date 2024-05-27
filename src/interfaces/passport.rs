@@ -8,7 +8,7 @@ use config::EnvExt;
 use consts::STORAGE_IO_ERROR_CODE;
 use models::user::UserData;
 use types::*;
-
+use actix_web::http::StatusCode;
 use self::appstate::AppState;
 
 

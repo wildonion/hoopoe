@@ -44,31 +44,38 @@ pub struct ConsumeNotif{
     pub queue: String,
     pub exchange_name: String,
     /* -ˋˏ✄┈┈┈┈ 
-        routing_key in ConsumeNotif can be the same as in ProduceNotif struct
-        but also it can be different than that cause:
-        pattern for the exchange to route the messages to the bounded queue, 
-        any queue that is bounded to this exchange routing key will receive 
+        routing_key is pattern for the exchange to route the messages to the 
+        bounded queue.
+        multiple producers can send their messages to a single exchange but 
+        each of with different routing keys.
+        any queue that is bounded to the exchange routing key will receive 
         all the messages that follows the pattern inside the routing_key.
         a message can be sent from producer to an exchange in a topic way with 
         an sepecific routing key which tells the exchange this is the way of 
-        receiving messages that a bounded queue can does since we might have 
+        receiving messages that a bounded queue does since we might have 
         sent messages to the same exchange with multiple different routing 
         keys per each message and for a queue that is bounded to the exchange 
         with the passed in routing key can only receives the messages that 
         follow the pattern in the selected routing key. so the routing key in 
-        consumer is patterns for this queue to tell exchange to what messages 
-        this queue is interested in:
+        consumer is the patterns for this queue to tell exchange to what 
+        messages this queue is interested in:
 
-                                 ------> routing_key1           --------
-                                |                              | queue1 | ----
-                    -----------------> routing_key2 <-------------------      |         ---------
-  messages ------> | exchange|                                                | <----- |consumer1|
-                    -----------------> routing_key3              --------     |         ---------
-                                |                               | queue2 | ---
-                                ------> routing_key4 <-------------------
+        1) producer produces messages and send them to the exchange with an specific routing key
+        2) a consumer create its own queue and bind it to the exchange with the bind key that 
+           is interested to receive the message from the exchange based on that key.
+                                                                                                                 --------          ---------
+                                                                                                                | queue1 | <----- |consumer1|
+                                                                        ------> routing_key1 <---------------------------          ---------
+                                                                       |                                            
+        producer1 ----------                                       -----------------> routing_key0               
+                            |____ messages > routing_key1 ------> | exchange|                                                
+                             ____ messages > routing_key4 ------>  -----------------> routing_key2                                     
+                            |                                          |                                --------        -----------
+       producer2 -----------                                           |                               | queue2 | <----| consumer2 |
+                                                                        ------> routing_key4 <------------------        -----------
 
     */
-    pub routing_key: String, // patterns for this queue to tell exchange to what messages this queue is interested in
+    pub routing_key: String, // patterns for this queue to tell exchange what messages this queue is interested in
     pub tag: String,
     pub redis_cache_exp: u64,
     pub local_spawn: bool // either spawn in actor context or tokio threadpool
@@ -304,8 +311,7 @@ impl NotifConsumerActor{
                                                                             let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
                                                                             if is_key_there{ // update only the value
                                                                                 let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
-                                                                            } else{
-                                                                                // initializing value for the expirable key 
+                                                                            } else{ // initializing a new expirable key containing the new notif data
                                                                                 /*
                                                                                     make sure you won't get the following error:
                                                                                     called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 

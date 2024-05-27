@@ -90,7 +90,6 @@ use redis::RedisResult;
 use redis::Commands;
 use redis_async::client::{self, PubsubConnection, ConnectionBuilder};
 use redis::RedisError;
-use hyper::StatusCode;
 use uuid::Uuid;
 use log::{info, error};
 use actix_redis::{Command, RedisActor, resp_array, RespValue};
@@ -196,6 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         Migrator::refresh(&connection).await.unwrap();
     } else{
         Migrator::up(&connection, None).await.unwrap(); // executing database tasks like creating tables on startup
+        Migrator::status(&connection).await.unwrap();
     }
 
     /* ******************************* IMPORTANT *******************************

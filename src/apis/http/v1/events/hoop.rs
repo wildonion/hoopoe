@@ -1,12 +1,12 @@
 
 
 
-use crate::{models::event::{EventQuery, NewHoopRequest, NotifData, UpdateHoopRequest}, workers::cqrs::accessors::notif::NotifDataResponse};
+use crate::{models::event::{EventQuery, NewHoopRequest, NotifData, UpdateHoopRequest}, 
+    workers::cqrs::accessors::notif::NotifDataResponse};
 use actix_web::{delete, put};
 use redis::AsyncCommands;
 use sea_orm::ConnectionTrait;
 use self::models::event::HoopQuery;
-
 pub use super::*;
 
 
