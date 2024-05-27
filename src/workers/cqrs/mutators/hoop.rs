@@ -19,7 +19,12 @@ pub struct StoreHoopEvent{
     pub local_spawn: bool
 }
 
-
+#[derive(Message, Clone, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct RawStoreHoopEvent{
+    pub hoop: HoopEvent,
+    pub local_spawn: bool
+}
 
 #[derive(Clone)]
 pub struct HoopMutatorActor{
@@ -55,6 +60,47 @@ impl HoopMutatorActor{
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
         Self { app_storage, zerlog_producer_actor }
+    }
+
+    pub async fn raw_store(&mut self, hoop: HoopEvent){
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let zerlog_producer_actor = self.clone().zerlog_producer_actor;
+
+        let db_backend = db.get_database_backend();
+        let stmt = Statement::from_sql_and_values(
+            db_backend, 
+            consts::queries::INSERT_HOOP, 
+            [
+                hoop.etype.into(),
+                hoop.manager.into(),
+                hoop.entrance_fee.into()
+            ]
+        );
+
+        match db.execute(stmt).await{
+            Ok(query_res) => {
+
+                // ...
+                
+            },
+            Err(e) => {
+                use crate::error::{ErrorKind, HoopoeErrorResponse};
+                let error_content = &e.to_string();
+                let error_content = error_content.as_bytes().to_vec();
+                let mut error_instance = HoopoeErrorResponse::new(
+                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    error_content, // error content
+                    ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
+                    "HoopMutatorActor.raw_store.db.execute", // method
+                    Some(&zerlog_producer_actor)
+                ).await;
+
+                return; // terminate the caller
+            }
+        }
+
     }
     
     pub async fn store(&mut self, hoop: HoopEvent){
@@ -158,6 +204,16 @@ impl HoopMutatorActor{
 
     }
 
+    pub async fn get(&mut self, hoop_id: i32){
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let redis_pool = storage.get_redis_pool().await.unwrap();
+
+        // ...
+
+    }
+
     pub async fn delete(&mut self, hoop_id: i32){
 
         let storage = self.app_storage.as_ref().clone().unwrap();
@@ -175,7 +231,6 @@ impl Handler<StoreHoopEvent> for HoopMutatorActor{
     type Result = ();
     fn handle(&mut self, msg: StoreHoopEvent, ctx: &mut Self::Context) -> Self::Result {
 
-        // unpacking the consumed data
         let StoreHoopEvent { 
                 hoop,
                 local_spawn
@@ -198,4 +253,32 @@ impl Handler<StoreHoopEvent> for HoopMutatorActor{
         return;
     }
 
+}
+
+impl Handler<RawStoreHoopEvent> for HoopMutatorActor{
+    type Result = ();
+    fn handle(&mut self, msg: RawStoreHoopEvent, ctx: &mut Self::Context) -> Self::Result {
+        
+        // unpacking the consumed data
+        let RawStoreHoopEvent{
+            hoop,
+            local_spawn
+        } = msg.clone();
+
+        let mut this = self.clone();
+        
+        if local_spawn{
+            async move{
+                this.raw_store(hoop).await;
+            }.into_actor(self)
+            .spawn(ctx);
+        } else{
+            tokio::spawn(async move{
+                this.raw_store(hoop).await;
+            });
+        }
+
+        return;
+
+    }
 }
