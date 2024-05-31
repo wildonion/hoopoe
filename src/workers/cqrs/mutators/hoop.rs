@@ -3,11 +3,12 @@ use chrono::{DateTime, FixedOffset, Local};
 use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, Statement, TryIntoModel, Value};
 use serde::{Serialize, Deserialize};
 use actix::prelude::*;
+use tonic::IntoRequest;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
 use crate::workers::producers::zerlog::ZerLogProducerActor;
-use crate::entities::hoops;
-use crate::models::event::HoopEvent;
+use crate::entities::{self, hoops};
+use crate::models::event::{DbHoopData, HoopEvent};
 use crate::s3::Storage;
 use crate::consts::{self, PING_INTERVAL};
 use serde_json::json;
@@ -62,7 +63,7 @@ impl HoopMutatorActor{
         Self { app_storage, zerlog_producer_actor }
     }
 
-    pub async fn raw_store(&mut self, hoop: HoopEvent){
+    pub async fn raw_store(&mut self, hoop: HoopEvent) -> Option<DbHoopData>{
 
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();
@@ -82,7 +83,44 @@ impl HoopMutatorActor{
         match db.execute(stmt).await{
             Ok(query_res) => {
 
-                // ...
+                let id = query_res.last_insert_id();                
+                let stmt = Statement::from_sql_and_values(
+                    db_backend, 
+                    consts::queries::SELECT_HOOP_BY_ID, 
+                    [
+                        id.into()
+                    ]
+                );
+
+                match db.query_one(stmt).await{
+                    Ok(exec_res) => {
+                        
+                        let res = exec_res.unwrap();
+                        Some(
+                            DbHoopData{
+                                id: res.try_get("", "id").unwrap(),
+                                etype: res.try_get("", "etype").unwrap(),
+                                manager: res.try_get("", "manager").unwrap(),
+                                entrance_fee: res.try_get("", "entrance_fee").unwrap(),
+                                created_at: res.try_get("", "created_at").unwrap(),
+                                updated_at: res.try_get("", "updated_at").unwrap(),
+                            }
+                        )
+                    },
+                    Err(e) => {
+                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                        let error_content = &e.to_string();
+                        let error_content = error_content.as_bytes().to_vec();
+                        let mut error_instance = HoopoeErrorResponse::new(
+                            *consts::STORAGE_IO_ERROR_CODE, // error code
+                            error_content, // error content
+                            ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
+                            "HoopMutatorActor.raw_store.db.query_one", // method
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                        return None; // terminate the caller
+                    }
+                }
                 
             },
             Err(e) => {
@@ -96,14 +134,13 @@ impl HoopMutatorActor{
                     "HoopMutatorActor.raw_store.db.execute", // method
                     Some(&zerlog_producer_actor)
                 ).await;
-
-                return; // terminate the caller
+                return None; // terminate the caller
             }
         }
 
     }
     
-    pub async fn store(&mut self, hoop: HoopEvent){
+    pub async fn store(&mut self, hoop: HoopEvent) -> Option<entities::hoops::Model>{
         
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();
@@ -130,8 +167,7 @@ impl HoopMutatorActor{
                     "hoop_active_model.set_from_json", // method
                     Some(&zerlog_producer_actor)
                 ).await;
-
-                return; // terminate the caller
+                return None; // terminate the caller
             }
         };
         
@@ -156,7 +192,8 @@ impl HoopMutatorActor{
                 match get_model{
                     Ok(model) => {
 
-                        // ...
+                        // return inserted model
+                        return Some(model);
 
                     },
                     Err(e) => {
@@ -170,8 +207,7 @@ impl HoopMutatorActor{
                             "hoop_active_model.save.try_into_model", // method
                             Some(&zerlog_producer_actor)
                         ).await;
-
-                        return; // terminate the caller
+                        return None; // terminate the caller
                     }
                 }
 
@@ -187,24 +223,13 @@ impl HoopMutatorActor{
                     "hoop_active_model.save", // method
                     Some(&zerlog_producer_actor)
                 ).await;
-
-                return; // terminate the caller   
+                return None; // terminate the caller   
             }
         }
 
     }
 
     pub async fn update(&mut self, hoop: HoopEvent){
-
-        let storage = self.app_storage.as_ref().clone().unwrap();
-        let db = storage.get_seaorm_pool().await.unwrap();
-        let redis_pool = storage.get_redis_pool().await.unwrap();
-
-        // ...
-
-    }
-
-    pub async fn get(&mut self, hoop_id: i32){
 
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();

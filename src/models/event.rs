@@ -2,6 +2,7 @@
 
 
 use chrono::{DateTime, NaiveDateTime};
+use sea_orm::prelude::DateTimeWithTimeZone;
 use serde::{Serialize, Deserialize};
 use crate::*;
 
@@ -101,4 +102,14 @@ pub struct DbNotifData{
     pub action_type: String,
     pub fired_at: NaiveDateTime,
     pub is_seen: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DbHoopData{
+    pub id: i32,
+    pub etype: String,
+    pub manager: i32,
+    pub entrance_fee: i64,
+    pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
 }
