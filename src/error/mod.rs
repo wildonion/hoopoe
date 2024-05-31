@@ -160,7 +160,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 // this one is more concise than the actix error
 pub struct HoopoeErrorResponse{ 
     pub code: u16,
-    pub msg: Vec<u8>, // reason 
+    pub msg: Vec<u8>, // this is the exact source of error and is being used to build an http response with message so we need to have an error string
     pub kind: ErrorKind, // due to what service 
     pub method_name: String // in what method
 }
@@ -470,7 +470,7 @@ impl From<std::io::Error> for HoopoeErrorResponse{ // building error instance fr
     fn from(error: std::io::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::File(FileEror::ReadWrite(error)), 
             method_name: String::from("") 
         }
@@ -481,7 +481,7 @@ impl From<serde_json::Error> for HoopoeErrorResponse{
     fn from(error: serde_json::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Codec(CodecError::Serde(error)), 
             method_name: String::from("") 
         }
@@ -492,7 +492,7 @@ impl From<chrono::ParseError> for HoopoeErrorResponse{
     fn from(error: chrono::ParseError) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Time(TimeError::Chrono(error)), 
             method_name: String::from("") 
         }
@@ -503,7 +503,7 @@ impl From<ws::ProtocolError> for HoopoeErrorResponse{
     fn from(error: ws::ProtocolError) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Server(ServerError::Ws(error)), 
             method_name: String::from("") 
         }
@@ -514,7 +514,7 @@ impl From<redis::RedisError> for HoopoeErrorResponse{
     fn from(error: redis::RedisError) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::Redis(error)),
             method_name: String::from("") 
         }
@@ -525,7 +525,7 @@ impl From<actix_redis::Error> for HoopoeErrorResponse{
     fn from(error: actix_redis::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RedisActor(error)),
             method_name: String::from("") 
         }
@@ -536,7 +536,7 @@ impl From<themis::Error> for HoopoeErrorResponse{
     fn from(error: themis::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Crypter(CrypterError::Themis(error)),
             method_name: String::from("") 
         }
@@ -547,7 +547,7 @@ impl From<redis_async::error::Error> for HoopoeErrorResponse{
     fn from(error: redis_async::error::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), // this is the exact source of error and is being used to build an http response with message so we need to have an error string
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RedisAsync(error)),
             method_name: String::from("") 
         }
@@ -558,7 +558,7 @@ impl From<deadpool_lapin::lapin::Error> for HoopoeErrorResponse{
     fn from(error: deadpool_lapin::lapin::Error) -> Self {
         Self{ 
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(), 
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(), 
             kind: ErrorKind::Storage(StorageError::Rmq(error)), 
             method_name: String::from("") 
         }
@@ -569,7 +569,7 @@ impl From<deadpool_lapin::PoolError> for HoopoeErrorResponse{
     fn from(error: deadpool_lapin::PoolError) -> Self {
         Self{
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(),
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RmqPool(error)),
             method_name: String::from(""),
         }
@@ -580,7 +580,7 @@ impl From<deadpool_redis::PoolError> for HoopoeErrorResponse{
     fn from(error: deadpool_redis::PoolError) -> Self {
         Self{
             code: 0, 
-            msg: error.to_string().as_bytes().to_vec(),
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RedisPool(error)),
             method_name: String::from(""),
         }
@@ -591,7 +591,7 @@ impl From<sea_orm::DbErr> for HoopoeErrorResponse{
     fn from(error: sea_orm::DbErr) -> Self {
         Self{
             code: 0,
-            msg: error.to_string().as_bytes().to_vec(),
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::SeaOrm(error)),
             method_name: String::from("")
         }
@@ -602,7 +602,7 @@ impl From<actix::MailboxError> for HoopoeErrorResponse{
     fn from(error: actix::MailboxError) -> Self {
         Self{
             code: 0,
-            msg: error.to_string().as_bytes().to_vec(),
+            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Actor(ActixMailBoxError::Mailbox(error)),
             method_name: String::from("")
         }
