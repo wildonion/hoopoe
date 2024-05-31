@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-
+##### ===================================================================================================
   nginx:
     image: nginx
     container_name: nginx
@@ -19,7 +19,7 @@ services:
       - ./infra/logs:/etc/nginx/logs:rw
     networks:
       - host
-
+##### ===================================================================================================
   redis:
     container_name: redis
     image: redis:latest
@@ -40,7 +40,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
-
+##### ===================================================================================================
   grafana:
     container_name: grafana
     image: grafana/grafana
@@ -52,7 +52,7 @@ services:
     networks:
       - hoopoe
     user: "$(id -u)"
-
+##### ===================================================================================================
   portainer:
     container_name: portainer
     image: portainer/portainer-ce:latest
@@ -65,7 +65,7 @@ services:
       - "9443:9443"
     networks:
       - hoopoe
-
+##### ===================================================================================================
   timescaledb:
     container_name: postgres
     image: timescale/timescaledb-ha:pg16
@@ -86,7 +86,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-
+##### ===================================================================================================
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:latest
@@ -106,7 +106,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
-
+##### ===================================================================================================
   adminer:
     container_name: adminer
     image: adminer 
@@ -119,10 +119,10 @@ services:
       - "7543:8080"
     networks:
       - hoopoe
-
+##### ===================================================================================================
   hoopoe-http:
     container_name: hoopoe-http
-    image: docker.youwho.club/hoopoe-http
+    image: docker.youwho.club/hoopoe-http # the tag name would be the same as image name
     build:
       context: ./
       dockerfile: ./infra/docker/hoopoe-http/Dockerfile
@@ -139,10 +139,10 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-
+##### ===================================================================================================
   hooper-tcp:
     container_name: hooper-tcp
-    image: docker.youwho.club/hooper-tcp
+    image: docker.youwho.club/hooper-tcp # the tag name would be the same as image name
     build:
       context: ./
       dockerfile: ./infra/docker/hooper-tcp/Dockerfile
@@ -159,10 +159,10 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-
+##### ===================================================================================================
   hooper-grpc:
     container_name: hooper-grpc
-    image: docker.youwho.club/hooper-grpc
+    image: docker.youwho.club/hooper-grpc # the tag name would be the same as image name
     build:
       context: ./
       dockerfile: ./infra/docker/hooper-grpc/Dockerfile
@@ -179,10 +179,10 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-  
+##### ===================================================================================================
   hooper-p2p:
     container_name: hooper-p2p
-    image: docker.youwho.club/hooper-p2p
+    image: docker.youwho.club/hooper-p2p # the tag name would be the same as image name
     build:
       context: ./
       dockerfile: ./infra/docker/hooper-p2p/Dockerfile

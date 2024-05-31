@@ -4,7 +4,7 @@
 
 ## ᝰ.ᐟ What am i?
 
-i'm hoopoe, the social event platform to hoop!
+i'm hoopoe, the social event platform allows your hoop get heard!
 
 ## Execution flow & system design?
 
@@ -162,7 +162,7 @@ cd scripts && ./setup.sh
 sqlx database create
 ```
 
-#### step2) create migration folder (make sure you have already!)
+#### step2) create migration folder (make sure you have it already!)
 
 > make sure you uncomment the runtime setup inside its `Cargo.toml` file.
 
@@ -228,6 +228,8 @@ cargo run --bin hooper -- --help
 > [!IMPORTANT]
 > make sure you've opened all necessary domains inside your DNS panel per each nginx config file and changed the `hoopoe.app` to your own domain name in every where mostly the nginx config files and the `APP_NAME` in `consts.rs`. this approach can be used if you need a fully automatic deployment process, it uses github actions to build and publish all images on a self-hosted docker registry on a custom VPS, so update the github ci/cd workflow files inside `.github/workflows` folder to match your VPS infos eventually on every push the ci/cd process will begin to building and pushing automatically the docker images to the self-hosted registry. instead of using a custom registry you can use either ducker hub or github packages as well! it's notable that you should renew nginx service everytime you add a new domain or subdomain (do this on adding a new domain), `./renew.sh` script will create ssl certificates with certbot for your new domain and add it inside the `infra/docker/nginx` folder so nginx docker can copy them into its own container. for every new domain there must be its ssl certs and nginx config file inside that folder so make sure you've setup all your domains before pushing to the repo. continue reading... 
 
+> you can build and up all images on your machine with `sudo docker compose up -d --build` command.
+
 #### 🚨 me before you!
 
 > [!CAUTION]
@@ -249,11 +251,13 @@ cargo run --bin hooper -- --help
 
 - **step7)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`.
+- **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker: `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2` then login to your hub with `sudo docker login docker.hoopoe.app` command.
 
 - **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
-> **current hub registry is set to `docker.youwho.club` and the `infra` folder on the VPS would be the place where the `docker-compose.yml` file is in**
+> **current hub registry is set to `docker.youwho.club` and the `/root/hoopoe` folder on the VPS would be the place where the `docker-compose.yml` file is in**
+
+> make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images using `sudo docker ...` command.
 
 #### ☕ What's happening inside the `cicd.yml` file?
 
@@ -274,8 +278,8 @@ use postman to check the server health and register notif producer and consumer.
 
 ### When developing?!
 
-- `net.spec`
 - always update:
+    - cicd.yml `uses` section
     - erd pictures every time you are finished with developing database tables
     - crates and Rust edition!
     - postman collection
