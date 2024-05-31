@@ -146,7 +146,7 @@ impl Passport for actix_web::HttpRequest{
                         */
                         let now = chrono::Local::now().timestamp();
                         let parsed_token_time = token_time.parse::<i64>().unwrap_or_default();
-                        if now > parsed_token_time{
+                        if parsed_token_time > now{
                             let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
                                 Response::<'_, &[u8]>{
                                     data: Some(&[]),
