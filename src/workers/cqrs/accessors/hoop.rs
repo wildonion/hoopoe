@@ -55,8 +55,12 @@ impl HoopAccessorActor{
         Self { app_storage, zerlog_producer_actor }
     }
 
-    pub async fn fetch(&self){
+    pub async fn get(&self, hoop_id: i32){
 
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let redis_pool = storage.get_redis_pool().await.unwrap();
+        
         // cache in redis with expirable key 
         // retrieve it in main api to return it
         // ...
