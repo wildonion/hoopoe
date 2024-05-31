@@ -47,6 +47,7 @@ pub static STORAGE_IO_ERROR_CODE: &u16 = &0xFFFF;
 pub static CHRONO_ERROR_CODE: &u16 = &0xFFAE;
 pub static CODEC_ERROR_CODE: &u16 = &0xFFFB;
 pub static MAILBOX_CHANNEL_ERROR_CODE: &u16 = &0xFFFD;
+pub static HTTP_RESPONSE_ERROR_CODE: &u16 = &0xFFFA;
 pub static CRYPTER_THEMIS_ERROR_CODE: &u16 = &0xFFAB;
 pub static THIRDPARTYAPI_ERROR_CODE: &u16 = &0xFFFC;
 pub const PING_INTERVAL: Duration = Duration::from_secs(10);

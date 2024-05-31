@@ -73,7 +73,11 @@ impl EventPubsubService for EventServer{
         info!("got an gRPC request at time {:?} | {:?}", 
             chrono::Local::now().naive_local(), request);
         
-        let req = request.into_inner();
+        let mut req = request.into_inner();
+        while let Some(data) = req.next().await{
+
+        }
+
         
         // get a list of all grpc clients from redis cache
         // then send the received message with its title (channel) to 
