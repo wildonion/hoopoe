@@ -97,7 +97,20 @@ impl NotifProducerActor{
                     match pool.create_channel().await{
                         Ok(chan) => {
 
+                            let mut ex_options = ExchangeDeclareOptions::default();
+                            ex_options.auto_delete = true; // the exchange can only be deleted if all bindings are deleted
+                            ex_options.durable = true; // durability is the ability to restore data on node shutdown
+                            
                             // -ˋˏ✄┈┈┈┈ creating exchange
+                            /* 
+                                you should set the auto_delete flag to True when declaring the exchange. This will 
+                                automatically delete the exchange when all channels are done with it.
+                                Keep in mind that this means that it will stay as long as there is an active binding 
+                                to the exchange. If you delete the binding, or queue, the exchange will be deleted.
+                                if you need to keep the queue, but not the exchange you can remove the binding once 
+                                you are done publishing. This should automatically remove the exchange.
+                                so when all bindings (queues and exchanges) get deleted the exchange will be deleted.
+                            */
                             match chan
                                 .exchange_declare(&exchange, {
                                     match exchange_type.as_str(){
@@ -106,12 +119,12 @@ impl NotifProducerActor{
                                         "headers" => deadpool_lapin::lapin::ExchangeKind::Headers,
                                         _ => deadpool_lapin::lapin::ExchangeKind::Topic,
                                     }
-                                }, 
-                                    ExchangeDeclareOptions::default(), FieldTable::default()
+                                },
+                                ex_options, FieldTable::default()
                                 )
                                 .await
                                 {
-                                    Ok(ex) => ex,
+                                    Ok(ok) => {ok},
                                     Err(e) => {
                                         use crate::error::{ErrorKind, HoopoeErrorResponse};
                                         let e_string = &e.to_string();
@@ -144,7 +157,7 @@ impl NotifProducerActor{
                                         &routing_key, // the way that message gets routed to the queue based on a unique routing key
                                         BasicPublishOptions::default(),
                                         payload, // this is the ProduceNotif data,
-                                        BasicProperties::default(),
+                                        BasicProperties::default().with_content_type("application/json".into()),
                                     )
                                     .await
                                     {
