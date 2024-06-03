@@ -283,4 +283,3 @@ use postman to check the server health and register notif producer and consumer.
     - erd pictures every time you are finished with developing database tables
     - crates and Rust edition!
     - postman collection
-    - tests folder and check the cicd

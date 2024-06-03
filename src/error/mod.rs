@@ -650,7 +650,7 @@ impl HoopoeErrorResponse{
                         fired_at: chrono::Local::now().timestamp(), 
                         is_seen: false 
                     },
-                    exchange_name: "ZerlogExchange".to_string(), // any queue bounded to this exchange can consume errors
+                    exchange_name: format!("{}:ZerlogExchange", APP_NAME), // any queue bounded to this exchange can consume errors
                     exchange_type: "fanout".to_string(), // all queues that are bounded to this exchange will receive the messages
                     routing_key: "".to_string(), // if amq.fanout is used the routing key will be ignored
                 }
