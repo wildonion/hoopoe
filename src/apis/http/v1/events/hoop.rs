@@ -6,7 +6,6 @@ use crate::{models::event::{EventQuery, NewHoopRequest, NotifData, UpdateHoopReq
 use actix_web::{delete, put};
 use redis::AsyncCommands;
 use sea_orm::ConnectionTrait;
-use self::models::event::HoopQuery;
 pub use super::*;
 
 
@@ -15,13 +14,13 @@ pub use super::*;
  ------------------------
 |  Hoop CRUD controller
 |------------------------
-| store new hoop                => POST   /hoop
-| get all hoops                 => GET    /hoop
-| get a single hoop             => GET    /hoop/?hoop_id=1
+| store new hoop                => POST   /hoop/
+| get all hoops                 => GET    /hoop/
+| get a single hoop             => GET    /hoop/?id=1
 | get all hoops for an owner    => GET    /hoop/?owner=
-| delete a single hoop          => DELETE /hoop/?hoop_id=1 
+| delete a single hoop          => DELETE /hoop/?id=1 
 | delete all hoops for an owner => DELETE /hoop/?owner=
-| update a single hoop          => PUT    /hoop/?id=1
+| update a single hoop          => PUT    /hoop/
 |
 */
 
@@ -29,7 +28,24 @@ pub use super::*;
 #[delete("/hoop/")]
 pub(self) async fn delete_hoop(
     req: HttpRequest,
-    hoop_id: web::Query<HoopQuery>,
+    hoop_id: web::Query<EventQuery>,
+    app_state: web::Data<AppState>
+) -> HoopoeHttpResponse{
+
+    let app_storage = app_state.app_storage.clone().unwrap();
+    let db = app_storage.get_seaorm_pool().await.unwrap();
+    let zerlog_producer_actor = app_state.actors.clone().unwrap().producer_actors.zerlog_actor;
+
+    // execute raw query or call accessor actor to do so
+    db.execute_unprepared("").await.unwrap();
+
+    todo!()
+}
+
+#[delete("/hoop/")]
+pub(self) async fn delete_hoop_by_owner(
+    req: HttpRequest,
+    hoop_owner: web::Query<EventQuery>,
     app_state: web::Data<AppState>
 ) -> HoopoeHttpResponse{
 
@@ -78,7 +94,9 @@ pub(self) async fn add_hoop(
     todo!()
 }
 
-
+// /hoop/
+// /hoop/?hoop_id=
+// /hoop/?owner=
 #[get("/hoop/")]
 pub(self) async fn get_hoop(
     req: HttpRequest,
@@ -91,8 +109,12 @@ pub(self) async fn get_hoop(
     let hoop_accessor_actor = actors.cqrs_actors.accessors.hoop_accessor_actor;
     let zerlog_producer_actor = actors.producer_actors.zerlog_actor;
 
+    // if both of them is none (hoop_id and hoop owner) then all hoops are retunred
+    // ...
+    
     match redis_pool.get().await{
         Ok(redis_conn) => {
+
 
             // try to get from redis cache
             // otherwise send message to its accessor actor 
@@ -119,6 +141,7 @@ pub(self) async fn get_hoop(
 pub mod exports{
     pub use super::get_hoop;
     pub use super::add_hoop;
-    pub use super::delete_hoop;
     pub use super::update_hoop;
+    pub use super::delete_hoop;
+    pub use super::delete_hoop_by_owner;
 }

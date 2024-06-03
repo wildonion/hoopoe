@@ -11,87 +11,177 @@
 			"name": "Events",
 			"item": [
 				{
-					"name": "Register Notif",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "124kUmD39YUwJRKxaQqTkkMrFezWXtmhiNXZzX59xjCSS8WAyNk2tjGSrccnc8NhGJAckJyZk"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    // \"producer_info\": {\n    //     \"info\":{\n    //         \"local_spawn\": true,\n    //         \"notif_data\": { \n    //             \"receiver_info\": \"1\",\n    //             \"id\": \"unqie-id0\",\n    //             \"action_data\": {\n    //                 \"pid\": 200.4\n    //             }, \n    //             \"actioner_info\": \"2\", \n    //             \"action_type\": \"ProductPurchased\", \n    //             \"fired_at\": 1714316645, \n    //             \"is_seen\": false\n    //         }, \n    //         \"exchange_name\": \"wildonionExchange\",\n    //         \"exchange_type\": \"fanout\", // amq.topic for pubsub\n    //         \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n    //     }\n    // },\n    \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true,\n            \"cache_on_redis\": true,\n            \"store_in_db\": true\n        }\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{events-v1}}/notif/register",
-							"host": [
-								"{{events-v1}}"
-							],
-							"path": [
-								"notif",
-								"register"
-							]
-						},
-						"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
-					},
-					"response": []
+					"name": "Hoop",
+					"item": []
 				},
 				{
-					"name": "Get Owner Notifs",
-					"protocolProfileBehavior": {
-						"disableBodyPruning": true
-					},
-					"request": {
-						"method": "GET",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": { \"id\": 1 },\n                \"id\": \"unqie-id\",\n                \"action_data\": {\n                    \"pid\": 200\n                }, \n                \"actioner_info\": { \"id\": 2 }, \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"wildonionExchange\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
+					"name": "Notif",
+					"item": [
+						{
+							"name": "Register Notif",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "x-api-key",
+										"value": "124kUmD39YUwJRKxaQqTkNzcoVW4P1ZqZ3ahiJWVQqs89bope7GtqU881rWpMyVXskyn2PWsp"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    \"consumer_info\": null\n    // \"consumer_info\": {\n    //     \"info\": {\n    //         \"queue\": \"TestOnion\",\n    //         \"exchange_name\": \"SavageEx\",\n    //         \"routing_key\": \"\",\n    //         \"tag\": \"cons_tag0\",\n    //         \"redis_cache_exp\": 300,\n    //         \"local_spawn\": true,\n    //         \"cache_on_redis\": true,\n    //         \"store_in_db\": true\n    //     }\n    // }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
 						},
-						"url": {
-							"raw": "{{events-v1}}/notif/get/?owner=1&page_size=10&from=0&to=20",
-							"host": [
-								"{{events-v1}}"
-							],
-							"path": [
-								"notif",
-								"get",
-								""
-							],
-							"query": [
-								{
-									"key": "owner",
-									"value": "1"
+						{
+							"name": "Get Owner Notifs",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": { \"id\": 1 },\n                \"id\": \"unqie-id\",\n                \"action_data\": {\n                    \"pid\": 200\n                }, \n                \"actioner_info\": { \"id\": 2 }, \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"wildonionExchange\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
 								},
-								{
-									"key": "page_size",
-									"value": "10"
+								"url": {
+									"raw": "{{events-v1}}/notif/?owner=1&page_size=10&from=0&to=20",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									],
+									"query": [
+										{
+											"key": "owner",
+											"value": "1"
+										},
+										{
+											"key": "page_size",
+											"value": "10"
+										},
+										{
+											"key": "from",
+											"value": "0"
+										},
+										{
+											"key": "to",
+											"value": "20"
+										}
+									]
 								},
-								{
-									"key": "from",
-									"value": "0"
-								},
-								{
-									"key": "to",
-									"value": "20"
-								}
-							]
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
 						},
-						"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
-					},
-					"response": []
+						{
+							"name": "Get All Notifs",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": { \"id\": 1 },\n                \"id\": \"unqie-id\",\n                \"action_data\": {\n                    \"pid\": 200\n                }, \n                \"actioner_info\": { \"id\": 2 }, \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"wildonionExchange\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/?from=0&to=20&page_size=20",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									],
+									"query": [
+										{
+											"key": "from",
+											"value": "0"
+										},
+										{
+											"key": "to",
+											"value": "20"
+										},
+										{
+											"key": "page_size",
+											"value": "20"
+										}
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Notif By Id",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": { \"id\": 1 },\n                \"id\": \"unqie-id\",\n                \"action_data\": {\n                    \"pid\": 200\n                }, \n                \"actioner_info\": { \"id\": 2 }, \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"wildonionExchange\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    // \"consumer_info\": null\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"RustReporterQ\",\n            \"exchange_name\": \"wildonionExchange\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true\n        }\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/?id=3",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									],
+									"query": [
+										{
+											"key": "id",
+											"value": "3"
+										}
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						}
+					]
 				}
 			]
 		},
@@ -135,7 +225,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{health-v1}}/generate-access-token/?exp=300&scope=write",
+							"raw": "{{health-v1}}/generate-access-token/?exp=4000&scope=write",
 							"host": [
 								"{{health-v1}}"
 							],
@@ -146,7 +236,7 @@
 							"query": [
 								{
 									"key": "exp",
-									"value": "300"
+									"value": "4000"
 								},
 								{
 									"key": "scope",

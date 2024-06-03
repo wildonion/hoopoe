@@ -9,25 +9,16 @@ use crate::*;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct EventQuery{
-    pub owner: Option<String>,
+    pub owner: Option<String>, // the entity owner
+    pub id: Option<i32>, // any entity id 
     pub from: Option<u64>,
     pub to: Option<u64>,
     pub page_size: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct SingleNotifQuery{
-    pub notif_id: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct HoopQuery{
-    pub id: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct UpdateHoopRequest{
-
+    pub  hoop_id: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
