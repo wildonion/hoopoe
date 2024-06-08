@@ -158,47 +158,22 @@ async fn main() -> std::io::Result<()>{
     /* -ˋˏ✄┈┈┈┈ logging
         >_
     */
-    let args = cli::ServerKind::parse();
     dotenv::dotenv().expect("expected .env file be there!");
     env::set_var("RUST_LOG", "trace");
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
 
-    /* -ˋˏ✄┈┈┈┈ initializing appstate actor workers
+    /* -ˋˏ✄┈┈┈┈ initializing app contexts: storages and actor workers
         >_ run actor workers, app_state contains the whole app data 
         which will be used globally during the execution of the app
     */
     let app_state = appstate::AppState::init().await;
 
-
-    /* -ˋˏ✄┈┈┈┈ migrating on startup
-        >_ ORM checks on its own that the db is up to create the pool connection
-        it won't start the app if the db is off, makes sure you've started
-        the pg db server
-    */
-    let connection = sea_orm::Database::connect(
-        &app_state.config.as_ref().unwrap().vars.DATABASE_URL
-    ).await.unwrap();
-    let fresh = args.fresh;
-    if fresh{
-        Migrator::fresh(&connection).await.unwrap();
-        Migrator::refresh(&connection).await.unwrap();
-    } else{
-        Migrator::up(&connection, None).await.unwrap();
-    }
-    
-    Migrator::status(&connection).await.unwrap();
-
     /* -ˋˏ✄┈┈┈┈ bootstrapping http server
         >_ 
     */
-    info!("➔ 🚀 {} HTTP+WebSocket server has launched from [{}:{}] at {}", 
-        APP_NAME, app_state.config.as_ref().unwrap().vars.HOST, 
-        app_state.config.as_ref().unwrap().vars.HTTP_PORT.parse::<u16>().unwrap(), 
-        chrono::Local::now().naive_local());
-
     bootsteap_http!{
-        app_state.clone(), // sharing the whole app state data between actix threads and apis
+        app_state.clone(), // sharing the whole app state data between actix service factory threads
     }
         
 
