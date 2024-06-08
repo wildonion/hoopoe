@@ -203,3 +203,9 @@ services:
 networks:
   hoopoe:
   host:
+  existing1:
+    name: existing_network_1
+    external: true
+  existing2:
+    name: existing_network_2
+    external: true
