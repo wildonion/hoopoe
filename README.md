@@ -111,6 +111,100 @@ tokio::select! {
 }
 ```
 
+### proper way to produce and consume data from RMQ broker
+
+> [!IMPORTANT]
+> start producing or consuming in the background by sending related message to their actors inside the `tokio::spawn()` scope.
+
+#### to produce data in the background: 
+
+```rust
+#[derive(Clone)]
+struct SomeData{}
+let data = SomeData{};
+tokio::spawn( // running the producing notif job in the background in a free thread
+    {
+        let cloned_app_state = app_state.clone();
+        let cloned_notif = ProduceNotif{
+            "local_spawn": true,
+            "notif_data": { 
+                "receiver_info": "1",
+                "id": "unqie-id0",
+                "action_data": {
+                    "pid": 200.4
+                }, 
+                "actioner_info": "2", 
+                "action_type": "ProductPurchased", 
+                "fired_at": 1714316645, 
+                "is_seen": false
+            }, 
+            "exchange_name": "SavageEx",
+            "exchange_type": "fanout", // amq.topic for pubsub
+            "routing_key": "" // routing pattern or key - will be ignored if type is fanout
+        };
+        async move{
+            match cloned_app_state.clone().actors.as_ref().unwrap()
+                    .producer_actors.notif_actor.send(cloned_notif).await
+                {
+                    Ok(_) => { () },
+                    Err(e) => {
+                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                        let err_instance = crate::error::HoopoeErrorResponse::new(
+                            *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                            crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                            &String::from("register_notif.producer_actors.notif_actor.send"), // current method name
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                        return;
+                    }
+                }
+            }
+    }
+);
+```
+
+> to consume data in the background:
+
+```rust
+tokio::spawn( // running the consuming notif job in the background in a free thread
+    {
+        let cloned_app_state = app_state.clone();
+        let cloned_notif = ConsumeNotif{
+            "queue": "TestOnion",
+            "exchange_name": "SavageEx",
+            "routing_key": "",
+            "tag": "cons_tag0",
+            "redis_cache_exp": 300,
+            "local_spawn": true,
+            "cache_on_redis": true,
+            "store_in_db": true
+        };
+        async move{
+            // consuming notif by sending the ConsumeNotif message to 
+            // the consumer actor,
+            match cloned_app_state.clone().actors.as_ref().unwrap()
+                    .consumer_actors.notif_actor.send(cloned_notif).await
+                {
+                    Ok(_) => { () },
+                    Err(e) => {
+                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                        let err_instance = crate::error::HoopoeErrorResponse::new(
+                            *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                            crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                            &String::from("register_notif.consumer_actors.notif_actor.send"), // current method name
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                        return;
+                    }
+                }
+
+        }
+    }
+);
+```
+
 ## routes and apis
 
 ```bash
