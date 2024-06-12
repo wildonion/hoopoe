@@ -116,7 +116,14 @@ pub(self) async fn register_notif(
                             match cloned_app_state.clone().actors.as_ref().unwrap()
                                     .consumer_actors.notif_actor.send(cloned_notif).await
                                 {
-                                    Ok(_) => { () },
+                                    Ok(_) => { 
+                                        
+                                        // in here you could access the notif for an owner using 
+                                        // a redis key like: notif_owner:3 which retrieve all data
+                                        // on the redis for the receiver with id 3   
+                                        () 
+
+                                    },
                                     Err(e) => {
                                         let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                                         let err_instance = crate::error::HoopoeErrorResponse::new(
@@ -163,6 +170,11 @@ pub(self) async fn register_notif(
 
 }
 
+/* -ˋˏ✄┈┈┈┈
+    >_  this route is used mainly to retrieve notifications in a short polling 
+        manner, client must call this api in an interval to fetch notifs for an
+        owner or whole data like every 5 seconds to simulate realtiming in client.
+*/
 #[get("/notif/")]
 pub(self) async fn get_notif(
     req: HttpRequest,

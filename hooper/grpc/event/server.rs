@@ -79,6 +79,8 @@ impl EventPubsubService for EventServer{
         }
 
         
+        // grpc is the nice protocol to build message queues and brokers like rmq
+        // so we can create a pubsub service like:
         // get a list of all grpc clients from redis cache
         // then send the received message with its title (channel) to 
         // those ones are subscribing to the topic 

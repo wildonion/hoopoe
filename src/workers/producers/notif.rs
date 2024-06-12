@@ -98,9 +98,9 @@ impl NotifProducerActor{
                         Ok(chan) => {
 
                             let mut ex_options = ExchangeDeclareOptions::default();
-                            ex_options.auto_delete = true; // the exchange can only be deleted if all bindings are deleted
+                            ex_options.auto_delete = true; // the exchange can only be deleted automatically if all bindings are deleted
                             ex_options.durable = true; // durability is the ability to restore data on node shutdown
-                            
+
                             // -ˋˏ✄┈┈┈┈ creating exchange
                             /* 
                                 you should set the auto_delete flag to True when declaring the exchange. This will 
@@ -136,8 +136,7 @@ impl NotifProducerActor{
                                             "NotifProducerActor.exchange_declare", // method
                                             Some(&zerlog_producer_actor)
                                         ).await;
-
-                                        return;   
+                                        
                                     }
 
                                 };

@@ -29,8 +29,8 @@ pub(self) async fn index(
 
     // we can convert payload stream into the ws messages using ws msg handlers
     let mut buffer = vec![];
-    while let Some(chunk) = stream.next().await{ // reading future objects from the streamer is a mutable process
-        match chunk{
+    while let Some(get_chunk) = stream.next().await{ // reading future objects from the streamer is a mutable process
+        match get_chunk{
             Ok(b) => {
                 buffer.extend_from_slice(&b);
             },
@@ -58,6 +58,7 @@ pub(self) async fn index(
 
     // some user inputs validation
     // starting session actor probably!
+
     // ...
 
     /* -ˋˏ✄┈┈┈┈
@@ -66,13 +67,19 @@ pub(self) async fn index(
         is established, the HTTP connection transitions to a WebSocket connection and remains 
         open as long as the WebSocket session is active, the ws::start function is used to start 
         the WebSocket connection, transitioning the HTTP connection to a WebSocket connection.
+        every client which is connected to the ws server is an actor which can be accessible 
+        easily during the execution of the app to send message to that via actor message sending
+        pattern, this way gently makes easier for us to store clients inside the ws server by 
+        their actor address instead of socket address.
     */
     // use this: https://github.com/wildonion/gem/blob/master/core/panel/apis/clp/chat.rs
+    // starting a session actor for this connection
     // let ws_resp = ws::start(
     //     ws_session_actor, 
     //     &req, 
     //     stream
     // );
+
     
     todo!()
 

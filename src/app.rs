@@ -120,6 +120,7 @@ use once_cell::sync::Lazy;
 use std::rc::Weak;
 use tokio::sync::RwLock;
 use migration::{Migrator, MigratorTrait};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 
 // all macros in other crates will be loaded in here 
