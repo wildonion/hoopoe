@@ -6,13 +6,13 @@ use serde::{Serialize, Deserialize};
 
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct Request{
+pub struct Fetch{
     path: String,
     auth_token: String,
     base_url: String,
 }
 
-impl Request{
+impl Fetch{
 
     pub fn builder(path: &str, auth_token: &str, base_url: &str) -> Self{
         Self{

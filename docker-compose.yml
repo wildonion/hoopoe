@@ -32,6 +32,8 @@ services:
       - "6379:6379"
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
     hostname: redis
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
     healthcheck:
@@ -51,11 +53,13 @@ services:
       - "7050:3000"
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
     user: "$(id -u)"
 ##### ===================================================================================================
   portainer:
     container_name: portainer
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -65,10 +69,12 @@ services:
       - "9443:9443"
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   timescaledb:
     container_name: postgres
-    image: timescale/timescaledb-ha:pg16
+    image: timescale/timescaledb-ha
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -81,6 +87,8 @@ services:
       - "127.0.0.1:5433:5432" # this local binding only avoid the container eating cpu constantly due having kinsing virus in this timescaledb container
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "localhost", "-U", "$POSTGRES_USER", "-d", "postgres"]
       interval: 10s
@@ -89,7 +97,7 @@ services:
 ##### ===================================================================================================
   rabbitmq:
     container_name: rabbitmq
-    image: rabbitmq:latest
+    image: rabbitmq
     restart: unless-stopped
     environment:
       - RABBITMQ_DEFAULT_USER=${AMQP_USERNAME}
@@ -99,6 +107,8 @@ services:
       - "15672:15672"
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
     hostname: rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q ping
@@ -119,6 +129,8 @@ services:
       - "7543:8080"
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   hoopoe-http:
     container_name: hoopoe-http
@@ -139,6 +151,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   hooper-tcp:
     container_name: hooper-tcp
@@ -159,6 +173,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   hooper-grpc:
     container_name: hooper-grpc
@@ -179,6 +195,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   hooper-p2p:
     container_name: hooper-p2p
@@ -199,13 +217,12 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
+      - existing_net1
+      - existing_net2
 
 networks:
   hoopoe:
   host:
-  existing1:
-    name: existing_network_1
-    external: true
-  existing2:
-    name: existing_network_2
-    external: true
+  bridge:
+    existing_net1: external:true
+    existing_net2: external:true

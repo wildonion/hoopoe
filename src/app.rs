@@ -1,4 +1,6 @@
 
+
+
 /*
 
 Coded by
@@ -71,15 +73,14 @@ Coded by
 
 */
 
-use crate::workers::consumers::notif::ConsumeNotif;
-use crate::workers::producers::notif::ProduceNotif;
-use crate::consts::APP_NAME;
+use crate::constants::APP_NAME;
 use std::env;
 use std::net::SocketAddr;
-use actix_web::middleware::Logger;
-use consts::SERVERS;
 use clap::Parser;
 use dotenv::dotenv;
+use models::event::NotifData;
+use salvo::http::response;
+use workers::notif::{self, NotifBrokerActor};
 use std::io::BufWriter;
 use std::str::FromStr;
 use std::{fs::OpenOptions, io::BufReader};
@@ -94,16 +95,7 @@ use redis_async::client::{self, PubsubConnection, ConnectionBuilder};
 use redis::RedisError;
 use uuid::Uuid;
 use log::{info, error};
-use actix_redis::{Command, RedisActor, resp_array, RespValue};
-use actix::{Actor, StreamHandler};
-use actix_web_actors::ws;
-use actix_cors::Cors;
-use actix_web::{App, Error, web, cookie::{self, Cookie, time::Duration, time::OffsetDateTime}, 
-                web::Data, http::header, HttpRequest, middleware,
-                HttpServer, Responder, HttpResponse, get, post, ResponseError};
-use actix_multipart::Multipart;
 use env_logger::Env;
-use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
@@ -121,61 +113,53 @@ use std::rc::Weak;
 use tokio::sync::RwLock;
 use migration::{Migrator, MigratorTrait};
 use std::sync::atomic::{AtomicBool, Ordering};
+use salvo::Router;
+use salvo::prelude::*;
+use tracing::subscriber;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
+use serde::{Serialize, Deserialize};
+use salvo::logging::Logger;
+use salvo::oapi::extract::*;
+use crate::server::HoopoeServer;
 
-
-// all macros in other crates will be loaded in here 
-// so accessing them from other crates and modules is
-// like use crate::macro_name;
-
-mod workers;
-mod interfaces;
-mod s3;
-mod config;
-mod consts;
-mod lockers;
-mod error;
 mod server;
-mod types;
-mod appstate;
-mod services;
-mod requests;
 mod apis;
-mod extractors;
-mod cli;
-mod tests;
 mod models;
+mod types;
+mod helpers;
+mod tests;
+mod constants;
+mod requests;
 mod entities;
+mod config;
+mod cli;
+mod tasks;
+mod interfaces;
+mod context;
+mod storage;
+mod workers;
+mod lockers;
+mod middlewares;
+mod error;
+mod routers;
 
 
+#[tokio::main]
+async fn main(){
 
-/* ******************************* IMPORTANT *******************************
-    can't start tokio stuffs or actix stuffs like actors inside the context
-    of actix or tokio runtime, so we can't have a pure TCP server with 
-    actix_web::main HTTP server with tokio::main. 
- ************************************************************************* */
-#[actix_web::main]
-async fn main() -> std::io::Result<()>{
-
-    /* -ˋˏ✄┈┈┈┈ logging
-        >_
-    */
-    dotenv::dotenv().expect("expected .env file be there!");
-    env::set_var("RUST_LOG", "trace");
-    env_logger::init_from_env(Env::default().default_filter_or("info"));
-
-
-    /* -ˋˏ✄┈┈┈┈ initializing app contexts: storages and actor workers
-        >_ run actor workers, app_state contains the whole app data 
-        which will be used globally during the execution of the app
-    */
-    let app_state = appstate::AppState::init().await;
-
-    /* -ˋˏ✄┈┈┈┈ bootstrapping http server
-        >_ 
-    */
-    bootsteap_http!{
-        app_state.clone(), // sharing the whole app state data between actix service factory threads
-    }
-        
+    // new() method accepts two params: the address and the domain
+    // to add ssl using let's encrypt, so if you want to make an 
+    // internal ssl just pass your app domain name as second param.
+    let domain = Some(constants::APP_DOMAIN.to_string());
+    let mut app = HoopoeServer::new(None).await; // create server, read the address from the env
+    
+    app.initLog(); // trace the logs
+    app.buildAppContext().await; // build the entire app context (actors, confis)
+    app.buildRouter(); // build app router from apis + swagger ui 
+    
+    app.buildService(); // build salvo service
+    app.applyMigrations().await; // execute db migration files
+    app.run().await; // run server; after this call we can't use app since the run() method isn't &self and takes the ownership of the app instance
 
 }

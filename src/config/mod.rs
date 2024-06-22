@@ -50,7 +50,7 @@ pub trait EnvExt{
 impl EnvExt for Env{
 
     type Context = Context<Self>;
-
+    
     fn get_vars(&self) -> Self::Context {
 
         dotenv::dotenv().expect("expected .env file be there!");

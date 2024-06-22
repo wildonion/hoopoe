@@ -32,8 +32,8 @@ pub fn gen_random_chars_no_special(size: u32) -> String{
 pub fn get_random_elem<T: Default + Clone + Send + Sync + Sized>(vec: Vec<T>) -> T{
     // making a high entropy seed to create the rng
     let random_chars = gen_random_chars(10);
-    let hash_of_random_chars = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
-    let mut crypto_seeded_rng = rand_chacha::ChaCha20Rng::from_seed(hash_of_random_chars);
+    let high_entropy_seed = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
+    let mut crypto_seeded_rng = rand_chacha::ChaCha20Rng::from_seed(high_entropy_seed);
 
     // to_owned() convert the pointer to the owned type by cloning it
     // since clone returns the actual type it's kinda like dereferencing 

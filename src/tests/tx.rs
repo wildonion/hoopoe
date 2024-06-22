@@ -1,17 +1,29 @@
 
-
-use actix::Context;
-
+use wallexerr::misc::Wallet;
+use crate::interfaces::tx::TransactionPoolActorTxExt;
 use crate::*;
 
-/* --------------------- a fintech object
+pub static WALLET: Lazy<std::sync::Arc<wallexerr::misc::Wallet>> = Lazy::new(||{
+    let wallet = Wallet::new_ed25519();
+    std::sync::Arc::new(wallet) // a shareable wallet object
+});
+
+/* --------------------- a fintech object to do any financial process
+    atomic tx syncing execution to avoid deadlocks, race conditions and double spendings using tokio select spawn arc mutex channels
     produce tx actor objects to rmq then consume them in txpool service and update the balance in there
     use notif prodcons actor worker to produce and consume tx objects
     send each tx object into the exchange 
     tx pool service concumes every incoming tx and execute them in the background
     safe tx execution without double spending issue using tokio spawn select mutex and channels
     finally tx pool service publishes the result of executed each tx into the exchange 
-    tokio spawn, select, mutex, channels, redis, rmq, actor worker <---> ws, http, tcp, quic, grpc, p2p, wrtc
+
+    1 => create ed25591 wallet keypairs with high entropy seed for its rng
+    2 => then build tx object and use sha256 to make a hash of the stringified of tx object
+    3 => sign the hash of the tx object with prvkey to create the tx signature
+    4 => use pubkey and hash of tx object to verify the signature
+    use hex::encode() to generate hex string from utf8 bytes
+    use hex::decode() to generate utf8 bytes from hex string
+    use base58 and base64 to generate base58 or base64 from utf8 bytes  
  */
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct TransactionPoolActor{
@@ -22,7 +34,10 @@ pub struct TransactionPoolActor{
     data: Vec<u8>, // every tx object can store data
     tx_type: TxType,
     treasury_type: TreasuryType,
-    status: TxStatus
+    status: TxStatus,
+    hash: String, // sha256 ash of the transaction
+    tx_sig: String, // the signature result of signing the tx hash with private key, this will use to verify the tx along with the pubkey of the signer
+    signer: String, // the one who has signed the tx
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -45,26 +60,8 @@ pub enum TreasuryType{
 impl TransactionPoolActor{
     pub fn new(amount: f64, from: &str, to: &str, tax: f64, data: &[u8]) -> Self{
 
-        trait ArrExt{
-            fn getCode(&self) -> &Self;
-        }
-        type Arr = [String];
-        impl ArrExt for Arr{
-            // returning the borrowed form of [String] with the lifetime of &self 
-            // since [String] has no fixed size at compile time
-            fn getCode(&self) -> &Self{
-                todo!()
-            }
-        }
-
-        let hex: u8 = 0xff; // hex
-        let oct = 0o777; // octal
-        let bin = 00001110; // bin
-
-        let arr_str: &Arr = &[String::from("")]; // slices need to behind the & due to their unknown size at compile time
-        _ = arr_str.getCode();
-
-        let tx = Self{
+        let wallet = WALLET.clone();
+        let mut tx = Self{
             amount,
             from: from.to_string(),
             to: to.to_string(),
@@ -73,7 +70,12 @@ impl TransactionPoolActor{
             status: TxStatus::Started,
             tx_type: TxType::Deposit,
             treasury_type: TreasuryType::Credit,
+            hash: String::from(""), // stringify the whole tx object then hash it
+            tx_sig: String::from(""), // sign the the stringified_tx_object with prvkey
+            signer: String::from("") // the one who has signed with the prv key usually the server
         };
+
+
         // tx.on_error(||{});
         // tx.on_success(||{});
         // tx.on_reject(||{});
@@ -82,14 +84,6 @@ impl TransactionPoolActor{
         
     }
     
-}
-
-impl Actor for TransactionPoolActor{
-
-    type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -106,18 +100,10 @@ pub struct FailedTx{
     cause: String
 }
 
-trait TransactionPoolActorTx{
-    type Tx;
-    fn execute(&self) -> Self;
-    fn get_status(&self) -> Self;
-    fn started(&self);
-    fn aborted(&self);
-}
-
-impl TransactionPoolActorTx for TransactionPoolActor{
+impl TransactionPoolActorTxExt for TransactionPoolActor{
     type Tx = Self;
 
-    fn execute(&self) -> Self {
+    async fn execute(&self) -> Self {
         
         // update user balance and treasury logics
         // ...
@@ -125,11 +111,11 @@ impl TransactionPoolActorTx for TransactionPoolActor{
         todo!()
     }
 
-    fn get_status(&self) -> Self {
+    async fn get_status(&self) -> Self {
         todo!()
     }
 
-    fn started(&self){}
+    async fn started(&self){}
 
-    fn aborted(&self){}
+    async fn aborted(&self){}
 }

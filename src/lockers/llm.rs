@@ -101,16 +101,12 @@
         However, if your specific case involves a lot of concurrent reads with infrequent writes and the 
         read operations are substantial enough to create a bottleneck, a RWLock might be a better choice.
 */
+//-----------------------------------------------------------------------------------------------------
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use actix::Addr;
-use actix_web::web::route;
+use interfaces::product::ProductExt;
 use serde::{Deserialize, Serialize};
-use interfaces::purchase::ProductExt;
-use crate::{consts::PURCHASE_DEMO_LOCK_MUTEX, *};
-
-use self::workers::producers::notif::NotifProducerActor;
-
+use crate::{constants::PURCHASE_DEMO_LOCK_MUTEX, *};
 
 
 /*  
@@ -130,22 +126,28 @@ use self::workers::producers::notif::NotifProducerActor;
     for the Product struct but the following is not ok:
     impl anothercrate1::ProductExt for anothercrate2::Product{}
 */
+#[derive(Extractible)]
+#[salvo(extract(default_source(from="body")))]
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Product{
-    pub pid: i32,
+    #[salvo(extract(source(from="query")))]
+    pub pid: i32, // pid gets filled from the query
     pub buyer_id: i32,
-    pub is_minted: bool
+    pub is_minted: bool,
 }
 
 impl ProductExt for Product{
     type Product = Self;
-    async fn atomic_purchase_status(&self, notif_producer_actor: Addr<NotifProducerActor>) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>) {
-        start_minting(self.clone(), notif_producer_actor).await
+    async fn atomic_purchase_status(&mut self) -> (bool, tokio::sync::mpsc::Receiver<Product>) {
+        start_minting(self.clone()).await
     }
-    async fn mint(&mut self, notif_producer_actor: Addr<NotifProducerActor>) -> (bool, Product){ 
+    async fn mint(&mut self) -> (bool, Product){ 
         
         let Product{pid, buyer_id, is_minted} = self.clone();
         log::info!("minting product with id {}", pid);
+
+        /////-------------- logic1
+        /////------------------------------
 
         // eg: it takes approximately 10 seconds or more to mint a product
         // meanwhile we MUST reject any request coming to the api from 
@@ -153,19 +155,13 @@ impl ProductExt for Product{
         // is over
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
+        /////-------------- logic2
+        /////------------------------------
+        // send the product into to the rmq channel, we receive it 
+        // inside the mint service and start minting then produce 
+        // the result into the exchange so the consumer in here can 
+        // consume it and update the product info in here.
         tokio::spawn(async move{
-
-            // // sending a notif data contains the product info into the rmq exchange
-            // // nftport-minter-service-actor will consume it to start the minting process
-            // notif_producer_actor.send(
-            //     ProduceNotif{
-            //         local_spawn: todo!(),
-            //         notif_data: todo!(),
-            //         exchange_name: todo!(),
-            //         exchange_type: todo!(),
-            //         routing_key: todo!(),
-            //     }
-            // ).await;
             
             // -----------------------
             //// FUTURE IMPROVEMENTS
@@ -192,7 +188,9 @@ impl ProductExt for Product{
             
         });
 
-        let pinfo = Product{pid, buyer_id, is_minted: false}; // some minted product info
+        // doesn't matter to update the is_minted in here cause it gets updated
+        // after a successful minting
+        let pinfo = Product{pid, buyer_id, is_minted }; // some minted product info
         (false, pinfo)
 
     }
@@ -239,15 +237,15 @@ impl ProductExt for Product{
     step3) if it's in there then we must reject the request
     step4) otherwise we can proceed to minting process
 */
-pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifProducerActor>) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
 
-    let Product { pid, buyer_id, is_minted } = product;
+    let Product { pid, buyer_id, is_minted } = product.clone();
 
     // cloning the static mutex, having a global data in Rust requires to define 
     // an static type and if it wants to be mutated we should use arc mutex which 
     // converts it into a thread safe mutable data since Rust doesn't support raw
     // static for mutation due to avoiding deadlocks and race conditions.
-    let lock_ids = consts::PURCHASE_DEMO_LOCK_MUTEX.clone();
+    let lock_ids = constants::PURCHASE_DEMO_LOCK_MUTEX.clone();
     
     let (tx, mut rx) = 
         tokio::sync::mpsc::channel::<bool>(1024);
@@ -301,7 +299,7 @@ pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifPro
             let mut product_info = product.clone();
             async move{
 
-                let (err, mut pinfo) = product_info.mint(notif_producer).await;
+                let (err, mut pinfo) = product_info.mint().await;
                 
                 // set the minting flag to true, if there was no error
                 if !err{
@@ -330,7 +328,7 @@ pub(self) async fn start_minting(product: Product, notif_producer: Addr<NotifPro
                     with storing product info in db and notify the client with the status
                 */
                 let mut write_lock = lock_ids.lock().await;
-                (*write_lock).retain(|&p_id| p_id != pid); // product got minted, don't keep its id in the locks vector
+                (*write_lock).retain(|&p_id| p_id != pid); // product got minted, don't keep its id in the locks vector, other clients can demand the minting process easily on the next request
             }
         }
     );

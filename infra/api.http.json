@@ -195,7 +195,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"pid\": 1,\n    \"is_minted\": false,\n    \"buyer_id\": 1\n}",
+							"raw": "{\n    \"is_minted\": false,\n    \"buyer_id\": 1,\n    \"meta\": null\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -203,44 +203,17 @@
 							}
 						},
 						"url": {
-							"raw": "{{health-v1}}/mint-demo",
+							"raw": "{{health-v1}}/?pid=1",
 							"host": [
 								"{{health-v1}}"
 							],
 							"path": [
-								"mint-demo"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Generate Access Token",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{secret_key}}"
-							}
-						],
-						"url": {
-							"raw": "{{health-v1}}/generate-access-token/?exp=4000&scope=write",
-							"host": [
-								"{{health-v1}}"
-							],
-							"path": [
-								"generate-access-token",
 								""
 							],
 							"query": [
 								{
-									"key": "exp",
-									"value": "4000"
-								},
-								{
-									"key": "scope",
-									"value": "write"
+									"key": "pid",
+									"value": "1"
 								}
 							]
 						}
@@ -265,12 +238,43 @@
 							}
 						},
 						"url": {
-							"raw": "{{health-v1}}/check",
+							"raw": "{{health-v1}}",
 							"host": [
 								"{{health-v1}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Generate Access Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{secret_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{auth-v1}}?exp=4000&scope=write",
+							"host": [
+								"{{auth-v1}}"
 							],
-							"path": [
-								"check"
+							"query": [
+								{
+									"key": "exp",
+									"value": "4000"
+								},
+								{
+									"key": "scope",
+									"value": "write"
+								}
 							]
 						}
 					},
@@ -304,12 +308,17 @@
 	"variable": [
 		{
 			"key": "events-v1",
-			"value": "http://localhost:2344/v1/events",
+			"value": "http://localhost:2344/v1/events/",
+			"type": "string"
+		},
+		{
+			"key": "auth-v1",
+			"value": "http://localhost:2344/v1/auth/",
 			"type": "string"
 		},
 		{
 			"key": "health-v1",
-			"value": "http://localhost:2344/v1/health",
+			"value": "http://localhost:2344/v1/health/",
 			"type": "string"
 		},
 		{

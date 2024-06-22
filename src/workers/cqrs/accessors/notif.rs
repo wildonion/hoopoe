@@ -6,22 +6,21 @@ use std::net;
 use std::str::FromStr;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context, Handler};
-use actix_web::ResponseError;
 use chrono::{DateTime, FixedOffset};
-use consts::STORAGE_IO_ERROR_CODE;
+use constants::STORAGE_IO_ERROR_CODE;
 use deadpool_redis::{Connection, Manager, Pool};
 use redis::{AsyncCommands, Commands};
 use sea_orm::{ConnectionTrait, QueryResult, Statement, Value};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use crate::models::event::DbNotifData;
-use crate::workers::producers::zerlog::ZerLogProducerActor;
-use crate::{workers::consumers, models::event::NotifData};
+use crate::workers::zerlog::ZerLogProducerActor;
+use crate::{models::event::NotifData};
 use crate::types::RedisPoolConnection;
-use crate::s3::Storage;
-use crate::consts::PING_INTERVAL;
+use crate::storage::engine::Storage;
+use crate::constants::PING_INTERVAL;
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
-use crate::{consts, entities};
+use crate::{constants, entities};
 use crate::entities::notifs::{
     self, Model as NotifModel, Column as NotifColumn,
     ActiveModel as NotifActiveModel, 
@@ -52,7 +51,7 @@ pub struct RequestNotifDataByNotifId{
     pub notif_id: i32
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct NotifDataResponse{
     pub notifs: Vec<notifs::Model>,
     pub items: u64,
@@ -85,7 +84,7 @@ impl Actor for NotifAccessorActor{
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 NotifAccessorActor has started, let's read baby!");
+        log::info!("🎬 NotifAccessorActor has started");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -120,7 +119,7 @@ impl NotifAccessorActor{
         let db_backend = db.get_database_backend();
         let stmt = Statement::from_sql_and_values(
             db_backend, 
-            consts::queries::SELECT_BY_NOTIF_ID,
+            constants::queries::SELECT_BY_NOTIF_ID,
             [
                 notif_id.into() // Value::Int(Some())
             ]
@@ -149,7 +148,7 @@ impl NotifAccessorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "get_by_notif_id.db.query_one", // method

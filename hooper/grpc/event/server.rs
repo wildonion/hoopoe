@@ -30,7 +30,7 @@ pub struct EventServer{}
 impl EventServer{
 
     pub async fn start(addr: SocketAddr) 
-        -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{ // handling error dynamically at runtime using dynamic dispatching
+        -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{ // dynamic dispatch approach for handling errors at runtime
 
         info!("🚀 {} gRPC server has launched in the background from [{}] at {}", 
             APP_NAME, addr, chrono::Local::now().naive_local());
@@ -48,7 +48,7 @@ impl EventServer{
         
     }
 
-    fn restart() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{
+    fn restart() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{ // dynamic dispatch approach for handling errors at runtime
 
         // if there was an already server is started 
         // then restart it
@@ -74,8 +74,8 @@ impl EventPubsubService for EventServer{
             chrono::Local::now().naive_local(), request);
         
         let mut req = request.into_inner();
-        while let Some(data) = req.next().await{
-
+        while let Some(data) = req.next().await{ // stream over req future objects contains EventRequest data instance
+            
         }
 
         

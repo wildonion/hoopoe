@@ -7,11 +7,45 @@
     https://ryhl.io/blog/actors-with-tokio/
     https://medium.com/@maturationofthe/leveraging-rusts-tokio-library-for-asynchronous-actor-model-cf6d477afb19
 
-    actor is a simple structure that can be used to execute async tasks and jobs in the whole 
-    actor system threadpool they can also communicate and send message to each other by using 
-    their mailbox, mailbox gives each actor a unique address to send message togehter using 
-    channels like mpsc and oneshot in local and rpc and rmq in a remote manner.
+    async tasks execution flow in user space level (not os threads):
+    >_ code             : developer put a future on the stack
+    >_ code             : hey runtime scheduler, developer did an await on the task in a lightweight thread of execution of an actor which has its own stack!
+    >_ code             : if you don't mind me asking, can i have the result right now?
+    >_ runtime scheduler: allow me to poll the result out of the future stack,... oh no sorry the future is not ready yet! i'll go for other tasks and notify you once it gets ready
+    >_ code             : alright sir, i'll keep executing other tasks, perhaps sending the result through an mpsc channel to.... 
+    >_ runtime scheduler: hey i've just received the result of the future you wanted earlier from the waker, here is the result.
+    >_ code             : as i was saying, ....to outside of this current thread! great other threads and scopes can now use the result as they're receiving the result from the channel that i've sent earlier.           
 
+    in those days that async wasn't there we had been using the queue concepts 
+    to queue some tasks then execute them one by one but with the arrival of the
+    async tasks/jobs/processes we can just wait for multiple tasks while we're 
+    executing others simultaneously and concurrently, here is the concurrency model 
+    for actor worker object (actix): 
+        > example of executing async task: 
+            - handle each socket in the background asyncly in a tokio spawn like writing bytes to a networking interface like tcp based protocols (ws, http, rmq, redis and rpc)
+            - mutating an object in a separate thread by locking on the mutex to acquire the lock to avoid blocking the current thread
+            - waiting for some io to get received while other tasks are being executed simultaneously
+                ::> in this case the runtime scheduler check for the task to poll out of the stack if 
+                    it has completed otherwise the waker fo the future object notify the scheduler as
+                    soon as the task gets completed.
+        > creating new actor object creates new lightweight thread of execution using tokio spawn to execute asyc tasks inside that 
+        > thread management: each actor has its own lighweight thread of execution (an actor object is a lightweight worker thread)
+        > async task process execution in the background: use tokio::spawn over tokio runtime scheduler
+        > send async task resp across threads: use jobq based channels mailboxes, mpsc or rpc 
+        > async task example: atomic syncing for mutating data in threads using arc mutex
+        > control over the execution flow: use tokio select to only join that thread which is completed sooner than others
+        > distributed clustering talking: use rpc for sending message and calling each other methdos
+    conclusion:
+        actor is a simple structure that can be used to execute async tasks and jobs in the whole 
+        actor system threadpool they can also communicate and send message to each other by using 
+        their mailbox, mailbox gives each actor a unique address to send message togehter using 
+        channels like mpsc and oneshot in local and rpc and rmq in a remote manner.
+        if there are two many variables to be stored on CPU registers they'll be stored on the stack 
+        related to the current thread cause each thread gets a seprate stack. 
+
+    ====================================
+    HOW 2 USE THESE IMPLEMENTATIONS:
+    ====================================
     for worker in 0..10{ //// spawning tokio green threads for 10 workers
         tokio::spawn(async move{ //// spawning tokio worker green threadpool to solve async task
             
@@ -55,7 +89,6 @@
 
 use std::{default, thread};
 use std::sync::mpsc as std_mpsc;
-use actix::Context;
 use tokio::sync::mpsc;
 use futures_util::Future;
 use is_type::Is;
@@ -150,18 +183,18 @@ pub struct JobHandler; // a threadpool structure to handle the poped-out job fro
 
 pub mod workerthreadpool{
 
-    // --------------- GUIDE TO CREATE A MULTITHREADED WEB SERVER ---------------
-    // every worker is a thread with an id along with the thread itself, a threadpool is a vector containing the number 
-    // of spawned workers then we'll send the async job to the sender channel by calling the execute method and while we're 
-    // streaming over the arced mutexed receiver inside each thread we receives the task in on of those free threads and 
-    // finally call the async task, the spawning threads in the background part are done inside the spawn() method also every 
-    // worker threadpool needs a channel and multiple spawned threads in the background so we could send the task to the 
-    // channel and receives it in one of the free spawned thread so the steps would be:
-    // 1 - create channel and spawn threads in the background waiting to receive from the channel by calling new() method
-    // 2 - pass the task to spawn() or execute() method then send it to channel
-    // 3 - make sure receiver is of type Arc<Mutex<Receiver>>
-
     /* 
+        --------------- GUIDE TO CREATE A MULTITHREADED WEB SERVER ---------------
+        every worker is a thread with an id along with the thread itself, a threadpool is a vector containing the number 
+        of spawned workers then we'll send the async job to the sender channel by calling the execute method and while we're 
+        streaming over the arced mutexed receiver inside each thread we receives the task in on of those free threads and 
+        finally call the async task, the spawning threads in the background part are done inside the spawn() method also every 
+        worker threadpool needs a channel and multiple spawned threads in the background so we could send the task to the 
+        channel and receives it in one of the free spawned thread so the steps would be:
+        1 - create channel and spawn threads in the background waiting to receive from the channel by calling new() method
+        2 - pass the task to spawn() or execute() method then send it to channel
+        3 - make sure receiver is of type Arc<Mutex<Receiver>>
+ 
         how threadpool works?
         once the execute method is called the task is sent to the jobq channel 
         spawned threads on the other hand are thrilling to receive the task 
@@ -170,7 +203,6 @@ pub mod workerthreadpool{
         acquire the lock on the receiver then the task can be called inside 
         that thread
     */
-
     pub use super::*;
 
     // ------------------------------------------------------------
@@ -297,7 +329,6 @@ pub mod workerthreadpool{
                         });
                         self.count += 1;
                     }
-
 
             pub async fn execute(mut self) -> Result<(), Box<dyn std::error::Error + Send +'static>>{
 

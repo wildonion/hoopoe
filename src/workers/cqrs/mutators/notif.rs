@@ -6,14 +6,11 @@ use actix::prelude::*;
 use std::future::IntoFuture;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
-use crate::workers::consumers::notif;
-use crate::workers::producers::zerlog::ZerLogProducerActor;
+use crate::workers::zerlog::ZerLogProducerActor;
 use crate::entities::hoops;
-use crate::workers::producers::notif::ProduceNotif;
 use crate::models::event::NotifData;
-use crate::interfaces::passport;
-use crate::s3::Storage;
-use crate::consts::{self, PING_INTERVAL};
+use crate::storage::engine::Storage;
+use crate::constants::{self, PING_INTERVAL};
 use serde_json::json;
 use crate::entities::*;
 
@@ -42,7 +39,7 @@ impl Actor for NotifMutatorActor{
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 NotifMutatorActor has started, let's mutate baby!");
+        log::info!("🎬 NotifMutatorActor has started");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -95,7 +92,7 @@ impl NotifMutatorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "notif_active_model.set_from_json", // method
@@ -135,7 +132,7 @@ impl NotifMutatorActor{
                         let error_content = &e.to_string();
                         let error_content = error_content.as_bytes().to_vec();
                         let mut error_instance = HoopoeErrorResponse::new(
-                            *consts::STORAGE_IO_ERROR_CODE, // error code
+                            *constants::STORAGE_IO_ERROR_CODE, // error code
                             error_content, // error content
                             ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                             "noif_active_model.save.try_into_model", // method
@@ -152,7 +149,7 @@ impl NotifMutatorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "noif_active_model.save", // method

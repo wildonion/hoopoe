@@ -2,41 +2,46 @@
 
 
 use std::error::Error;
-
-use crate::{error::HoopoeErrorResponse, models::http::Response, *};
+use crate::{error::HoopoeErrorResponse, *};
 use config::EnvExt;
-use consts::STORAGE_IO_ERROR_CODE;
-use models::user::UserData;
+use constants::STORAGE_IO_ERROR_CODE;
+use models::{server::Response, user::UserData};
 use types::*;
-use actix_web::http::StatusCode;
-use self::appstate::AppState;
+use self::context::AppContext;
+use crate::models::server::Response as HoopoeResponse;
 
 
-// async methods and functions need to be Send in order to share them
-// between threads for future solvation
-#[trait_variant::make(PassportSend: Send)]
+/* -----------------
+    https://boats.gitlab.io/blog/post/async-methods-i/
+    GATs can now generic params which allows us to have async 
+    method in traits cause the future returned by an async function 
+    captures all lifetimes inputed into the function, in order 
+    to express that lifetime relationship, the Future type needs 
+    to be generic over a lifetime, so that it can capture the 
+    lifetime from the self argument on the method.
+*/
 pub trait Passport{
 
     type Request;
 
-    async fn get_user(&self) -> Result<UserData, HoopoeHttpResponse>;
-    async fn get_secret(&self, app_state: web::Data<AppState>) -> Result<String, HoopoeHttpResponse>;
-    async fn verify_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>;
+    async fn get_user(&self) -> Result<UserData, salvo::Response>;
+    async fn get_secret(&self, app_state: Option<AppContext>) -> Result<String, salvo::Response>;
+    async fn verify_token_time(&self, app_state: Option<AppContext>, scope: &str) -> Result<String, salvo::Response>;
 }
 
 // only traits defined in the current crate can be implemented for types defined outside of the crate
 // Passport trait is defined here and must be implemented in this crate for HttpRequest which is a type
 // outside of this crate, we can't add the following codes in server or any other crates.
-impl Passport for actix_web::HttpRequest{
+impl Passport for salvo::Request{
 
     type Request = Self;
 
-    async fn get_user(&self) -> Result<UserData, HoopoeHttpResponse>{
+    async fn get_user(&self) -> Result<UserData, salvo::Response>{
 
         let req = self; // self is a mutable reference to the HttpRequest object
 
         let jwt = "";
-        let api = requests::Request::builder(
+        let api = requests::Fetch::builder(
             "/health/check-token", 
             jwt,
             &String::from("")
@@ -45,44 +50,53 @@ impl Passport for actix_web::HttpRequest{
         todo!()
     }
 
-    async fn get_secret(&self, app_state: web::Data<AppState>) -> Result<String, HoopoeHttpResponse>{
+    async fn get_secret(&self, app_state: Option<AppContext>) -> Result<String, salvo::Response>{
 
+        let mut resp = salvo::Response::new(); // create a new response object
         let req = self;
-        let config = app_state.config.as_ref().unwrap();
+        let config = app_state.as_ref().unwrap().config.as_ref().unwrap();
         let secret_key = &config.vars.SECRET_KEY;
 
         let headers = req.headers();
         let get_secret_key = headers.get("x-api-key");
         let Some(header_secret_key) = get_secret_key else{
             
-            let res = HttpResponse::build(StatusCode::NOT_ACCEPTABLE).json(
-                Response::<'_, &[u8]>{
-                    data: Some(&[]),
-                    message: &format!("ERROR: empty header secret key"),
+            let server_time = format!("{}", chrono::Local::now().to_string());
+            resp.status_code = Some(StatusCode::NOT_ACCEPTABLE);
+            resp.render(Json(
+                HoopoeResponse::<&[u8]>{ 
+                    data: &[], 
+                    message: "ERROR: empty header secret key", 
+                    is_err: true, 
                     status: StatusCode::NOT_ACCEPTABLE.as_u16(),
-                    is_error: true,
-                    meta: None
+                    meta: Some(
+                        serde_json::json!({
+                            "server_time": server_time
+                        })
+                    )
                 }
-            );
-            return Err(
-                Ok(res)
-            );
+            ));
+            return Err(resp);
         };
 
         if header_secret_key != secret_key{
 
-            let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
-                Response::<'_, &[u8]>{
-                    data: Some(&[]),
-                    message: &format!("ERROR: wrong secret key"),
+            let server_time = format!("{}", chrono::Local::now().to_string());
+            resp.status_code = Some(StatusCode::FORBIDDEN);
+            resp.render(Json(
+                HoopoeResponse::<&[u8]>{ 
+                    data: &[], 
+                    message: "ERROR: wrong secret key", 
+                    is_err: true, 
                     status: StatusCode::FORBIDDEN.as_u16(),
-                    is_error: true,
-                    meta: None
+                    meta: Some(
+                        serde_json::json!({
+                            "server_time": server_time
+                        })
+                    )
                 }
-            );
-            return Err(
-                Ok(res)
-            );
+            ));
+            return Err(resp);
 
         }
 
@@ -90,28 +104,34 @@ impl Passport for actix_web::HttpRequest{
 
     }
 
-    async fn verify_token_time(&self, app_state: web::Data<AppState>, scope: &str) -> Result<String, HoopoeHttpResponse>{
+    async fn verify_token_time(&self, app_state: Option<AppContext>, scope: &str) -> Result<String, salvo::Response>{
 
         let req = self;
-        let redis_pool = app_state.clone().app_storage.clone().unwrap().get_redis_pool().await.unwrap();
-        let zerlog_producer_actor = app_state.as_ref().actors.clone().unwrap().producer_actors.zerlog_actor;
+        let mut resp = salvo::Response::new(); // create a new response object
+        let redis_pool = app_state.as_ref().unwrap().app_storage.clone().unwrap().get_redis_pool().await.unwrap();
+        let zerlog_producer_actor = app_state.as_ref().unwrap().actors.clone().unwrap().broker_actors.zerlog_actor;
 
         let headers = req.headers();
         let get_secret_key = headers.get("x-api-key");
         let Some(header_secret_key) = get_secret_key else{
             
-            let res = HttpResponse::build(StatusCode::NOT_ACCEPTABLE).json(
-                Response::<'_, &[u8]>{
-                    data: Some(&[]),
-                    message: &format!("ERROR: empty header token time"),
-                    status: StatusCode::NOT_ACCEPTABLE.as_u16(),
-                    is_error: true,
-                    meta: None
+            let server_time = format!("{}", chrono::Local::now().to_string());
+            resp.status_code = Some(StatusCode::NOT_ACCEPTABLE);
+            resp.render(Json(
+                HoopoeResponse::<&[u8]>{ 
+                    data: &[], 
+                    message: "ERROR: empty header token time", 
+                    is_err: true,
+                    status: StatusCode::NOT_ACCEPTABLE.as_u16(), 
+                    meta: Some(
+                        serde_json::json!({
+                            "server_time": server_time
+                        })
+                    )
                 }
-            );
-            return Err(
-                Ok(res)
-            );
+            ));
+            return Err(resp);
+
         };
 
         match redis_pool.get().await{
@@ -124,41 +144,49 @@ impl Passport for actix_web::HttpRequest{
                     let token_time: String = redis_conn.get(&redis_key).await.unwrap();
                     if header_secret_key != &token_time{
 
-                        let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
-                            Response::<'_, &[u8]>{
-                                data: Some(&[]),
-                                message: &format!("ERROR: wrong token time "),
-                                status: StatusCode::FORBIDDEN.as_u16(),
-                                is_error: true,
-                                meta: None
+                        let server_time = format!("{}", chrono::Local::now().to_string());
+                        resp.status_code = Some(StatusCode::FORBIDDEN);
+                        resp.render(Json(
+                            HoopoeResponse::<&[u8]>{ 
+                                data: &[], 
+                                message: "ERROR: wrong token time", 
+                                is_err: true,
+                                status: StatusCode::FORBIDDEN.as_u16(), 
+                                meta: Some(
+                                    serde_json::json!({
+                                        "server_time": server_time
+                                    })
+                                )
                             }
-                        );
-                        return Err(
-                            Ok(res)
-                        );
+                        ));
+                        return Err(resp);
             
                     } else{
 
                         /*  -ˋˏ✄┈┈┈┈
                             this is not necessary to be checked cause we're using redis set_ex key
                             to set an expirable token time and if we couldn't get the token time from 
-                            redis means it has been expired
+                            redis in the first place it means it has been expired.
                         */
                         let now = chrono::Local::now().timestamp();
                         let parsed_token_time = token_time.parse::<i64>().unwrap_or_default();
                         if parsed_token_time > now{
-                            let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
-                                Response::<'_, &[u8]>{
-                                    data: Some(&[]),
-                                    message: &format!("ERROR: ahead of time for token time"),
-                                    status: StatusCode::FORBIDDEN.as_u16(),
-                                    is_error: true,
-                                    meta: None
+                            let server_time = format!("{}", chrono::Local::now().to_string());
+                            resp.status_code = Some(StatusCode::FORBIDDEN);
+                            resp.render(Json(
+                                HoopoeResponse::<&[u8]>{ 
+                                    data: &[], 
+                                    message: "ERROR: expired token time", 
+                                    is_err: true,
+                                    status: StatusCode::FORBIDDEN.as_u16(), 
+                                    meta: Some(
+                                        serde_json::json!({
+                                            "server_time": server_time
+                                        })
+                                    )
                                 }
-                            );
-                            return Err(
-                                Ok(res)
-                            );
+                            ));
+                            return Err(resp);
                         }
                         // -ˋˏ✄┈┈┈┈
 
@@ -166,18 +194,23 @@ impl Passport for actix_web::HttpRequest{
                     }
 
                 } else{
-                    let res = HttpResponse::build(StatusCode::FORBIDDEN).json(
-                        Response::<'_, &[u8]>{
-                            data: Some(&[]),
-                            message: &format!("ERROR: expired token time or wrong scope"),
-                            status: StatusCode::FORBIDDEN.as_u16(),
-                            is_error: true,
-                            meta: None
+
+                    let server_time = format!("{}", chrono::Local::now().to_string());
+                    resp.status_code = Some(StatusCode::FORBIDDEN);
+                    resp.render(Json(
+                        HoopoeResponse::<&[u8]>{ 
+                            data: &[], 
+                            message: "ERROR: expired token time or wrong scope", 
+                            is_err: true,
+                            status: StatusCode::FORBIDDEN.as_u16(), 
+                            meta: Some(
+                                serde_json::json!({
+                                    "server_time": server_time
+                                })
+                            )
                         }
-                    );
-                    return Err(
-                        Ok(res)
-                    );
+                    ));
+                    return Err(resp);
                 }
     
             },
@@ -190,7 +223,24 @@ impl Passport for actix_web::HttpRequest{
                     &String::from("generate_access_token.redis_pool"), // current method name
                     Some(&zerlog_producer_actor)
                 ).await;
-                return Err(Ok(err_instance.error_response()));
+                
+                let server_time = format!("{}", chrono::Local::now().to_string());
+                resp.status_code = Some(StatusCode::INTERNAL_SERVER_ERROR);
+                resp.render(Json(
+                    HoopoeResponse::<&[u8]>{ 
+                        data: &[], 
+                        message: &source, 
+                        is_err: true,
+                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(), 
+                        meta: Some(
+                            serde_json::json!({
+                                "server_time": server_time
+                            })
+                        )
+                    }
+                ));
+                return Err(resp);
+
             }
         }
 

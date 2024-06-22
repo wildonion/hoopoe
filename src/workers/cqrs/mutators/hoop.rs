@@ -6,11 +6,11 @@ use actix::prelude::*;
 use tonic::IntoRequest;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
-use crate::workers::producers::zerlog::ZerLogProducerActor;
+use crate::workers::zerlog::ZerLogProducerActor;
 use crate::entities::{self, hoops};
 use crate::models::event::{DbHoopData, HoopEvent};
-use crate::s3::Storage;
-use crate::consts::{self, PING_INTERVAL};
+use crate::storage::engine::Storage;
+use crate::constants::{self, PING_INTERVAL};
 use serde_json::json;
 
 #[derive(Message, Clone, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ impl Actor for HoopMutatorActor{
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 HoopMutatorActor has started, let's mutate baby!");
+        log::info!("🎬 HoopMutatorActor has started");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -72,30 +72,30 @@ impl HoopMutatorActor{
         let db_backend = db.get_database_backend();
         let stmt = Statement::from_sql_and_values(
             db_backend, 
-            consts::queries::INSERT_HOOP, 
-            [
+            constants::queries::INSERT_HOOP, 
+            [ // pass the followings to the query
                 hoop.etype.into(),
                 hoop.manager.into(),
                 hoop.entrance_fee.into()
             ]
         );
 
-        match db.execute(stmt).await{
+        match db.execute(stmt).await{ // execute the query
             Ok(query_res) => {
 
-                let id = query_res.last_insert_id();                
+                let id = query_res.last_insert_id(); // get the inserted id           
                 let stmt = Statement::from_sql_and_values(
                     db_backend, 
-                    consts::queries::SELECT_HOOP_BY_ID, 
+                    constants::queries::SELECT_HOOP_BY_ID, 
                     [
                         id.into()
                     ]
                 );
 
-                match db.query_one(stmt).await{
+                match db.query_one(stmt).await{ // fetch the last inserted row
                     Ok(exec_res) => {
                         
-                        let res = exec_res.unwrap();
+                        let res = exec_res.unwrap(); // get the query result to extract the rows
                         Some(
                             DbHoopData{
                                 id: res.try_get("", "id").unwrap(),
@@ -112,7 +112,7 @@ impl HoopMutatorActor{
                         let error_content = &e.to_string();
                         let error_content = error_content.as_bytes().to_vec();
                         let mut error_instance = HoopoeErrorResponse::new(
-                            *consts::STORAGE_IO_ERROR_CODE, // error code
+                            *constants::STORAGE_IO_ERROR_CODE, // error code
                             error_content, // error content
                             ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                             "HoopMutatorActor.raw_store.db.query_one", // method
@@ -128,7 +128,7 @@ impl HoopMutatorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "HoopMutatorActor.raw_store.db.execute", // method
@@ -161,7 +161,7 @@ impl HoopMutatorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "hoop_active_model.set_from_json", // method
@@ -201,7 +201,7 @@ impl HoopMutatorActor{
                         let error_content = &e.to_string();
                         let error_content = error_content.as_bytes().to_vec();
                         let mut error_instance = HoopoeErrorResponse::new(
-                            *consts::STORAGE_IO_ERROR_CODE, // error code
+                            *constants::STORAGE_IO_ERROR_CODE, // error code
                             error_content, // error content
                             ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                             "hoop_active_model.save.try_into_model", // method
@@ -217,7 +217,7 @@ impl HoopMutatorActor{
                 let error_content = &e.to_string();
                 let error_content = error_content.as_bytes().to_vec();
                 let mut error_instance = HoopoeErrorResponse::new(
-                    *consts::STORAGE_IO_ERROR_CODE, // error code
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
                     error_content, // error content
                     ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
                     "hoop_active_model.save", // method

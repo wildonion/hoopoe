@@ -1,10 +1,7 @@
 
 
 
+use crate::*;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct UserData{
-
-}
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct UserData;

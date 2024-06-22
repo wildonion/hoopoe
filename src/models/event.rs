@@ -4,7 +4,9 @@
 use chrono::{DateTime, NaiveDateTime};
 use sea_orm::prelude::DateTimeWithTimeZone;
 use serde::{Serialize, Deserialize};
+use workers::notif::{ConsumeNotif, ProduceNotif};
 use crate::*;
+
 
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -50,6 +52,8 @@ pub struct ConsumeNotifInfo{
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Extractible)]
+#[salvo(extract(default_source(from="body")))]
 pub struct RegisterNotif{
     pub producer_info: Option<ProduceNotifInfo>,
     pub consumer_info: Option<ConsumeNotifInfo>,

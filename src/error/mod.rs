@@ -1,9 +1,8 @@
 
 
 use crate::workers;
-use crate::workers::producers::zerlog::ProduceNotif;
-use crate::consts::APP_NAME;
-use crate::models::http::Response;
+use crate::workers::zerlog::ProduceNotif;
+use crate::constants::APP_NAME;
 
 /* 
     -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -97,18 +96,16 @@ use crate::models::http::Response;
 */
 
 use actix::Addr;
-use actix_web::http::StatusCode;
+use salvo::writing::Json;
+use salvo::{async_trait, Writer};
 use crate::models::event::*;
 use serde::{Serialize, Deserialize};
 use std::error::Error;
 use std::io::{Write, Read};
-use actix_web::cookie::Cookie;
-use actix_web::HttpResponse;
-use actix_web_actors::ws;
 use thiserror::Error;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use crate::consts::LOGS_FOLDER_ERROR_KIND;
+use crate::constants::LOGS_FOLDER_ERROR_KIND;
 
 
 /* -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -246,9 +243,7 @@ pub enum StorageError{
     #[error("[REDIS] - failed to do redis operation")]
     Redis(#[from] redis::RedisError),
     #[error("[REDIS ASYNC] - failed to subscribe to channel")]
-    RedisAsync(#[from] redis_async::error::Error), 
-    #[error("[REDIS ACTOR] - failed to get response value")]
-    RedisActor(#[from] actix_redis::Error), 
+    RedisAsync(#[from] redis_async::error::Error),  
     #[error("[REDIS ACTOR] - failed to get redis pool")]
     RedisPool(#[from] deadpool_redis::PoolError), 
     #[error("[RMQ] - failed to do rmq operation")]
@@ -260,10 +255,8 @@ pub enum StorageError{
 }
 #[derive(Error)]
 pub enum ServerError{
-    #[error("[ACTIX WEB] - failed to start actix web server")]
-    ActixWeb(#[from] std::io::Error),
-    #[error("[ACTIX WS] - failed to read from ws stream")]
-    Ws(#[from] ws::ProtocolError), 
+    #[error("[SALVO] - salvo error")]
+    Salvo(#[from] salvo::Error),
 }
 #[derive(Error)]
 pub enum RequestError{
@@ -376,71 +369,6 @@ impl std::fmt::Debug for RequestError{
 unsafe impl Send for HoopoeErrorResponse{}
 unsafe impl Sync for HoopoeErrorResponse{}
 
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-/* 
-    implementing an actix error responder for the HoopoeErrorResponse struct, 
-    allows us to use HoopoeErrorResponse as the error part of the http response 
-    result instead of actix_web::Error to avoid unknown runtime actix
-    crashes
-*/
-// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-impl actix_web::ResponseError for HoopoeErrorResponse{
-    
-    /* 
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-        when we use ? operator on the result type to unwrap the error Rust
-        get started looking for the From implementation for the type that
-        caused the error like if we're using ? to unwrap the error on a file
-        reading process there must be From<std::io::Error> implementation for
-        the HoopoeErrorResponse with some error message, since it allows Rust to log 
-        the error to the console, in the following we're creating a response 
-        object from the error detected by ? to send it back to the client, 
-        note that in the place of the message we've used the error message
-        inside the From implementation, also since we're handling possible errors
-        using HoopoeErrorResponse there is no need to match over ok or the err part
-        of any result, we can directly use ? operator Rust will take care of 
-        the rest process and then if there is an error an http response containing 
-        the error will be returned back to the client.
-        -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-    */
-    fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody>{ // the error response contains a boxed body bytes
-        HttpResponse::build(self.status_code()).json(
-            Response::<'_, &[u8]>{
-                data: Some(&[]),
-                message: {
-                    // converting the error bytes caused by one of the ErrorKind variant back to the string
-                    let string_err = std::str::from_utf8(&self.msg).unwrap();
-                    &string_err
-                },
-                status: self.status_code().as_u16(),
-                is_error: true,
-                meta: None
-            }
-        )
-    }
-
-    fn status_code(&self) -> StatusCode{
-        match &self.kind{
-            ErrorKind::Codec(CodecError::Serde(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Crypter(CrypterError::Themis(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Time(TimeError::Chrono(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Server(ServerError::ActixWeb(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Server(ServerError::Ws(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::RedisAsync(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::RedisActor(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::RedisPool(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::Redis(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::SeaOrm(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::Rmq(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Storage(StorageError::RmqPool(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Actor(ActixMailBoxError::Mailbox(s)) => StatusCode::INTERNAL_SERVER_ERROR,
-            ErrorKind::Request(RequestError::Reqwest(s)) => StatusCode::EXPECTATION_FAILED,
-            ErrorKind::Workers(s) => StatusCode::NOT_ACCEPTABLE,
-            ErrorKind::File(s) => StatusCode::EXPECTATION_FAILED,
-        }
-    }
-
-}
 
 impl std::fmt::Display for HoopoeErrorResponse{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -499,34 +427,12 @@ impl From<chrono::ParseError> for HoopoeErrorResponse{
     }
 }
 
-impl From<ws::ProtocolError> for HoopoeErrorResponse{
-    fn from(error: ws::ProtocolError) -> Self {
-        Self{ 
-            code: 0, 
-            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
-            kind: ErrorKind::Server(ServerError::Ws(error)), 
-            method_name: String::from("") 
-        }
-    }
-}
-
 impl From<redis::RedisError> for HoopoeErrorResponse{
     fn from(error: redis::RedisError) -> Self {
         Self{ 
             code: 0, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::Redis(error)),
-            method_name: String::from("") 
-        }
-    }
-}
-
-impl From<actix_redis::Error> for HoopoeErrorResponse{
-    fn from(error: actix_redis::Error) -> Self {
-        Self{ 
-            code: 0, 
-            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
-            kind: ErrorKind::Storage(StorageError::RedisActor(error)),
             method_name: String::from("") 
         }
     }
@@ -615,10 +521,39 @@ impl From<(Vec<u8>, u16, ErrorKind, String)> for HoopoeErrorResponse{
     }
 }
 
+// implement the salvo error writer response for the 
+// HoopoeErrorResponse custom error handler
+#[async_trait]
+impl Writer for HoopoeErrorResponse{
+    async fn write(mut self, _req: &mut salvo::Request, _depot: &mut salvo::Depot, res: &mut salvo::Response) {
+        use crate::models::server::Response as HoopoeResponse;
+        res.status_code(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
+        res.render(
+            Json(
+                HoopoeResponse::<&[u8]>{ 
+                    data: &[], 
+                    message: {
+                        std::str::from_utf8(&self.msg).unwrap()
+                    }, 
+                    is_err: true, 
+                    status: salvo::http::StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    meta: {
+                        Some(
+                            serde_json::json!({
+                                "server_time": format!("{}", chrono::Local::now().to_string())
+                            })
+                        )
+                    }
+                }
+            )
+        );
+    }
+}
+
 impl HoopoeErrorResponse{
 
     pub async fn new(code: u16, msg: Vec<u8>, kind: ErrorKind, method_name: &str, 
-            producer_actor: Option<&Addr<workers::producers::zerlog::ZerLogProducerActor>>) -> Self{
+            producer_actor: Option<&Addr<workers::zerlog::ZerLogProducerActor>>) -> Self{
         
         let string_kind = &kind.to_string();
         let mut err = HoopoeErrorResponse::from((msg.clone(), code, kind, method_name.to_string()));

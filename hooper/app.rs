@@ -74,7 +74,6 @@ Coded by
 use crate::consts::APP_NAME;
 use std::env;
 use std::net::SocketAddr;
-use actix_web::middleware::Logger;
 use clap::Parser;
 use consts::SERVERS;
 use dotenv::dotenv;
@@ -92,14 +91,6 @@ use redis_async::client::{self, PubsubConnection, ConnectionBuilder};
 use redis::RedisError;
 use uuid::Uuid;
 use log::{info, error};
-use actix_redis::{Command, RedisActor, resp_array, RespValue};
-use actix::{Actor, StreamHandler};
-use actix_web_actors::ws;
-use actix_cors::Cors;
-use actix_web::{App, Error, web, cookie::{self, Cookie, time::Duration, time::OffsetDateTime}, 
-                web::Data, http::header, HttpRequest, middleware,
-                HttpServer, Responder, HttpResponse, get, post, ResponseError};
-use actix_multipart::Multipart;
 use env_logger::Env;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
@@ -179,7 +170,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         log::error!("Unsupported server");
         panic!();
     }
-
 
     /* -ˋˏ✄┈┈┈┈ migrating on startup
         >_ ORM checks on its own that the db is up to create the pool connection

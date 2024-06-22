@@ -114,7 +114,7 @@ tokio::select! {
 ### proper way to produce and consume data from RMQ broker
 
 > [!IMPORTANT]
-> start producing or consuming in the background by sending related message to their actors inside the `tokio::spawn()` scope.
+> start producing or consuming in the background by sending related message to their actors inside the `tokio::spawn()` scope, this way can be used to execute any async task or job gently in the background threads using tokio scheduler.
 
 #### to produce data in the background: 
 
@@ -268,7 +268,7 @@ sea-orm-cli migrate init -d migration
 > make sure you've installed the `sea-orm-cli` then create migration file per each table operation, contains `Migrations` structure with `up` and `down` methods extended by the `MigrationTrait` interface, take not that you must create separate migration per each db operation when you're in production.
 
 ```bash
-sea-orm-cli migrate generate "table_name"
+sea-orm-cli migrate generate "sql_process_name_like_table_name_or_add_column"
 ```
 
 #### step4) apply pending migrations (fresh, refresh, reset, up or down)
@@ -341,17 +341,30 @@ cargo run --bin hooper -- --help
 
 - **step5)** connect your device to github for workflow actions using `gh auth login -s workflow`, this allows you to push to the repo.
 
-- **step6)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository.
+- **step6)** setup `DOCKER_PASSWORD`, `DOCKER_USERNAME`, `SERVER_HOST`, `SERVER_USER` and `SERVER_PASSWORD` secrets on your repository, _(`DOCKER_PASSWORD` and `DOCKER_USERNAME` are nginx login info to access the `docker.hoopoe.app` url)_.
 
 - **step7)** created a `/root/hoopoe` folder on your VPS containing the `docker-compose.yml` file only and update its path inside the `cicd.yml` file in ssh action part where you're changing directory to where the docker compose file is in.
 
-- **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker: `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2` then login to your hub with `sudo docker login docker.hoopoe.app` command.
+- **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker: `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2` then login to your hub with `sudo docker login docker.hoopoe.app` command (use the nginx username and password, note that if you've not setup a username and password no need to do the login process! simply run the push and pull on VPS).
 
 - **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
 > **current hub registry is set to `docker.youwho.club` and the `/root/hoopoe` folder on the VPS would be the place where the `docker-compose.yml` file is in**
 
 > make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images using `sudo docker ...` command.
+
+> [!IMPORTANT]
+additionally you can push a docker image to your custom docker registry manually:
+```bash
+sudo docker login docker.youwho.club # login to the registry
+sudo docker tag hoopoe-http docker.youwho.club/hoopoe-http # tag the image first
+sudo docker push docker.youwho.club/hoopoe-http # push to the registry
+```
+login to the VPS and put the `docker-compose.yml` in the app directory (`/root/hoopoe`) then run:
+```bash
+cd /root/hoopoe/ && sudo docker compose -f "docker-compose.yml" up -d
+```
+automatically it'll pull the images from the specified registry in `image` key inside the compose file, just make sure that the image tag name is the one inside the `docker-compose.yml` file.
 
 #### ☕ What's happening inside the `cicd.yml` file?
 

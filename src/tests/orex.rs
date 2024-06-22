@@ -5,15 +5,65 @@ use crate::*;
 /* ------------------------------------------- */
 // NODEJS LIKE ASYNC METHOD ORDER OF EXECUTION
 /* ------------------------------------------- */
-// future objects need to live longer with 'satatic lifetime also they must be send sync so 
-// we can move them between threads and scope for future solvation also they need to be pinned 
-// into the ram cause they're self-ref types and pointers of self-ref types won't be updated 
-// by Rust after moving to break the cycle we need to add some indirection using rc, arc, box, 
-// pin, futures are placeholders with a default value which gets solved as soon as the result
-// was ready then waker poll the result to update caller
-/* 
+/*  https://lunatic.solutions/blog/rust-without-the-async-hard-part/
+    
+    ----------------------------------------------------------------------
+              Golang and Rust (goroutines and futures)!
+    ==========>>>==========>>>==========>>>==========>>>==========>>>=====
+    
+    Rust has future objects but Go has goroutines in Go there is a default 
+    runtime scheduler to execute computational tasks or goroutines but in 
+    Rust we should use tokio runtime scheduler to execute async or future 
+    object tasks, both of them execute tasks inside a lightweight thread of
+    execution in the background allows us to use channels to send the task 
+    result to outside of the thread.
+    Rust requires more low level control over the execution flow of tasks 
+    but Go's design prioritizes ease of use and simplicity over this matter.
+    following are the features of future objects in Rust:
+        - future trait objects 
+        - capture lifetimes 
+        - unsized and heap allocated 
+        - Box::pin(fut) as separate type 
+        - self ref types requires to pin them to breack the cycle and add indirection
+        - requires runtime scheduler to execute them
+        - async recursive methods requires Box::pin(method)
+        - async trait methods due to having supports for generics in gat traits like generic and lifetime
+    Rust's type system, including its ownership and borrowing principles, 
+    provides strong guarantees about memory safety and concurrency. Rust's 
+    async/await and Future abstractions fit naturally within this framework, 
+    providing zero-cost abstractions for asynchronous programming.
+    it aims for zero-cost abstractions, safety, and performance. its ecosystem 
+    and language features, including the async/await model, are designed to 
+    give programmers fine-grained control over system resources, fitting 
+    well with the systems programming domain.
+
+    ----------------------------------------------------------------------
+              easons that we can't have async recursive?!
+    ==========>>>==========>>>==========>>>==========>>>==========>>>=====
+
+    the compiler can't pre determine how many recursive 
+    calls you're going to have and can't reserve the perfect
+    amount of space to preserve all local variables during 
+    the context switching that's why we have to put the 
+    the async function on the heap and since future objects
+    are self-ref types that move gets broken when they're 
+    doing so, we need to pin them into the heap at an stable 
+    memory address, cause having future objects as separate types
+    requires to pin them into the ram. 
+    a context switch is the process of storing the state of a process 
+    or thread, so that it can be restored and resume execution at a 
+    later point, and then restoring a different, previously saved, state
+    
+    future objects need to live longer with 'satatic lifetime also they must be send sync so 
+    we can move them between threads and scope for future solvation also they need to be pinned 
+    into the ram cause they're self-ref types and pointers of self-ref types won't be updated 
+    by Rust after moving to break the cycle we need to add some indirection using rc, arc, box, 
+    pin, futures are placeholders with a default value which gets solved as soon as the result
+    was ready then waker poll the result to update caller
+ 
     ----------------------------------------------------------------------
                     order of async methods execution
+    ==========>>>==========>>>==========>>>==========>>>==========>>>=====
 
     nodejs has its own runtime by default so there is no need to await on an async method to execute
     it because in Rust futures are lazy they do nothing unless we await on them but this is not the 
@@ -44,8 +94,9 @@ use crate::*;
     the codes get executed asyncly in the bacground, the api body is executed and the response 
     sent to the client even if those async codes are not yet executed or are being exeucted
     
-        ----------------------------------------------------------------------
-        differences between tokio::spawn() and awaiting on a joinhanlde
+    ----------------------------------------------------------------------
+       differences between tokio::spawn() and awaiting on a joinhanlde
+    ==========>>>==========>>>==========>>>==========>>>==========>>>=====
 
     tokio::spawn:
         tokio::spawn is used to spawn a new asynchronous task (future) onto the Tokio runtime without 
@@ -66,6 +117,28 @@ use crate::*;
 
     ----------------------------------------------------------------------
                     blocking and none blocking execution
+    ==========>>>==========>>>==========>>>==========>>>==========>>>=====
+
+    >_ Async runtimes like tokio and async-std manage async tasks. These runtimes use a small number of OS 
+    threads to run a large number of tasks. Tasks are lightweight and do not each require their own OS-level 
+    stack. Instead, they use a smaller, dynamically managed stack.
+
+    >_ The runtime schedules tasks and polls them for progress. When a task is not ready to make progress 
+    (e.g., it is waiting for I/O), it is not polled again until it is ready, this non-blocking, cooperative 
+    multitasking approach allows a single OS thread to manage many tasks efficiently.
+
+    >_ Futures are typically stack-allocated, and when they await on other futures, the state of the future 
+    is saved in a state machine. This state machine is stored on the heap but is much smaller than a traditional 
+    OS thread stack. When a future is polled, it uses the current thread's stack. Once it yields (using await), 
+    it frees the stack space.
+
+    >_
+    Executor: The async runtime uses an executor to manage and poll tasks. The executor runs on a few OS threads 
+        and uses an event loop to drive task execution.
+    Wakers: When a task awaits a future, it registers a waker. The waker is notified when the future can make 
+        progress, at which point the runtime will poll the task again.
+    Task State: The state of each task is managed on the heap in a way that minimizes memory usage compared to 
+        having a full OS thread stack per task which is what's currently is handled by the naitive threads.
 
     when you await on acquiring the lock of the mutex the os can decide to switch to another task that's ready to run.
     await doesn't block the current thread, awaitng allows another thread to be scheduled by the os to be run, awaiting 
