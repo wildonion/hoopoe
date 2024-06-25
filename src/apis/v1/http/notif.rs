@@ -217,11 +217,6 @@ pub async fn get_notif(
     
     // extracting query params
     let notif_query: EventQuery = req.parse_queries().unwrap();
-    let owner = notif_query.clone().owner;
-    let id = notif_query.clone().id;
-    let from = notif_query.clone().from;
-    let to = notif_query.clone().to;
-    let page_size = notif_query.clone().page_size;
 
     // get a single notif by id
     if notif_query.id.is_some(){
@@ -541,10 +536,10 @@ pub async fn get_notif(
 
 
 
-pub fn register_controllers() -> Router{
-
-    Router::with_path("/v1/notif/")
-        .hoop(check_passport) // the passport verifier middleware
+pub fn register_controller() -> Router{
+    Router::with_path("/v1/events/")
+        .hoop(check_passport)
+        .oapi_tag("Events") // the passport verifier middleware
         .post(register_notif)
         .get(get_notif)
 }

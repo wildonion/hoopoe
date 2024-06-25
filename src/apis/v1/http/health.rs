@@ -203,11 +203,18 @@ pub async fn mint(
     }
 }
 
-pub fn register_controllers() -> Router{
-    
+pub fn register_controller() -> Router{
+
     Router::with_path("/v1/health/")
+        .oapi_tag("Health")
         .hoop(set_data) // this api must be passed as middleware to update the state of depot before accessing the check_health route api
-        .get(check_health)
-        .post(mint)
+        .push(
+            Router::with_path("check")
+                .get(check_health)
+        )
+        .push(
+            Router::with_path("atomic-mint")
+                .post(mint)
+        )
     
 }

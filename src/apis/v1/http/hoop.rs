@@ -65,9 +65,10 @@ pub async fn get_hoop(
 }
 
 
-pub fn register_controllers() -> Router{
+pub fn register_controller() -> Router{
 
     Router::with_path("/v1/hoop/")
+        .oapi_tag("Hoop")
         .get(get_hoop)
         .post(add_hoop)
         .delete(delete_hoop)
