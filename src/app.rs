@@ -78,8 +78,10 @@ use std::env;
 use std::net::SocketAddr;
 use clap::Parser;
 use dotenv::dotenv;
+use indexmap::IndexMap;
 use models::event::NotifData;
 use salvo::http::response;
+use serde_json::Value;
 use workers::notif::{self, NotifBrokerActor};
 use std::io::BufWriter;
 use std::str::FromStr;
@@ -96,7 +98,7 @@ use redis::RedisError;
 use uuid::Uuid;
 use log::{info, error};
 use env_logger::Env;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use std::fmt::Write;
@@ -148,12 +150,19 @@ mod routers;
 #[tokio::main]
 async fn main(){
 
-    // new() method accepts two params: the address and the domain
-    // to add ssl using let's encrypt, so if you want to make an 
-    // internal ssl just pass your app domain name as second param.
+    /* ------------- 
+      new() method accepts the address and the domain to add 
+      ssl using let's encrypt, so if you want to make an 
+      internal ssl just pass your app domain name.
+    */
     let domain = Some(constants::APP_DOMAIN.to_string());
-    let mut app = HoopoeServer::new(None).await; // create server, read the address from the env
+    let mut app = HoopoeServer::new(None).await;
     
+    /* ------------- 
+      configure the app instance, initializing and building
+      logs, app context, routers, the main service, apply 
+      migrations finally run the app
+    */
     app.initLog(); // trace the logs
     app.buildAppContext().await; // build the entire app context (actors, confis)
     app.buildRouter(); // build app router from apis + swagger ui 
