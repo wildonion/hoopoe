@@ -3,14 +3,14 @@
 
 /* ========================================================================================
             a sexy actor to produce/consume messages to/from RMQ broker exchange
-             use rmq to fetch a massive data from the exchange for realtiming
+            use rmq to fetch a massive data from the exchange in realtime manner
 
     -ˋˏ✄┈┈┈┈
     >_ the consuming task has been started by sending the ConsumeNotif message 
     to this actor which will execute the streaming loop over the queue in 
     either the notif consumer actor context itself or the tokio spawn thread:
 
-        notif consumer -----Q(Consume Payload)-----> Exchange -----notif CQRS writer-----> Redis cache & Db
+        notif consumer -----Q(Consume Payload)-----> Exchange -----notif CQRS writer-----> cache/store on Redis & db
 
     -ˋˏ✄┈┈┈┈
     >_ the producing task has been started by sending the ProduceNotif message 
@@ -21,6 +21,8 @@
     ======================================================================================== */
 
 use crate::*;
+use constants::CRYPTER_THEMIS_ERROR_CODE;
+use constants::FILE_ERROR_CODE;
 use models::event::NotifData;
 use actix::prelude::*;
 use actix::Handler as ActixHandler;
@@ -33,15 +35,20 @@ use deadpool_lapin::lapin::types::FieldTable;
 use deadpool_lapin::lapin::BasicProperties;
 use interfaces::*;
 use storage::engine::Storage;
+use wallexerr::misc::SecureCellConfig;
+use wallexerr::misc::Wallet;
 use workers::cqrs::mutators::notif::NotifMutatorActor;
 use workers::cqrs::mutators::notif::StoreNotifEvent;
 use workers::zerlog::ZerLogProducerActor;
 use std::error::Error;
+use std::io::Read;
 use std::sync::Arc;
 use crate::models::event::*;
 
 
-#[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
+
+
+#[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
 #[rtype(result = "()")]
 pub struct ProduceNotif{
     pub local_spawn: bool, // either spawn in actor context or tokio threadpool
@@ -49,10 +56,18 @@ pub struct ProduceNotif{
     pub exchange_name: String,
     pub exchange_type: String,
     pub routing_key: String,
+    pub encryption_config: Option<CryptoConfig>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
+pub struct CryptoConfig{
+    pub secret: String,
+    pub passphrase: String,
+    pub path: String, // <>.config.json
 }
 
 
-#[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
 #[rtype(result = "()")]
 pub struct ConsumeNotif{
     /* -ˋˏ✄┈┈┈┈ 
@@ -101,7 +116,8 @@ pub struct ConsumeNotif{
     pub redis_cache_exp: u64,
     pub local_spawn: bool, // either spawn in actor context or tokio threadpool
     pub cache_on_redis: bool,
-    pub store_in_db: bool
+    pub store_in_db: bool,
+    pub decryption_config: Option<CryptoConfig>
 }
 
 
@@ -123,6 +139,7 @@ impl Actor for NotifBrokerActor{
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
             let this = actor.clone();
+            let addr = ctx.address();
 
             tokio::spawn(async move{
 
@@ -142,10 +159,14 @@ impl NotifBrokerActor{
     /* ********************************************************************* */
     /* ***************************** CONSUMING ***************************** */
     /* ********************************************************************* */
+    // if a consumer service wants to read notifs received from the rmq it 
+    // needs to either fetch from redis or db the method doesn't return 
+    // anything back to the caller
     pub async fn consume(&self, exp_seconds: u64,
         consumer_tag: &str, queue: &str, 
         binding_key: &str, exchange: &str,
         cache_on_redis: bool, store_in_db: bool,
+        decryption_config: Option<CryptoConfig>
     ){
 
         let storage = self.app_storage.clone();
@@ -227,6 +248,8 @@ impl NotifBrokerActor{
                         /* =================================================================================== */
                         /* ================================ CONSUMING PROCESS ================================ */
                         /* =================================================================================== */
+                        // start consuming in the background in a lightweight thread of execution
+                        // receiving is considered to be none blocking which won't block the current thread. 
                         tokio::spawn(async move{
 
                             // -ˋˏ✄┈┈┈┈ consuming from the queue owned by this consumer
@@ -248,7 +271,6 @@ impl NotifBrokerActor{
                                 .await
                             {
                                 Ok(mut consumer) => {
-
                                     // stream over consumer to receive data from the queue
                                     while let Some(delivery) = consumer.next().await{
                                         match delivery{
@@ -264,8 +286,82 @@ impl NotifBrokerActor{
                                                         /* --------------------- storing and caching logics --------------------- */
                                                         /* ---------------------------------------------------------------------- */
                                                         let buffer = delv.data;
-                                                        let data = std::str::from_utf8(&buffer).unwrap();
 
+
+                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                        // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
+                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                        // if we have a config means the data has been encrypted
+                                                        let data = if let Some(config) = decryption_config.clone(){
+                                                            
+                                                            match std::fs::File::open(config.path){
+                                                                Ok(mut file) => {
+                                                                    let mut buffer = vec![];
+                                                                    let read_bytes = file.read(&mut buffer).unwrap();
+                                                                    let mut secure_cell_config = serde_json::from_slice::<SecureCellConfig>(&buffer).unwrap();
+
+                                                                    match Wallet::secure_cell_decrypt(&mut secure_cell_config){
+                                                                        Ok(data) => {
+                                                                            std::str::from_utf8(&buffer).unwrap().to_string()
+                                                                        },
+                                                                        Err(e) => {
+
+                                                                            tokio::spawn(
+                                                                                {
+                                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
+                                                                                    async move{
+                                                                                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                                        let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                                            *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                                                                                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                                            crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                                                                                            &String::from("NotifBrokerActor.consume.Wallet::secure_cell_encrypt"), // current method name
+                                                                                            Some(&zerlog_producer_actor)
+                                                                                        ).await;
+                                                                                    }
+                                                                                }
+                                                                            );
+
+                                                                            // can't decrypt return the raw base58 string of encrypted data
+                                                                            // this can't be decoded to NotifData we'll get serde error!
+                                                                            std::str::from_utf8(&buffer).unwrap().to_string()
+                                                                        }
+                                                                    }
+                                                                },
+                                                                Err(e) => {
+
+                                                                    tokio::spawn(
+                                                                        {
+                                                                            let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
+                                                                            async move{
+                                                                                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                                let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                                    *FILE_ERROR_CODE, // error hex (u16) code
+                                                                                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                                    crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
+                                                                                    &String::from("NotifBrokerActor.consume.std::fs::File::open"), // current method name
+                                                                                    Some(&zerlog_producer_actor)
+                                                                                ).await;
+                                                                            }
+                                                                        }
+                                                                    );
+                                                                    
+                                                                    // can't open the file perhaps it's deleted!
+                                                                    // return the raw base58 string of encrypted data, this can't 
+                                                                    // be decoded to NotifData we'll get serde error!
+                                                                    std::str::from_utf8(&buffer).unwrap().to_string()
+                                                                }
+                                                            }
+
+                                                        } else{
+                                                            // no decryption config is needed
+                                                            std::str::from_utf8(&buffer).unwrap().to_string()
+                                                        };
+                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+
+                                                        // either decrypted or the raw data
                                                         log::info!("[*] received data: {}", data);
                                                         
                                                         let get_notif_event = serde_json::from_str::<NotifData>(&data);
@@ -274,6 +370,9 @@ impl NotifBrokerActor{
 
                                                                 log::info!("[*] decoded data: {:?}", notif_event);
 
+                                                                // =============================================================================
+                                                                // ------------- if the cache on redis flag was activated we then store on redis
+                                                                // =============================================================================
                                                                 if cache_on_redis{
                                                                     match redis_pool.get().await{
                                                                         Ok(mut redis_conn) => {
@@ -376,10 +475,14 @@ impl NotifBrokerActor{
                                                                     }
                                                                 }
 
+                                                                // =============================================================================
+                                                                // ------------- if the store in db flag was activated we then store in database
+                                                                // =============================================================================
                                                                 if store_in_db{
                                                                     // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
                                                                     // sending StoreNotifEvent message to the notif event mutator actor
                                                                     // spawning the async task of storing data in db in the background
+                                                                    // worker of lightweight thread of execution using tokio threadpool
                                                                     tokio::spawn(
                                                                         {
                                                                             let cloned_message = notif_event.clone();
@@ -701,9 +804,72 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
                 routing_key,
                 local_spawn,
                 notif_data,
+                encryption_config,
+
             } = msg.clone();
         
-        let stringified_data = serde_json::to_string_pretty(&notif_data).unwrap();
+        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+        // ===>>>===>>>===>>>===>>>===>>> data encryption logic ===>>>===>>>===>>>===>>>===>>>
+        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+        let stringified_data = if let Some(config) = encryption_config{
+
+            let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
+                secret_key: config.secret,
+                passphrase: config.passphrase,
+                data: serde_json::to_vec(&notif_data).unwrap(),
+            };
+
+            // store the config as json, since we don't need output or any result 
+            // from the task inside the thread thus there is no channel to send
+            // data to outside of tokio::spawn
+            tokio::spawn(
+                {
+                    let secure_cell_config = secure_cell_config.clone();
+                    async move{
+                        let config_path = format!("{}", config.path);
+                        let config_file = tokio::fs::File::create(config_path).await;
+                        config_file.unwrap().write_all(
+                            &serde_json::to_string_pretty(&secure_cell_config).unwrap().as_bytes()
+                        ).await;
+                    }
+                }
+            );
+            
+            match Wallet::secure_cell_encrypt(secure_cell_config){
+                Ok(data) => {
+                    use base58::ToBase58;
+                    let base58_data = data.to_base58();
+                    base58_data               
+                },
+                Err(e) => {
+                    let zerlog_producer_actor = self.zerlog_producer_actor.clone();
+                    // log the error in the a lightweight thread of execution inside tokio threads
+                    // since we don't need output or any result from the task inside the thread thus
+                    // there is no channel to send data to outside of tokio::spawn
+                    tokio::spawn(async move{
+                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                        let err_instance = crate::error::HoopoeErrorResponse::new(
+                            *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                            crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                            &String::from("NotifBrokerActor.ActixHandler<ProduceNotif>.Wallet::secure_cell_encrypt"), // current method name
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                    });
+                    // return the actual data with no encryption
+                    serde_json::to_string_pretty(&notif_data).unwrap()
+                }
+            }
+
+
+        } else{
+            // return the actual data with no encryption
+            serde_json::to_string_pretty(&notif_data).unwrap()
+        };
+        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+
         let this = self.clone();
 
         // spawn the future in the background into the given actor context thread
@@ -713,7 +879,7 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
             async move{
                 this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
             }
-            .into_actor(self)
+            .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
             .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
@@ -744,7 +910,8 @@ impl ActixHandler<ConsumeNotif> for NotifBrokerActor{
                 redis_cache_exp,
                 local_spawn,
                 cache_on_redis,
-                store_in_db
+                store_in_db,
+                decryption_config
 
             } = msg.clone(); // the unpacking pattern is always matched so if let ... is useless
         
@@ -762,10 +929,11 @@ impl ActixHandler<ConsumeNotif> for NotifBrokerActor{
                     &routing_key, 
                     &exchange_name,
                     cache_on_redis,
-                    store_in_db
+                    store_in_db,
+                    decryption_config
                 ).await;
             }
-            .into_actor(self)
+            .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
             .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
@@ -776,7 +944,8 @@ impl ActixHandler<ConsumeNotif> for NotifBrokerActor{
                     &routing_key, 
                     &exchange_name,
                     cache_on_redis,
-                    store_in_db
+                    store_in_db,
+                    decryption_config
                 ).await;
             });
         }
