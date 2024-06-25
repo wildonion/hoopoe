@@ -5,9 +5,10 @@ use interfaces::task::TaskExt;
 use types::Job;
 
 // async tasks or jobs that will be executed in 
-// the background inside a thread using tokio::spawn()
-// task scheduler and jobq based channels; actor workers 
-// will run these in their own execution context.
+// the background inside a lightweight thread of 
+// execution using tokio::spawn() task scheduler 
+// and jobq based channels; actor workers will run 
+// these in their own execution context.
 
 
 #[derive(Clone, Debug)]

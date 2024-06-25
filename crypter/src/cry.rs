@@ -61,7 +61,6 @@ pub mod wannacry{
     pub use super::*;
 
     /* 
-
         let path_on_server = "onion.png";
         let dec_path_on_server = "onion.dec.png";
 
@@ -71,7 +70,7 @@ pub mod wannacry{
         let hex_file_sig = hex::encode(&encrypted_buffer);
         let base58_file_sig = encrypted_buffer.to_base58();
     
-        ------
+        ====>>>====>>>====>>>====>>>====>>>====>>>====>>>
 
         tools: RSA ed25519 ECC curve with aes256 hash in wallexerr, openssl and ring for RSA + KDF like sha256 and keccak256
         ransomewere, steganography and files encryption to generate unique assets by encrypting using 
@@ -87,7 +86,6 @@ pub mod wannacry{
 
             gpg --output encrypted.data --symmetric --cipher-algo AES256 un_encrypted.data
             gpg --output un_encrypted.data --decrypt encrypted.data
-    
     */
 
     pub async fn encrypt_file(fpath: &str) -> (Vec<u8>, SecureCellConfig){
@@ -106,7 +104,7 @@ pub mod wannacry{
                         // even the server doesn't know the fucking secret key!
                         let random_chars = gen_random_chars(64);
                         let hash_of_random_chars = wallexerr::misc::Wallet::generate_sha256_from(&random_chars); // generating a 256 bits hash
-                        let mut crypto_seeded_rng = rand_chacha::ChaCha20Rng::from_seed(hash_of_random_chars);
+                        let mut crypto_seeded_rng = rand_chacha::ChaCha20Rng::from_seed(hash_of_random_chars); // generate rng with the has of random chars as the seed
                         let seed = crypto_seeded_rng.get_seed();
                         hex::encode(seed)
                     }

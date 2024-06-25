@@ -167,7 +167,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     let server = args.server.as_str();
     let servers = SERVERS.to_vec();
     if !servers.contains(&server){
-        log::error!("Unsupported server");
+        log::error!("[?] Unsupported server");
         panic!();
     }
 

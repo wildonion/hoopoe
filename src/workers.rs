@@ -6,6 +6,6 @@
 // at any time, we'll send them command to execute what we want during the app execution
 
 
-pub mod cqrs;
-pub mod notif;
-pub mod zerlog;
+pub mod cqrs; // cqrs actor components
+pub mod notif; // broker actor component
+pub mod zerlog; // zerlog actor component

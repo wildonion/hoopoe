@@ -3,7 +3,8 @@
 
 // app context
 
-use std::collections::HashMap;
+use std::any::Any;
+use std::collections::{BTreeMap, HashMap};
 use crate::apis::v1::http::notif;
 use crate::workers::cqrs::accessors::hoop::HoopAccessorActor;
 use crate::workers::cqrs::accessors::notif::NotifAccessorActor;
@@ -14,6 +15,7 @@ use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::storage::engine::Storage;
 use actix::{Actor, Addr};
+use indexmap::IndexMap;
 use ractor::concurrency::JoinHandle;
 use serde::{Serialize, Deserialize};
 use crate::types::*;
@@ -57,7 +59,7 @@ pub struct ActorInstaces{
 pub struct AppContext{
     pub config: Option<std::sync::Arc<Context<ConfigEnv>>>,
     pub app_storage: Option<std::sync::Arc<Storage>>,
-    pub actors: Option<ActorInstaces>, // redis subscriber actors
+    pub actors: Option<ActorInstaces>,
     pub ramdb: RamDb
 
 }
@@ -68,7 +70,7 @@ impl AppContext{
 
         let app_storage = Storage::new().await;
 
-        // build the necessary actors
+        // build the necessary actors, start once
         let zerlog_producer_actor = ZerLogProducerActor::new(app_storage.clone()).start();
         let notif_mutator_actor = NotifMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
@@ -104,7 +106,7 @@ impl AppContext{
             }, 
             app_storage: app_storage.clone(), 
             actors: Some(actor_instances),  
-            ramdb: std::sync::Arc::new(
+            ramdb: std::sync::Arc::new( // an in memory, mutable and safe map which can be shared across threads
                 tokio::sync::Mutex::new(
                     HashMap::new()
                 )

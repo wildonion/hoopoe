@@ -353,7 +353,7 @@ cargo run --bin hooper -- --help
 
 > make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images using `sudo docker ...` command.
 
-> [!IMPORTANT]
+> [!TIP]
 additionally you can push a docker image to your custom docker registry manually:
 ```bash
 sudo docker login docker.youwho.club # login to the registry

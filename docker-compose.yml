@@ -19,6 +19,9 @@ services:
       - ./infra/logs:/etc/nginx/logs:rw
     networks:
       - host
+      - hoopoe
+      - existing_net1
+      - existing_net2
 ##### ===================================================================================================
   redis:
     container_name: redis

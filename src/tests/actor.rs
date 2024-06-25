@@ -42,6 +42,12 @@
         channels like mpsc and oneshot in local and rpc and rmq in a remote manner.
         if there are two many variables to be stored on CPU registers they'll be stored on the stack 
         related to the current thread cause each thread gets a seprate stack. 
+        tokio runtime will execute all async tasks in its lightweight threads when we put the 
+        #[tokio::main] above the main function we can also spawn async task inside a separate 
+        lightweight thread manually by using tokio::spawn which contains lightweight thread workers 
+        can be used to build actor to execute tasks inside of it hence talk with mpsc channels, we 
+        can build multithreaded web servers upon tokio runtime in which each socket will be handled 
+        inside tokio spawn threads as well as executing each api 
 
     ====================================
     HOW 2 USE THESE IMPLEMENTATIONS:

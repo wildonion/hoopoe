@@ -32,9 +32,6 @@ impl EventServer{
     pub async fn start(addr: SocketAddr) 
         -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{ // dynamic dispatch approach for handling errors at runtime
 
-        info!("🚀 {} gRPC server has launched in the background from [{}] at {}", 
-            APP_NAME, addr, chrono::Local::now().naive_local());
-
         let hooper = EventServer::default();
         
         TonicServer::builder()
