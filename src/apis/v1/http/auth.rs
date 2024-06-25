@@ -48,11 +48,10 @@ pub async fn generate_access_token(
     let exp_time = params.exp.unwrap_or_default();
     let scope = params.scope.unwrap_or_default();
 
-
     match redis_pool.get().await{
         Ok(mut redis_conn) => {
 
-            match req.get_secret(app_ctx.clone()).await{
+            match req.check_secret(app_ctx.clone()).await{
                 Ok(sec) => {
         
                     let now = chrono::Local::now();
@@ -188,9 +187,13 @@ pub async fn generate_access_token(
 
 }
 
-pub fn register_controllers() -> Router{
-    
+pub fn register_controller() -> Router{
+        
     Router::with_path("/v1/auth/")
-        .post(generate_access_token)
-    
+        .oapi_tag("Auth")
+        .push(
+            Router::with_path("generate-access-token")
+                .post(generate_access_token)
+        )
+
 }
