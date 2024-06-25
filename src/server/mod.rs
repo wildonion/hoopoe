@@ -2,6 +2,7 @@
 
 
 use crate::*;
+use salvo::{http::method::Method, cors::Cors};
 use context::AppContext;
 
 
@@ -15,11 +16,16 @@ pub struct HoopoeServer{
 impl HoopoeServer{
 
     pub fn buildRouter(&self) -> Router{
+        let cors = Cors::new()
+            .allow_origin("*")
+            .allow_methods(vec![Method::GET, Method::POST, Method::DELETE, Method::PATCH, Method::PUT])
+            .into_handler();
         let app_ctx = self.app_ctx.clone();
         let router = Router::new()
             .push(routers::register_app_controllers())
             .hoop(Logger::new()) // register middlewares using hoop() method
-            .hoop(affix::inject(app_ctx));
+            .hoop(affix::inject(app_ctx))
+            .hoop(cors);
 
         // adding swagger ui route
         let doc = OpenApi::new("Hoopoe Api", "0.1.0").merge_router(&router);
@@ -30,10 +36,15 @@ impl HoopoeServer{
     }
 
     fn internalBuildRouter(app_ctx: Option<AppContext>) -> Router{
+        let cors = Cors::new()
+            .allow_origin("*")
+            .allow_methods(vec![Method::GET, Method::POST, Method::DELETE, Method::PATCH, Method::PUT])
+            .into_handler();
         let router = Router::new()
             .push(routers::register_app_controllers())
             .hoop(Logger::new()) // register middlewares using hoop() method
-            .hoop(affix::inject(app_ctx));
+            .hoop(affix::inject(app_ctx))
+            .hoop(cors);
 
 
         // adding swagger ui route
@@ -138,7 +149,7 @@ impl HoopoeServer{
             let acceptor = TcpListener::new(addr).bind().await;
             let server = Server::new(acceptor);
             let serv = service.unwrap();
-            server.serve(serv).await;
+            server.serve(serv).await; // start server in a loop{} in a tokio lightweight thread of execution
         }
     }
 
