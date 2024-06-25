@@ -41,17 +41,17 @@ pub enum TokenTimeScope{
     Read
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct ProduceNotifInfo{
     pub info: ProduceNotif,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct ConsumeNotifInfo{
     pub info: ConsumeNotif,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 #[derive(Extractible)]
 #[salvo(extract(default_source(from="body")))]
 pub struct RegisterNotif{
@@ -66,7 +66,7 @@ pub struct HoopEvent{
     pub entrance_fee: i64,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
 pub enum ActionType{ // all the action type that causes the notif to get fired
     #[default]
     ProductPurchased, // or minted
@@ -76,7 +76,7 @@ pub enum ActionType{ // all the action type that causes the notif to get fired
     EventLocked,
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
 pub struct NotifData{
     pub id: String,
     pub receiver_info: String,

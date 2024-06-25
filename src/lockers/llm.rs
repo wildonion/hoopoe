@@ -128,7 +128,7 @@ use crate::{constants::PURCHASE_DEMO_LOCK_MUTEX, *};
 */
 #[derive(Extractible)]
 #[salvo(extract(default_source(from="body")))]
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
 pub struct Product{
     #[salvo(extract(source(from="query")))]
     pub pid: i32, // pid gets filled from the query
