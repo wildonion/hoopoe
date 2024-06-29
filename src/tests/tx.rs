@@ -1,4 +1,6 @@
 
+use ractor::Message;
+use rand_chacha::ChaCha12Core;
 use wallexerr::misc::Wallet;
 use crate::interfaces::tx::TransactionPoolActorTxExt;
 use crate::*;
@@ -16,6 +18,12 @@ pub static WALLET: Lazy<std::sync::Arc<wallexerr::misc::Wallet>> = Lazy::new(||{
     tx pool service concumes every incoming tx and execute them in the background
     safe tx execution without double spending issue using tokio spawn select mutex and channels
     finally tx pool service publishes the result of executed each tx into the exchange 
+
+
+    once a tx object is made publish it to the rmq exchange so consumer 
+    can consume it for committing and executing all tx objects finally 
+    produce the result to the TxResultExchange so main service can consume 
+    it and update the platform based on the result
 
     1 => create ed25591 wallet keypairs with high entropy seed for its rng
     2 => then build tx object and use sha256 to make a hash of the stringified of tx object
@@ -90,7 +98,8 @@ impl TransactionPoolActor{
 pub enum TxStatus{
     #[default]
     Started,
-    Executed,
+    Committed,
+    Dropped,
     Rejected(FailedTx),
 }
 
@@ -100,10 +109,20 @@ pub struct FailedTx{
     cause: String
 }
 
+// drop the transaction object from the ram
+// note that for Rc shared reference, the total reference count 
+// of type (type pointers used by different scopes) must reaches 
+// zero so the type can gets dropped out of the ram but not for weak. 
+impl Drop for TransactionPoolActor{
+    fn drop(&mut self) {
+        self.status = TxStatus::Dropped
+    }
+}
+
 impl TransactionPoolActorTxExt for TransactionPoolActor{
     type Tx = Self;
 
-    async fn execute(&self) -> Self {
+    async fn commit(&self) -> Self {
         
         // update user balance and treasury logics
         // ...
