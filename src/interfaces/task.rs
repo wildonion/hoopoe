@@ -15,9 +15,17 @@ use crate::*;
     generic and lifetime wasn't supported in GAT till Rust 1.79
     by the result we can have async methods in traits without 
     using third party crates.
+    the fact that async method wasn't supported in traits was
+    due to the unspported feature of generic and lifetime in GAT
+    which wouldn't allow to return a future object from the trait
+    method cause future obejcts capture lifetimes forces us to pass
+    the GAT with lifetime as the return type of async trait method
+    hence using the GAT as the return type of async trait method 
+    wasn't supported therefore having future objects in trait method 
+    return type was invalid.
 */
-pub trait TaskExt<S>{ // polymorphism: task schema
+pub trait TaskExt<S: Send + Sync + 'static>{ // polymorphism: task schema
     type State;
-    type This;
+    type Task;
     async fn execute(&self, task: S);
 }
