@@ -122,10 +122,12 @@ use event::{EventResponse, EventRequest, event_pubsub_service_server::{EventPubs
 
 
 mod consts;
+mod rpc;
 mod grpc;
 mod p2p;
 mod tcp;
 mod cli;
+mod wrtc;
 
 /* ---------------------------------------------------------
     loading the compiled proto file into rust code in here 
