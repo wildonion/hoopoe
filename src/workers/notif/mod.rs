@@ -18,6 +18,20 @@
     in either the notif producer actor context itself or the tokio spawn thread:
 
         notif producer -----payload-----> Exchange
+    
+    -ˋˏ✄┈┈┈┈
+    >_ client can use a short polling technique to fetch notifications for an 
+    specific owner from redis or db, this is the best solution to implement a
+    realtiming strategy on the client side to fetch what's happening on the 
+    server side in realtime. there is another expensive alternaitive to this
+    which is startiung a websocket server in backend side and send all notifications
+    to the client through the ws channels in realtime.
+
+     _________                                      _________
+    | server1 | <------- RMQ notif broker -------> | server2 |
+     ---------                                      ---------
+        | ws                                          | ws
+         ------------------- client ------------------
     ======================================================================================== */
 
 use crate::*;
@@ -282,11 +296,7 @@ impl NotifBrokerActor{
                                                 match delv.ack(BasicAckOptions::default()).await{
                                                     Ok(ok) => {
 
-                                                        /* ---------------------------------------------------------------------- */
-                                                        /* --------------------- storing and caching logics --------------------- */
-                                                        /* ---------------------------------------------------------------------- */
                                                         let buffer = delv.data;
-
 
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
@@ -294,34 +304,30 @@ impl NotifBrokerActor{
                                                         // if we have a config means the data has been encrypted
                                                         let data = if let Some(config) = decryption_config.clone(){
                                                             
-                                                            match std::fs::File::open(config.path){
+                                                            match tokio::fs::File::open(config.path).await{
                                                                 Ok(mut file) => {
                                                                     let mut buffer = vec![];
-                                                                    let read_bytes = file.read(&mut buffer).unwrap();
+                                                                    let read_bytes = file.read(&mut buffer).await.unwrap();
                                                                     let mut secure_cell_config = serde_json::from_slice::<SecureCellConfig>(&buffer).unwrap();
 
                                                                     match Wallet::secure_cell_decrypt(&mut secure_cell_config){
                                                                         Ok(data) => {
+                                                                            // data is the raw utf8 bytes of actual data we 
+                                                                            // can easily convert it into the string 
                                                                             std::str::from_utf8(&buffer).unwrap().to_string()
                                                                         },
                                                                         Err(e) => {
 
-                                                                            tokio::spawn(
-                                                                                {
-                                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
-                                                                                    async move{
-                                                                                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                                        let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                                            *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                                                                                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                                            crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                                                                                            &String::from("NotifBrokerActor.consume.Wallet::secure_cell_encrypt"), // current method name
-                                                                                            Some(&zerlog_producer_actor)
-                                                                                        ).await;
-                                                                                    }
-                                                                                }
-                                                                            );
-
+                                                                            let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
+                                                                            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                            let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                                *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                                                                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                                crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                                                                                &String::from("NotifBrokerActor.consume.Wallet::secure_cell_encrypt"), // current method name
+                                                                                Some(&zerlog_producer_actor)
+                                                                            ).await;
+                                                                              
                                                                             // can't decrypt return the raw base58 string of encrypted data
                                                                             // this can't be decoded to NotifData we'll get serde error!
                                                                             std::str::from_utf8(&buffer).unwrap().to_string()
@@ -330,21 +336,14 @@ impl NotifBrokerActor{
                                                                 },
                                                                 Err(e) => {
 
-                                                                    tokio::spawn(
-                                                                        {
-                                                                            let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
-                                                                            async move{
-                                                                                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                                let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                                    *FILE_ERROR_CODE, // error hex (u16) code
-                                                                                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                                    crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
-                                                                                    &String::from("NotifBrokerActor.consume.std::fs::File::open"), // current method name
-                                                                                    Some(&zerlog_producer_actor)
-                                                                                ).await;
-                                                                            }
-                                                                        }
-                                                                    );
+                                                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                        *FILE_ERROR_CODE, // error hex (u16) code
+                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                        crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
+                                                                        &String::from("NotifBrokerActor.consume.std::fs::File::open"), // current method name
+                                                                        Some(&zerlog_producer_actor)
+                                                                    ).await;           
                                                                     
                                                                     // can't open the file perhaps it's deleted!
                                                                     // return the raw base58 string of encrypted data, this can't 
