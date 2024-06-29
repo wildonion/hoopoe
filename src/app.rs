@@ -147,6 +147,14 @@ mod error;
 mod routers;
 
 
+
+/* -------------
+  by using tokio runtime as the async task scheduler we can 
+  spawn async task in tokio lightweight threads, the runtime
+  schedule the execution time automatically so handling each 
+  socket inside a tokio lightweight thread is a great logic
+  for handling each async api concurrently.
+*/
 #[tokio::main]
 async fn main(){
 
@@ -164,8 +172,8 @@ async fn main(){
       migrations finally run the app
     */
     app.initLog(); // trace the logs
-    app.buildAppContext().await; // build the entire app context (actors, confis)
-    app.buildRouter(); // build app router from apis + swagger ui 
+    app.buildAppContext().await; // build the entire app context (actors, configs and shared data across routers)
+    app.buildRouter(); // build the app router from apis + swagger ui 
     
     app.buildService(); // build salvo service
     app.applyMigrations().await; // execute db migration files
