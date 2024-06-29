@@ -20,8 +20,8 @@ services:
     networks:
       - host
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   redis:
     container_name: redis
@@ -35,8 +35,8 @@ services:
       - "6379:6379"
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
     hostname: redis
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
     healthcheck:
@@ -56,8 +56,8 @@ services:
       - "7050:3000"
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
     user: "$(id -u)"
 ##### ===================================================================================================
   portainer:
@@ -72,8 +72,8 @@ services:
       - "9443:9443"
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   timescaledb:
     container_name: postgres
@@ -90,8 +90,8 @@ services:
       - "127.0.0.1:5433:5432" # this local binding only avoid the container eating cpu constantly due having kinsing virus in this timescaledb container
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "localhost", "-U", "$POSTGRES_USER", "-d", "postgres"]
       interval: 10s
@@ -110,8 +110,8 @@ services:
       - "15672:15672"
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
     hostname: rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q ping
@@ -132,8 +132,8 @@ services:
       - "7543:8080"
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   hoopoe-http:
     container_name: hoopoe-http
@@ -154,8 +154,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   hooper-tcp:
     container_name: hooper-tcp
@@ -176,8 +176,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   hooper-grpc:
     container_name: hooper-grpc
@@ -198,8 +198,8 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 ##### ===================================================================================================
   hooper-p2p:
     container_name: hooper-p2p
@@ -220,12 +220,12 @@ services:
       - ./infra/logs:/app/logs:rw
     networks:
       - hoopoe
-      - existing_net1
-      - existing_net2
+      - hoopoe_is_there1
+      - hoopoe_is_there2
 
 networks:
   hoopoe:
   host:
   bridge:
-    existing_net1: external:true
-    existing_net2: external:true
+    hoopoe_is_there1: external:true
+    hoopoe_is_there2: external:true

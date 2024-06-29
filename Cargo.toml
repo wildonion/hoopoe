@@ -12,9 +12,10 @@ members = [
 [dependencies]
 migration = { path = "migration", name = "migration" }
 crypter = { path = "crypter", name = "crypter" }
+capnp-rpc = "0.19.2"
 salvo = { version = "0.68.4", features = ["full"] }
 actix = "0.13.5"
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1" }
 reqwest = { version = "0.12", features = ["json", "blocking", "stream", "multipart"] }
 tracing = "0.1"

@@ -219,6 +219,7 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
 🚥 HOOPOE RMQ                              ==> https://rmq.hoopoe.app
 🗞️ HOOPOE LOGS                             ==> https://api.hoopoe.app/logs
 🗂️ HOOPOE ASSETS FOLDER                    ==> https://api.hoopoe.app/assets
+🍀 SWAGGER UI                              ==> https://api.hoopoe.app/swagger
 ```
 
 ## 🗃️ wikis, docs, erds, schemas and collections
@@ -329,13 +330,13 @@ cargo run --bin hooper -- --help
 > [!CAUTION]
 > make sure you've done following configurations properly before pushing to your repo:
 
-- **step0)** create database with the same name inside the `.env` file on the VPS using command.
+- **step0)** `sudo docker network create hoopoe_is_there1 && sudo docker network create hoopoe_is_there2` then create database with the same name inside the `.env` file on the VPS using command.
 
 - **step1)** generate new ssl dh params for nginx using `openssl dhparam -out infra/docker/nginx/ssl-dhparams.pem 4096` command.
 
 - **step2)** setup ssl certs using `renew.sh` script and nginx config files per each domain and subdomain then put them inside `infra/docker/nginx` folder, **you MUST do this before you get pushed to the repo on github** cause there is already an nginx container inside the `docker-compose.yml` needs its files to be there to move them into the container on every push! 
 
-- **step3)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achieve this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for them by running `sudo apt-get install -y apache2-utils && htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `hoopoe@1234`.
+- **step3)** you would probably want to make `logs` dir and `docker.hoopoe.app` routes secure and safe, you can achieve this by adding an auth gaurd on the docker registry subdomain and the logs dir inside their nginx config files eventually setup the password for them by running `sudo apt-get install -y apache2-utils && sudo htpasswd -c infra/docker/nginx/.htpasswd hoopoe` command, the current one is `hoopoe@1234`.
 
 - **step4)** run `sudo rm .env && sudo mv .env.prod .env` then update necessary variables inside `.env` file.
 
@@ -351,7 +352,7 @@ cargo run --bin hooper -- --help
 
 > **current hub registry is set to `docker.youwho.club` and the `/root/hoopoe` folder on the VPS would be the place where the `docker-compose.yml` file is in**
 
-> make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images using `sudo docker ...` command.
+> make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images with `sudo docker ...` command, if you are not running the docker with sudo make sure there is no sudo in `cicd.yml` file.
 
 > [!TIP]
 additionally you can push a docker image to your custom docker registry manually:
@@ -380,7 +381,7 @@ automatically it'll pull the images from the specified registry in `image` key i
 
 #### last but not least!
 
-use postman to check the server health and register notif producer and consumer.
+use postman or swagger ui to check the server health, continue with registering notif producer and consumer.
 
 
 ### When developing?!
