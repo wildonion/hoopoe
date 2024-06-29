@@ -6,6 +6,11 @@ use salvo::{http::method::Method, cors::Cors};
 use context::AppContext;
 
 
+pub trait HoopoeService<G: Send + Sync>{
+    type Service: Send + Sync; // binding for GAT is supported now we can have async method
+    async fn run(&mut self);
+}
+
 pub struct HoopoeServer{
     pub service: Option<Service>,
     pub addr: String,
@@ -84,6 +89,11 @@ impl HoopoeServer{
 
     }
 
+    pub async fn injectService<T: Send + Sync, N, G: Send + Sync>(&mut self, service: impl HoopoeService<T>)
+        where N: HoopoeService<G, Service: Send + Sync>{ // binding Service GAT to traits
+
+    }
+
     pub async fn buildAppContext(&mut self){
 
         /* -ˋˏ✄┈┈┈┈ initializing app contexts: storages and actor workers
@@ -130,6 +140,13 @@ impl HoopoeServer{
     // means we can't use * to deref or use methods that take ownership of type we 
     // can either clone it or use self instead of &self in method params, note that we 
     // can't deref ref if it doesn't impl Copy trait.
+    // ---------
+    // the server must be started in a loop inside a lightweight thread of execution
+    // using tokio::spawn() so spawning the loop to halt the program and making it 
+    // constantly running is not correct since the halting part would be inside a
+    // separate thread other than the current one because we should halt the current 
+    // thread to start the server so spawn the an async task of starting server in
+    // tokio threads inside the loop like: loop{ tokio::spawn(async move{ start_server() }); }
     pub async fn run(self){ 
         let Self { service, addr, ssl_domain, app_ctx } = self;
         if ssl_domain.is_some() && !ssl_domain.as_ref().unwrap().is_empty(){
