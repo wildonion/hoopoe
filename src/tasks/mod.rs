@@ -22,6 +22,7 @@ pub struct Task<J, S> where // J is a Future object and must be executed with Bo
     pub sender: tokio::sync::mpsc::Sender<S>, // use this to send the result of the task into the channel
 }
 
+
 #[derive(Clone, Debug, Default)]
 pub enum TaskStatus{
     #[default]
@@ -36,13 +37,19 @@ impl<J: std::future::Future + Send + Sync + 'static, S> Task<J, S>
     pub async fn spawn(&self){
         self.execute(String::from("stringified task")).await;
     }
+
+    pub async fn none_assoc_spawn<O: Send + Sync + 'static>(
+        fut: impl std::future::Future<Output = O> + Send + Sync + 'static
+    ){
+        tokio::spawn(fut);
+    }
 }
 
 impl<J: std::future::Future + Send + Sync + 'static, S> TaskExt<String> for Task<J, S>
     where J::Output: Send + Sync + 'static{
     
     type State = String;
-    type This = Self;
+    type Task = Self;
     
     async fn execute(&self, t: String) {
 
