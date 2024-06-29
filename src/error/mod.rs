@@ -96,6 +96,7 @@ use crate::constants::APP_NAME;
 */
 
 use actix::Addr;
+use deadpool_lapin::lapin::protocol::constants;
 use salvo::writing::Json;
 use salvo::{async_trait, Writer};
 use crate::models::event::*;
@@ -408,7 +409,7 @@ impl From<std::io::Error> for HoopoeErrorResponse{ // building error instance fr
 impl From<serde_json::Error> for HoopoeErrorResponse{
     fn from(error: serde_json::Error) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::CODEC_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Codec(CodecError::Serde(error)), 
             method_name: String::from("") 
@@ -419,7 +420,7 @@ impl From<serde_json::Error> for HoopoeErrorResponse{
 impl From<chrono::ParseError> for HoopoeErrorResponse{
     fn from(error: chrono::ParseError) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::CHRONO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Time(TimeError::Chrono(error)), 
             method_name: String::from("") 
@@ -430,7 +431,7 @@ impl From<chrono::ParseError> for HoopoeErrorResponse{
 impl From<redis::RedisError> for HoopoeErrorResponse{
     fn from(error: redis::RedisError) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::Redis(error)),
             method_name: String::from("") 
@@ -441,7 +442,7 @@ impl From<redis::RedisError> for HoopoeErrorResponse{
 impl From<themis::Error> for HoopoeErrorResponse{
     fn from(error: themis::Error) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::CRYPTER_THEMIS_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Crypter(CrypterError::Themis(error)),
             method_name: String::from("") 
@@ -452,7 +453,7 @@ impl From<themis::Error> for HoopoeErrorResponse{
 impl From<redis_async::error::Error> for HoopoeErrorResponse{
     fn from(error: redis_async::error::Error) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RedisAsync(error)),
             method_name: String::from("") 
@@ -463,7 +464,7 @@ impl From<redis_async::error::Error> for HoopoeErrorResponse{
 impl From<deadpool_lapin::lapin::Error> for HoopoeErrorResponse{
     fn from(error: deadpool_lapin::lapin::Error) -> Self {
         Self{ 
-            code: 0, 
+            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(), 
             kind: ErrorKind::Storage(StorageError::Rmq(error)), 
             method_name: String::from("") 
@@ -474,7 +475,7 @@ impl From<deadpool_lapin::lapin::Error> for HoopoeErrorResponse{
 impl From<deadpool_lapin::PoolError> for HoopoeErrorResponse{
     fn from(error: deadpool_lapin::PoolError) -> Self {
         Self{
-            code: 0, 
+            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RmqPool(error)),
             method_name: String::from(""),
@@ -485,7 +486,7 @@ impl From<deadpool_lapin::PoolError> for HoopoeErrorResponse{
 impl From<deadpool_redis::PoolError> for HoopoeErrorResponse{
     fn from(error: deadpool_redis::PoolError) -> Self {
         Self{
-            code: 0, 
+            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::RedisPool(error)),
             method_name: String::from(""),
@@ -496,7 +497,7 @@ impl From<deadpool_redis::PoolError> for HoopoeErrorResponse{
 impl From<sea_orm::DbErr> for HoopoeErrorResponse{
     fn from(error: sea_orm::DbErr) -> Self {
         Self{
-            code: 0,
+            code: *crate::constants::STORAGE_IO_ERROR_CODE,
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Storage(StorageError::SeaOrm(error)),
             method_name: String::from("")
@@ -507,7 +508,7 @@ impl From<sea_orm::DbErr> for HoopoeErrorResponse{
 impl From<actix::MailboxError> for HoopoeErrorResponse{
     fn from(error: actix::MailboxError) -> Self {
         Self{
-            code: 0,
+            code: *crate::constants::MAILBOX_CHANNEL_ERROR_CODE,
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Actor(ActixMailBoxError::Mailbox(error)),
             method_name: String::from("")
@@ -553,19 +554,19 @@ impl Writer for HoopoeErrorResponse{
 impl HoopoeErrorResponse{
 
     pub async fn new(code: u16, msg: Vec<u8>, kind: ErrorKind, method_name: &str, 
-            producer_actor: Option<&Addr<workers::zerlog::ZerLogProducerActor>>) -> Self{
-        
+        zerlog_producer_actor: Option<&Addr<workers::zerlog::ZerLogProducerActor>>) -> Self{
+
         let string_kind = &kind.to_string();
         let mut err = HoopoeErrorResponse::from((msg.clone(), code, kind, method_name.to_string()));
         
         // write into the file
         err.wirte_async().await;
-        
 
-        // we're using the log producer actor to send and produce erro message to rmq exchange
-        // later on consumers' queues can be bounded to the exchange to consume the errors 
-        // from the queue
-        if producer_actor.is_some(){
+        // we're using the zerlog producer actor to send and produce each error message to 
+        // the related rmq exchange, later on consumers' queues can be bounded to the exchange 
+        // to consume the errors from the queue and show the logs in some kinda sexy ui in 
+        // realtime over salvo ws
+        if zerlog_producer_actor.is_some(){
 
             let action_data = serde_json::json!({
                 "code": code,
@@ -573,16 +574,16 @@ impl HoopoeErrorResponse{
                 "kind": string_kind,
                 "method_name": method_name
             });
-            let zerlog_actor = producer_actor.unwrap();
+            let zerlog_actor = zerlog_producer_actor.unwrap();
             zerlog_actor.send(
                 ProduceNotif{
                     notif_data: NotifData{ 
-                        receiver_info: String::from("0"),
-                        id: uuid::Uuid::new_v4().to_string(), 
-                        action_data: action_data, 
-                        actioner_info: String::from("1"), 
-                        action_type: ActionType::Zerlog, 
-                        fired_at: chrono::Local::now().timestamp(), 
+                        receiver_info: String::from("0"), // system id
+                        id: uuid::Uuid::new_v4().to_string(), // the uuid of this notif
+                        action_data: action_data, // the data to be published
+                        actioner_info: String::from("1"), // actioner id
+                        action_type: ActionType::Zerlog, // the action type
+                        fired_at: chrono::Local::now().timestamp(), // triggered at
                         is_seen: false 
                     },
                     exchange_name: format!("{}:ZerlogExchange", APP_NAME), // any queue bounded to this exchange can consume errors
