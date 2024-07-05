@@ -221,6 +221,7 @@ pub async fn get_notif(
     // get a single notif by id
     if notif_query.id.is_some(){
         
+        // send notif info with this id to the accessor actor to fetch notif info
         let get_notif_data = notif_accessor_actor
             .send(RequestNotifDataByNotifId{ notif_id: notif_query.id.unwrap_or_default() }).await;
 

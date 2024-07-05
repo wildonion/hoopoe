@@ -200,6 +200,19 @@ impl ProductExt for Product{
 /* -------------------------------------------------------------------------------------------
         atomic synchronisation and handling mutual exclusion state on purchasing product 
    -------------------------------------------------------------------------------------------
+    
+    sub-tasking solutions:
+        
+        ╰┈➤ Using multi-task concurrency: each smaller of work would be its own task. The user 
+            would spawn each of these tasks onto an executor. The results of the task would be 
+            collected with a synchronization primitive like a channel, or the tasks would be 
+            awaited together with a JoinSet.
+
+        ╰┈➤ Using intra-task concurrency: each smaller unit will be a future run concurrently 
+            within the same task. The user would construct all of the futures and then use a 
+            concurrency primitive like join! or select! to combine them into a single future, 
+            depending on the exact access pattern.
+
     same logic goes for any other purchasing process in which 
     multiple users want to do it simultaneously following logic 
     can be implemented on a cluster using redis set_nx() command 
