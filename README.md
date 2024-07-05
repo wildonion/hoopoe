@@ -348,18 +348,18 @@ cargo run --bin hooper -- --help
 
 - **step8)** make sure the docker [registry](https://distribution.github.io/distribution/) service is up and running on your VPS (run `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2`) and you have an already setup the `docker.hoopoe.app` subdomain for that which is pointing to the `http://localhost:5000`. use this command to run a registry docker: `sudo docker run -d -p 5000:5000 --restart always --name registry registry:2` then login to your hub with `sudo docker login docker.hoopoe.app` command (use the nginx username and password, note that if you've not setup a username and password no need to do the login process! simply run the push and pull on VPS).
 
-- **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint which currently the hub has setup to `docker.youwho.club` endpoint, doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
+- **step9)** each internal image name inside your compose file must be prefixed with your docker hub registry endpoint doing so tells docker to pull images from there cause as we know this subdoamin is already pointing to the docker registry hosted on `localhost:5000` on VPS.
 
-> **current hub registry is set to `docker.youwho.club` and the `/root/hoopoe` folder on the VPS would be the place where the `docker-compose.yml` file is in**
+> **current hub registry is set to `docker.hoopoe.app` and the `/root/hoopoe` folder on the VPS would be the place where the `docker-compose.yml` file is in**
 
 > make sure you've logged in with `sudo` cause `cicd.yml` is building, pushing and pulling images with `sudo docker ...` command, if you are not running the docker with sudo make sure there is no sudo in `cicd.yml` file.
 
 > [!TIP]
 additionally you can push a docker image to your custom docker registry manually:
 ```bash
-sudo docker login docker.youwho.club # login to the registry
-sudo docker tag hoopoe-http docker.youwho.club/hoopoe-http # tag the image first
-sudo docker push docker.youwho.club/hoopoe-http # push to the registry
+sudo docker login docker.hoopoe.app # login to the registry
+sudo docker tag hoopoe-http docker.hoopoe.app/hoopoe-http # tag the image first
+sudo docker push docker.hoopoe.app/hoopoe-http # push to the registry
 ```
 login to the VPS and put the `docker-compose.yml` in the app directory (`/root/hoopoe`) then run:
 ```bash
