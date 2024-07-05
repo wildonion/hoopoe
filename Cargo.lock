@@ -2198,6 +2198,7 @@ dependencies = [
  "actix",
  "base58",
  "bytes",
+ "capnp",
  "capnp-rpc",
  "chacha20",
  "chrono",
