@@ -55,12 +55,22 @@ pub struct ActorInstaces{
 }
 
 
+pub struct Channels{
+    pub notif_broker: NotifMpscChannel
+}
+
+pub struct NotifMpscChannel{
+    pub sender: tokio::sync::mpsc::Sender<String>,
+    pub receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>>
+}
+
 #[derive(Clone)]
 pub struct AppContext{
     pub config: Option<std::sync::Arc<Context<ConfigEnv>>>,
     pub app_storage: Option<std::sync::Arc<Storage>>,
     pub actors: Option<ActorInstaces>,
-    pub ramdb: RamDb
+    pub channels: std::sync::Arc<Channels>,
+    pub kvan: KVan
 
 }
 
@@ -69,12 +79,26 @@ impl AppContext{
     pub async fn init() -> Self{
 
         let app_storage = Storage::new().await;
+        let (notif_broker_tx, notif_broker_rx) = tokio::sync::mpsc::channel::<String>(1024);
+        let channels = 
+            std::sync::Arc::new(
+                Channels{
+                    notif_broker: NotifMpscChannel{
+                        sender: notif_broker_tx.clone(),
+                        receiver: std::sync::Arc::new(
+                            tokio::sync::Mutex::new(
+                                notif_broker_rx
+                            )
+                        )
+                    }
+                }
+            );
 
         // build the necessary actors, start once
         let zerlog_producer_actor = ZerLogProducerActor::new(app_storage.clone()).start();
         let notif_mutator_actor = NotifMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let notif_actor = NotifBrokerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone()).start();
+        let notif_actor = NotifBrokerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone(), notif_broker_tx.clone()).start();
         let hoop_mutator_actor = HoopMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let hoop_accessor_actor = HoopAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         
@@ -104,11 +128,12 @@ impl AppContext{
                 );
                 configs
             }, 
+            channels,
             app_storage: app_storage.clone(), 
             actors: Some(actor_instances),  
-            ramdb: std::sync::Arc::new( // an in memory, mutable and safe map which can be shared across threads
+            kvan: std::sync::Arc::new( // an in memory, mutable and safe map which can be shared across threads
                 tokio::sync::Mutex::new(
-                    HashMap::new()
+                    BTreeMap::new()
                 )
             )
         }

@@ -77,7 +77,7 @@ pub struct ProduceNotif{
 pub struct CryptoConfig{
     pub secret: String,
     pub passphrase: String,
-    pub path: String, // <>.config.json
+    pub path: String, // <PATH>.config.json
 }
 
 
@@ -137,6 +137,7 @@ pub struct ConsumeNotif{
 
 #[derive(Clone)]
 pub struct NotifBrokerActor{
+    pub notif_broker_sender: tokio::sync::mpsc::Sender<String>,
     pub app_storage: std::option::Option<Arc<Storage>>, // REQUIRED: communicating with third party storage
     pub notif_mutator_actor: Addr<NotifMutatorActor>, // REQUIRED: communicating with mutator actor to write into redis and db 
     pub zerlog_producer_actor: Addr<ZerLogProducerActor> // REQUIRED: send any error log to the zerlog queue
@@ -188,6 +189,7 @@ impl NotifBrokerActor{
         let redis_pool = storage.unwrap().get_redis_pool().await.unwrap();
         let notif_mutator_actor = self.notif_mutator_actor.clone();
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
+        let notif_data_sender = self.notif_broker_sender.clone();
         
         match rmq_pool.get().await{
             Ok(conn) => {
@@ -259,6 +261,8 @@ impl NotifBrokerActor{
                         // String to pass the String version of them to the tokio spawn scope
                         let cloned_consumer_tag = consumer_tag.to_string();
                         let cloned_queue = queue.to_string();
+                        let cloned_notif_data_sender_channel = notif_data_sender.clone();
+
                         /* =================================================================================== */
                         /* ================================ CONSUMING PROCESS ================================ */
                         /* =================================================================================== */
@@ -313,7 +317,7 @@ impl NotifBrokerActor{
                                                                     match Wallet::secure_cell_decrypt(&mut secure_cell_config){
                                                                         Ok(data) => {
                                                                             // data is the raw utf8 bytes of actual data we 
-                                                                            // can easily convert it into the string 
+                                                                            // can easily convert it into the string for future decoding
                                                                             std::str::from_utf8(&buffer).unwrap().to_string()
                                                                         },
                                                                         Err(e) => {
@@ -329,7 +333,7 @@ impl NotifBrokerActor{
                                                                             ).await;
                                                                               
                                                                             // can't decrypt return the raw base58 string of encrypted data
-                                                                            // this can't be decoded to NotifData we'll get serde error!
+                                                                            // this can't be decoded to NotifData we'll get serde error log!
                                                                             std::str::from_utf8(&buffer).unwrap().to_string()
                                                                         }
                                                                     }
@@ -347,7 +351,7 @@ impl NotifBrokerActor{
                                                                     
                                                                     // can't open the file perhaps it's deleted!
                                                                     // return the raw base58 string of encrypted data, this can't 
-                                                                    // be decoded to NotifData we'll get serde error!
+                                                                    // be decoded to NotifData we'll get serde error log!
                                                                     std::str::from_utf8(&buffer).unwrap().to_string()
                                                                 }
                                                             }
@@ -368,6 +372,20 @@ impl NotifBrokerActor{
                                                             Ok(notif_event) => {
 
                                                                 log::info!("[*] decoded data: {:?}", notif_event);
+
+                                                                // =================================================================
+                                                                /* -------------------------- send to mpsc channel for ws realtiming
+                                                                // =================================================================
+                                                                    this is the most important part in here, we're slightly sending the data
+                                                                    to downside of a jobq mpsc channel, the receiver however will receive data in 
+                                                                    websocket handler which enables us to send realtime data received from RMQ 
+                                                                    to the client through websocket server: RMQ over websocket
+                                                                    once we receive the data from the mpsc channel in websocket handler we'll 
+                                                                    send it to the client through websocket channel.
+                                                                */
+                                                                if let Err(e) = cloned_notif_data_sender_channel.send(data).await{
+                                                                    log::error!("can't send notif data to websocket channel due to: {}", e.to_string());
+                                                                }
 
                                                                 // =============================================================================
                                                                 // ------------- if the cache on redis flag was activated we then store on redis
@@ -399,7 +417,7 @@ impl NotifBrokerActor{
                                                                                                 ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
                                                                                                 "NotifBrokerActor.decode_serde_redis", // method
                                                                                                 Some(&zerlog_producer_actor)
-                                                                                        ).await;
+                                                                                            ).await;
                                                                                             return; // terminate the caller
                                                                                         }
                                                                                     }
@@ -408,7 +426,7 @@ impl NotifBrokerActor{
                                                                                 Err(e) => {
 
                                                                                     // ------------------------------------------------------------------
-                                                                                    // followings are commented to prevent producing high amounts of logs
+                                                                                    // followings are commented to prevent producing high amount of logs
                                                                                     // ------------------------------------------------------------------
                                                                                     /* 
                                                                                     use crate::error::{ErrorKind, HoopoeErrorResponse};
@@ -782,8 +800,9 @@ impl NotifBrokerActor{
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, 
         notif_mutator_actor: Addr<NotifMutatorActor>,
-        zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
-        Self { app_storage, notif_mutator_actor, zerlog_producer_actor}
+        zerlog_producer_actor: Addr<ZerLogProducerActor>,
+        notif_broker_sender: tokio::sync::mpsc::Sender<String>) -> Self{
+        Self { app_storage, notif_mutator_actor, zerlog_producer_actor, notif_broker_sender }
     }
 
 }
@@ -819,26 +838,36 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
             };
 
             // store the config as json, since we don't need output or any result 
-            // from the task inside the thread thus there is no channel to send
-            // data to outside of tokio::spawn
+            // from the task inside the thread there would be no channel to send
+            // data to outside of tokio::spawn, this gets executed asyncly in the 
+            // background thread by tokio runtime.
             tokio::spawn(
                 {
                     let secure_cell_config = secure_cell_config.clone();
                     async move{
                         let config_path = format!("{}", config.path);
                         let config_file = tokio::fs::File::create(config_path).await;
-                        config_file.unwrap().write_all(
+                        if let Err(e) = config_file.unwrap().write_all(
                             &serde_json::to_string_pretty(&secure_cell_config).unwrap().as_bytes()
-                        ).await;
+                        ).await{
+                            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                            let err_instance = crate::error::HoopoeErrorResponse::new(
+                                *FILE_ERROR_CODE, // error hex (u16) code
+                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
+                                &String::from("NotifBrokerActor.ActixHandler<ProduceNotif>.Wallet::secure_cell_encrypt.config_file.unwrap().write_all"), // current method name
+                                None
+                            ).await;
+                        }
                     }
                 }
             );
-            
+
             match Wallet::secure_cell_encrypt(secure_cell_config){
                 Ok(data) => {
                     use base58::ToBase58;
                     let base58_data = data.to_base58();
-                    base58_data               
+                    base58_data         
                 },
                 Err(e) => {
                     let zerlog_producer_actor = self.zerlog_producer_actor.clone();

@@ -26,7 +26,7 @@ use crate::*;
     wasn't supported therefore having future objects in trait method 
     return type was invalid.
 */
-pub trait TransactionPoolActorTxExt{
+pub trait TransactionExt{
     type Tx;
     async fn commit(&self) -> Self;
     async fn get_status(&self) -> Self;

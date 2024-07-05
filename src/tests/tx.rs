@@ -1,13 +1,18 @@
 
+use futures::lock;
 use ractor::Message;
 use rand_chacha::ChaCha12Core;
 use wallexerr::misc::Wallet;
-use crate::interfaces::tx::TransactionPoolActorTxExt;
+use crate::interfaces::tx::TransactionExt;
 use crate::*;
 
-pub static WALLET: Lazy<std::sync::Arc<wallexerr::misc::Wallet>> = Lazy::new(||{
+pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Wallet>>> = Lazy::new(||{
     let wallet = Wallet::new_ed25519();
-    std::sync::Arc::new(wallet) // a shareable wallet object
+    std::sync::Arc::new(
+        tokio::sync::Mutex::new( // since most of the wallet methods are mutable we need to define this to be mutex 
+            wallet
+        )
+    ) // a safe and shareable wallet object between threads
 });
 
 /* --------------------- a fintech object to do any financial process
@@ -34,7 +39,7 @@ pub static WALLET: Lazy<std::sync::Arc<wallexerr::misc::Wallet>> = Lazy::new(||{
     use base58 and base64 to generate base58 or base64 from utf8 bytes  
  */
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
-pub struct TransactionPoolActor{
+pub struct Transaction{
     amount: f64, 
     from: String, 
     to: String, 
@@ -43,8 +48,8 @@ pub struct TransactionPoolActor{
     tx_type: TxType,
     treasury_type: TreasuryType,
     status: TxStatus,
-    hash: String, // sha256 ash of the transaction
-    tx_sig: String, // the signature result of signing the tx hash with private key, this will use to verify the tx along with the pubkey of the signer
+    hash: Option<String>, // sha256 ash of the transaction
+    tx_sig: Option<String>, // the signature result of signing the tx hash with private key, this will use to verify the tx along with the pubkey of the signer
     signer: String, // the one who has signed the tx
 }
 
@@ -65,11 +70,11 @@ pub enum TreasuryType{
     Credit
 }
 
-impl TransactionPoolActor{
-    pub fn new(amount: f64, from: &str, to: &str, tax: f64, data: &[u8]) -> Self{
+impl Transaction{
+    pub async fn new(last_tx: Self, amount: f64, from: &str, to: &str, tax: f64, data: &[u8]) -> Self{ // a tx object might have some data inside of itself
 
-        let wallet = WALLET.clone();
-        let mut tx = Self{
+        // create a new tx object
+        let mut tx_data = Self{
             amount,
             from: from.to_string(),
             to: to.to_string(),
@@ -78,17 +83,24 @@ impl TransactionPoolActor{
             status: TxStatus::Started,
             tx_type: TxType::Deposit,
             treasury_type: TreasuryType::Credit,
-            hash: String::from(""), // stringify the whole tx object then hash it
-            tx_sig: String::from(""), // sign the the stringified_tx_object with prvkey
+            hash: Some(String::from("")), // stringify the whole tx object then hash it
+            tx_sig: Some(String::from("")), // sign the the stringified_tx_object with prvkey
             signer: String::from("") // the one who has signed with the prv key usually the server
         };
 
+        tx_data
+        
+    }
 
-        // tx.on_error(||{});
-        // tx.on_success(||{});
-        // tx.on_reject(||{});
+    pub fn on_error<E>(e: E) where E: FnMut() -> () + Send + Sync + 'static{
 
-        tx
+    }
+
+    pub fn on_success<S>(s: S) where S: FnMut() -> () + Send + Sync + 'static{
+        
+    }
+
+    pub fn on_reject<R>(r: R) where R: FnMut() -> () + Send + Sync + 'static{
         
     }
     
@@ -113,21 +125,61 @@ pub struct FailedTx{
 // note that for Rc shared reference, the total reference count 
 // of type (type pointers used by different scopes) must reaches 
 // zero so the type can gets dropped out of the ram but not for weak. 
-impl Drop for TransactionPoolActor{
+impl Drop for Transaction{
     fn drop(&mut self) {
         self.status = TxStatus::Dropped
     }
 }
 
-impl TransactionPoolActorTxExt for TransactionPoolActor{
+impl TransactionExt for Transaction{
+    
     type Tx = Self;
 
     async fn commit(&self) -> Self {
         
-        // update user balance and treasury logics
+        let mut tx_data = self.clone();
+        let mut wallet = WALLET.clone();
+        let tx_json = serde_json::json!({
+            "amount": tx_data.amount,
+            "from": tx_data.from,
+            "to": tx_data.to,
+            "tax": tx_data.tax,
+            "data": tx_data.data,
+            "tx_type": tx_data.tx_type,
+            "treasury_type": tx_data.treasury_type,
+            "signer": tx_data.signer,
+        });
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<(Option<String>, Option<String>)>(1024);
+        
+        // use a lightweight thread to lock on the wallet in order to avoid blocking issues
+        // basically we should do our async stuffs inside a lightweight thread then use 
+        // channels to send the result to outside of the thread scope.
+        tokio::spawn(
+            {
+                let tx = tx.clone();
+                async move{
+                    let data = serde_json::to_string(&tx_json).unwrap();
+                    let mut locked_wallet = wallet.lock().await;
+                    let prvkey = locked_wallet.ed25519_secret_key.clone().unwrap();
+                    let sig = locked_wallet.self_ed25519_sign(&data, &prvkey);
+                    let tx_data_hash = locked_wallet.self_generate_sha256_from(&data);
+                    let hex_tx_data_hash = Some(hex::encode(&tx_data_hash));
+                    tx.send((sig, hex_tx_data_hash)).await;
+                }
+            }
+        );
+
+        while let Some((tx_signature, tx_hash)) = rx.recv().await{
+            tx_data.tx_sig = tx_signature;
+            tx_data.hash = tx_hash;
+        }
+
+        // update from and to balances and calculate user and sys treasury
         // ...
 
-        todo!()
+        tx_data
+
+
     }
 
     async fn get_status(&self) -> Self {
@@ -137,4 +189,5 @@ impl TransactionPoolActorTxExt for TransactionPoolActor{
     async fn started(&self){}
 
     async fn aborted(&self){}
+
 }

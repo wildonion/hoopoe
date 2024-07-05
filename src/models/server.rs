@@ -25,3 +25,8 @@ pub struct Response<'m, T: Clone + Debug + Default>{
     pub status: u16,
     pub meta: Option<serde_json::Value>
 }
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct WsServer{
+
+}
