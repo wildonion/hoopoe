@@ -154,8 +154,11 @@ mod routers;
   schedule the execution time automatically so handling each 
   socket inside a tokio lightweight thread is a great logic
   for handling each async api concurrently.
+  actix has its own runtime which is upon tokio scheduler, note
+  that all actors need to get started inside the actix runtime!
 */
-#[tokio::main]
+// #[tokio::main]
+#[actix_web::main]
 async fn main(){
 
     /* ------------- 
