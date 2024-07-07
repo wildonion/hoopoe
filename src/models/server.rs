@@ -1,5 +1,8 @@
 
 
+use salvo::websocket::Message;
+use tokio::sync::mpsc::UnboundedSender;
+
 use crate::*;
 use std::fmt::Debug;
 
@@ -24,9 +27,4 @@ pub struct Response<'m, T: Clone + Debug + Default>{
     pub is_err: bool,
     pub status: u16,
     pub meta: Option<serde_json::Value>
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct WsServer{
-
 }

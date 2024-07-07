@@ -13,6 +13,7 @@ use crate::*;
 pub struct EventQuery{
     pub owner: Option<String>, // the entity owner
     pub id: Option<i32>, // any entity id 
+    pub room: Option<String>,
     pub from: Option<u64>,
     pub to: Option<u64>,
     pub page_size: Option<u64>,
