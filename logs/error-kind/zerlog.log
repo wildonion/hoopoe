@@ -1,0 +1,32 @@
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720350511418 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351186752 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351272297 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351617139 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351690160 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351806473 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720351914628 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720352079940 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720352286497 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720353554314 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720353672022 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720353722026 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720353849307 | method name: NotifBrokerActor.decode_serde
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720354102286 | method name: NotifBrokerActor.decode_serde
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1720354467974 | method name: NotifBrokerActor.consume.Wallet::secure_cell_decrypt
+code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
+ | time: 1720354467975 | method name: NotifBrokerActor.decode_serde

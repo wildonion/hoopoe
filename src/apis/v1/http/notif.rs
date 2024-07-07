@@ -119,6 +119,7 @@ pub async fn register_notif(
     } else if get_consumer_info.is_some(){
         let consumer_info = get_consumer_info.unwrap();
         let mut notif = consumer_info.info;
+        notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
         notif.queue = format!("{}.{}:{}", APP_NAME, notif.tag, notif.queue);
 
         /* -ˋˏ✄┈┈┈┈

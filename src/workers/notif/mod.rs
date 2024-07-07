@@ -270,6 +270,59 @@ impl NotifBrokerActor{
                         // receiving is considered to be none blocking which won't block the current thread. 
                         tokio::spawn(async move{
 
+                            // try to find the secure cell config on the redis and 
+                            // do passphrase and secret key validation logic before
+                            // consuming messages
+                            let mut secure_cell_config = if let Some(mut config) = decryption_config.clone(){
+                                match redis_pool.get().await{
+                                    Ok(mut redis_conn) => {
+                    
+                                        // get the secure cell config from redis cache
+                                        let redis_key = format!("notif_encryption_config_for_{}", config.unique_redis_id);
+                                        let is_key_there: bool = redis_conn.exists(&redis_key).await.unwrap();
+                                        
+                                        let secure_cell_config = if is_key_there{
+                                            let get_secure_cell: String = redis_conn.get(redis_key).await.unwrap();
+                                            serde_json::from_str::<SecureCellConfig>(&get_secure_cell).unwrap()
+                                        } else{
+                                            SecureCellConfig::default()
+                                        };
+    
+                                        config.secret = hex::encode(config.secret);
+                                        config.passphrase = hex::encode(config.passphrase);
+
+                                        // make sure that both passphrase and secret key are the same 
+                                        // inside the stored secure cell config on redis
+                                        if config.passphrase != secure_cell_config.passphrase || 
+                                            config.secret != secure_cell_config.secret_key{
+                                                log::error!("[!] wrong passphrase or secret key");
+                                                return; // terminate the caller and cancel consuming, api must gets called again
+                                            }
+                                        
+                                        // return the loaded instance from redis
+                                        secure_cell_config
+    
+                                    },
+                                    Err(e) => {
+                                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                        let error_content = &e.to_string();
+                                        let error_content_ = error_content.as_bytes().to_vec();
+                                        let mut error_instance = HoopoeErrorResponse::new(
+                                            *constants::STORAGE_IO_ERROR_CODE, // error code
+                                            error_content_, // error content
+                                            ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
+                                            "NotifBrokerActor.produce.redis_pool", // method
+                                            Some(&zerlog_producer_actor)
+                                        ).await;
+    
+                                        SecureCellConfig::default()
+                                    }
+                                }
+
+                            } else{
+                                SecureCellConfig::default()
+                            };
+
                             // -ˋˏ✄┈┈┈┈ consuming from the queue owned by this consumer
                             match chan
                                 .basic_consume(
@@ -301,82 +354,41 @@ impl NotifBrokerActor{
                                                     Ok(ok) => {
 
                                                         let consumed_buffer = delv.data;
-
+                                                        
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // if we have a config means the data has been encrypted
-                                                        let data = if let Some(config) = decryption_config.clone(){
+                                                        let data = if !secure_cell_config.clone().data.is_empty(){
                                                             
-                                                            match redis_pool.get().await{
-                                                                Ok(mut redis_conn) => {
-                                                
-                                                                    // get the secure cell config from redis cache
-                                                                    let redis_key = format!("notif_encryption_config_for_{}", config.unique_redis_id);
-                                                                    let is_key_there: bool = redis_conn.exists(&redis_key).await.unwrap();
-                                                                    let mut secure_cell_config = if is_key_there{
-                                                                        let get_secure_cell: String = redis_conn.get(redis_key).await.unwrap();
-                                                                        &mut serde_json::from_str::<SecureCellConfig>(&get_secure_cell).unwrap()
-                                                                    } else{
-                                                                        &mut SecureCellConfig::default()
-                                                                    };
-
-                                                                    // make sure that both passphrase and secret key are the same 
-                                                                    // inside the stored secure cell config on redis
-                                                                    if config.passphrase == secure_cell_config.passphrase || 
-                                                                        config.secret == secure_cell_config.secret_key{
-                                                                            
-                                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ // pass the secure cell config to decrypt the data
-                                                                                Ok(data) => {
-                                                                                    // data is the raw utf8 bytes of actual data we 
-                                                                                    // can easily convert it into the string for future decoding
-                                                                                    std::str::from_utf8(&data).unwrap().to_string()
-                                                                                },
-                                                                                Err(e) => {
-        
-                                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
-                                                                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                                                                                        &String::from("NotifBrokerActor.consume.Wallet::secure_cell_decrypt"), // current method name
-                                                                                        Some(&zerlog_producer_actor)
-                                                                                    ).await;
-                                                                                      
-                                                                                    // can't decrypt return the raw base58 string of encrypted data
-                                                                                    // this can't be decoded to NotifData we'll get serde error log!
-                                                                                    std::str::from_utf8(&consumed_buffer).unwrap().to_string()
-                                                                                }
-                                                                            }
-                                                                        } else{
-                                                                            // wrong passphrase or secret hence we can't decode the data
-                                                                            // we'll get serde deserializing error!
-                                                                            log::error!("[!] wrong passphrase or secret key");
-                                                                            std::str::from_utf8(&consumed_buffer).unwrap().to_string()
-                                                                        }
-                                                                    
+                                                            // pass the secure_cell_config instance to decrypt the data, note 
+                                                            // that the instance must contains the encrypted data in form of utf8 bytes
+                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ 
+                                                                Ok(data) => {
+                                                                    // data is the raw utf8 bytes of the actual data
+                                                                    std::str::from_utf8(&data).unwrap().to_string()
                                                                 },
                                                                 Err(e) => {
-                                                                    use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                                    let error_content = &e.to_string();
-                                                                    let error_content_ = error_content.as_bytes().to_vec();
-                                                                    let mut error_instance = HoopoeErrorResponse::new(
-                                                                        *constants::STORAGE_IO_ERROR_CODE, // error code
-                                                                        error_content_, // error content
-                                                                        ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
-                                                                        "NotifBrokerActor.produce.redis_pool", // method
+
+                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
+                                                                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                                                                        &String::from("NotifBrokerActor.consume.Wallet::secure_cell_decrypt"), // current method name
                                                                         Some(&zerlog_producer_actor)
                                                                     ).await;
-
-                                                                    // can't get secure cell config from redis, returning 
-                                                                    // the string form of consumed buffer itself
+                                                                      
+                                                                    // can't decrypt return the raw base58 string of encrypted data
+                                                                    // this can't be decoded to NotifData we'll get serde error log!
                                                                     std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                                 }
                                                             }
 
                                                         } else{
                                                             // no decryption config is needed
+                                                            log::error!("encrypted data is empty in secure_cell_config instance");
                                                             std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                         };
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
@@ -534,7 +546,7 @@ impl NotifBrokerActor{
                                                                                     {
                                                                                         Ok(_) => { () },
                                                                                         Err(e) => {
-                                                                                            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                                            let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                                                                                             let err_instance = crate::error::HoopoeErrorResponse::new(
                                                                                                 *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                                                                                                 source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
@@ -552,6 +564,7 @@ impl NotifBrokerActor{
 
                                                             },
                                                             Err(e) => {
+                                                                log::error!("[!] can't deserialized into NotifData struct");
                                                                 use crate::error::{ErrorKind, HoopoeErrorResponse};
                                                                 let error_content = &e.to_string();
                                                                 let error_content_ = error_content.as_bytes().to_vec();
@@ -892,8 +905,14 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
             let str_data = match Wallet::secure_cell_encrypt(secure_cell_config){
                 Ok(data) => {
                     use base58::ToBase58;
-                    let base58_data = data.to_base58();
-                    base58_data         
+                    let base58_data = data.clone().to_base58();
+
+                    // the data in secure_cell_config must be the encrypted data for future decryption
+                    // we need to update the data field right after the encryption since we're storing 
+                    // the secure_cell_config instance on redis which must contains the encrypted data.
+                    secure_cell_config.data = data; 
+
+                    base58_data // this can also be a hex or base64
                 },
                 Err(e) => {
                     let zerlog_producer_actor = self.zerlog_producer_actor.clone();
@@ -901,7 +920,7 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
                     // since we don't need output or any result from the task inside the thread thus
                     // there is no channel to send data to outside of tokio::spawn
                     tokio::spawn(async move{
-                        let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                        let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                         let err_instance = crate::error::HoopoeErrorResponse::new(
                             *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
                             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
