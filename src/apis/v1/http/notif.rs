@@ -98,6 +98,10 @@ pub async fn register_notif(
             }
         );
 
+        // in here the background task might have halted, executed or even 
+        // crashed but the response is sent already to the caller regardless
+        // of what ever has happened.
+
         // fill the response object, salvo returns it by itself to the caller
         res.status_code = Some(StatusCode::OK);
         res.render(Json(
@@ -538,7 +542,7 @@ pub async fn get_notif(
 
 
 pub fn register_controller() -> Router{
-    Router::with_path("/v1/events/")
+    Router::with_path("/v1/events/notif/")
         .hoop(check_passport)
         .oapi_tag("Events") // the passport verifier middleware
         .post(register_notif)

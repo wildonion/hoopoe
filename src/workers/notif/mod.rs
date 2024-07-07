@@ -39,7 +39,7 @@ use constants::CRYPTER_THEMIS_ERROR_CODE;
 use constants::FILE_ERROR_CODE;
 use models::event::NotifData;
 use actix::prelude::*;
-use actix::Handler as ActixHandler;
+use actix::Handler as ActixMessageHandler;
 use actix::{Actor, AsyncContext, Context, Addr};
 use config::EnvExt;
 use constants::{MAILBOX_CHANNEL_ERROR_CODE, PING_INTERVAL};
@@ -77,7 +77,7 @@ pub struct ProduceNotif{
 pub struct CryptoConfig{
     pub secret: String,
     pub passphrase: String,
-    pub path: String, // <PATH>.config.json
+    pub unique_redis_id: String,
 }
 
 
@@ -149,7 +149,7 @@ impl Actor for NotifBrokerActor{
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 NotifBrokerActor has started");
+        log::info!("🎬 NotifBrokerActor has started");    
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
@@ -159,7 +159,7 @@ impl Actor for NotifBrokerActor{
             tokio::spawn(async move{
 
                 // check something constantly, schedule to be executed 
-                // at a certain time in the background
+                // at a certain time in the background lightweight thread
                 // ...
                 
             });
@@ -300,7 +300,7 @@ impl NotifBrokerActor{
                                                 match delv.ack(BasicAckOptions::default()).await{
                                                     Ok(ok) => {
 
-                                                        let buffer = delv.data;
+                                                        let consumed_buffer = delv.data;
 
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
@@ -308,57 +308,76 @@ impl NotifBrokerActor{
                                                         // if we have a config means the data has been encrypted
                                                         let data = if let Some(config) = decryption_config.clone(){
                                                             
-                                                            match tokio::fs::File::open(config.path).await{
-                                                                Ok(mut file) => {
-                                                                    let mut buffer = vec![];
-                                                                    let read_bytes = file.read(&mut buffer).await.unwrap();
-                                                                    let mut secure_cell_config = serde_json::from_slice::<SecureCellConfig>(&buffer).unwrap();
+                                                            match redis_pool.get().await{
+                                                                Ok(mut redis_conn) => {
+                                                
+                                                                    // get the secure cell config from redis cache
+                                                                    let redis_key = format!("notif_encryption_config_for_{}", config.unique_redis_id);
+                                                                    let is_key_there: bool = redis_conn.exists(&redis_key).await.unwrap();
+                                                                    let mut secure_cell_config = if is_key_there{
+                                                                        let get_secure_cell: String = redis_conn.get(redis_key).await.unwrap();
+                                                                        &mut serde_json::from_str::<SecureCellConfig>(&get_secure_cell).unwrap()
+                                                                    } else{
+                                                                        &mut SecureCellConfig::default()
+                                                                    };
 
-                                                                    match Wallet::secure_cell_decrypt(&mut secure_cell_config){
-                                                                        Ok(data) => {
-                                                                            // data is the raw utf8 bytes of actual data we 
-                                                                            // can easily convert it into the string for future decoding
-                                                                            std::str::from_utf8(&buffer).unwrap().to_string()
-                                                                        },
-                                                                        Err(e) => {
-
-                                                                            let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
-                                                                            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                            let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                                *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                                                                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                                crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                                                                                &String::from("NotifBrokerActor.consume.Wallet::secure_cell_encrypt"), // current method name
-                                                                                Some(&zerlog_producer_actor)
-                                                                            ).await;
-                                                                              
-                                                                            // can't decrypt return the raw base58 string of encrypted data
-                                                                            // this can't be decoded to NotifData we'll get serde error log!
-                                                                            std::str::from_utf8(&buffer).unwrap().to_string()
+                                                                    // make sure that both passphrase and secret key are the same 
+                                                                    // inside the stored secure cell config on redis
+                                                                    if config.passphrase == secure_cell_config.passphrase || 
+                                                                        config.secret == secure_cell_config.secret_key{
+                                                                            
+                                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ // pass the secure cell config to decrypt the data
+                                                                                Ok(data) => {
+                                                                                    // data is the raw utf8 bytes of actual data we 
+                                                                                    // can easily convert it into the string for future decoding
+                                                                                    std::str::from_utf8(&data).unwrap().to_string()
+                                                                                },
+                                                                                Err(e) => {
+        
+                                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
+                                                                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                                                                                        &String::from("NotifBrokerActor.consume.Wallet::secure_cell_decrypt"), // current method name
+                                                                                        Some(&zerlog_producer_actor)
+                                                                                    ).await;
+                                                                                      
+                                                                                    // can't decrypt return the raw base58 string of encrypted data
+                                                                                    // this can't be decoded to NotifData we'll get serde error log!
+                                                                                    std::str::from_utf8(&consumed_buffer).unwrap().to_string()
+                                                                                }
+                                                                            }
+                                                                        } else{
+                                                                            // wrong passphrase or secret hence we can't decode the data
+                                                                            // we'll get serde deserializing error!
+                                                                            log::error!("[!] wrong passphrase or secret key");
+                                                                            std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                                         }
-                                                                    }
+                                                                    
                                                                 },
                                                                 Err(e) => {
-
-                                                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                        *FILE_ERROR_CODE, // error hex (u16) code
-                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                        crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
-                                                                        &String::from("NotifBrokerActor.consume.std::fs::File::open"), // current method name
+                                                                    use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                                    let error_content = &e.to_string();
+                                                                    let error_content_ = error_content.as_bytes().to_vec();
+                                                                    let mut error_instance = HoopoeErrorResponse::new(
+                                                                        *constants::STORAGE_IO_ERROR_CODE, // error code
+                                                                        error_content_, // error content
+                                                                        ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
+                                                                        "NotifBrokerActor.produce.redis_pool", // method
                                                                         Some(&zerlog_producer_actor)
-                                                                    ).await;           
-                                                                    
-                                                                    // can't open the file perhaps it's deleted!
-                                                                    // return the raw base58 string of encrypted data, this can't 
-                                                                    // be decoded to NotifData we'll get serde error log!
-                                                                    std::str::from_utf8(&buffer).unwrap().to_string()
+                                                                    ).await;
+
+                                                                    // can't get secure cell config from redis, returning 
+                                                                    // the string form of consumed buffer itself
+                                                                    std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                                 }
                                                             }
 
                                                         } else{
                                                             // no decryption config is needed
-                                                            std::str::from_utf8(&buffer).unwrap().to_string()
+                                                            std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                         };
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
@@ -371,7 +390,7 @@ impl NotifBrokerActor{
                                                         match get_notif_event{
                                                             Ok(notif_event) => {
 
-                                                                log::info!("[*] decoded data: {:?}", notif_event);
+                                                                log::info!("[*] deserialized data: {:?}", notif_event);
 
                                                                 // =================================================================
                                                                 /* -------------------------- send to mpsc channel for ws realtiming
@@ -633,7 +652,7 @@ impl NotifBrokerActor{
     /* ********************************************************************* */
     /* ***************************** PRODUCING ***************************** */
     /* ********************************************************************* */
-    pub async fn produce(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str){
+    pub async fn produce(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str, unique_redis_id: &str, secure_cell_config: &mut SecureCellConfig){
 
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         let this = self.clone();
@@ -646,11 +665,44 @@ impl NotifBrokerActor{
         let routing_key = routing_key.to_string();
         let exchange_type = exchange_type.to_string();
         let data = data.to_string();
+        let cloned_secure_cell_config = secure_cell_config.clone();
+        let unique_redis_id = unique_redis_id.to_string();
 
         tokio::spawn(async move{
 
             let storage = this.clone().app_storage.clone();
-            let rmq_pool = storage.unwrap().get_lapin_pool().await.unwrap();
+            let rmq_pool = storage.as_ref().unwrap().get_lapin_pool().await.unwrap();
+            let redis_pool = storage.as_ref().unwrap().get_redis_pool().await.unwrap();
+
+
+            // make sure that we have redis unique id and encrypted data in secure cell
+            // then cache the condif on redis with expirable key
+            if !unique_redis_id.is_empty() && !cloned_secure_cell_config.data.is_empty(){
+                match redis_pool.get().await{
+                    Ok(mut redis_conn) => {
+                        
+                        log::info!("[*] caching secure cell config on redis");
+
+                        // cache the secure cell config on redis for 5 mins
+                        // this is faster than storing it on disk or file
+                        let str_secure_cell = serde_json::to_string_pretty(&cloned_secure_cell_config).unwrap();
+                        let redis_key = format!("notif_encryption_config_for_{}", unique_redis_id);
+                        let _: () = redis_conn.set_ex(redis_key, str_secure_cell, 300).await.unwrap();
+                    },
+                    Err(e) => {
+                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                        let error_content = &e.to_string();
+                        let error_content_ = error_content.as_bytes().to_vec();
+                        let mut error_instance = HoopoeErrorResponse::new(
+                            *constants::STORAGE_IO_ERROR_CODE, // error code
+                            error_content_, // error content
+                            ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
+                            "NotifBrokerActor.produce.redis_pool", // method
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                    }
+                };
+            }
             
             // trying to ge a connection from the pool
             match rmq_pool.get().await{
@@ -810,7 +862,7 @@ impl NotifBrokerActor{
 /* ********************************************************************************* */
 /* ***************************** PRODUCE NOTIF HANDLER ***************************** */
 /* ********************************************************************************* */
-impl ActixHandler<ProduceNotif> for NotifBrokerActor{
+impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
     
     type Result = ();
     fn handle(&mut self, msg: ProduceNotif, ctx: &mut Self::Context) -> Self::Result {
@@ -829,41 +881,15 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
         // ===>>>===>>>===>>>===>>>===>>> data encryption logic ===>>>===>>>===>>>===>>>===>>>
         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-        let stringified_data = if let Some(config) = encryption_config{
+        let stringified_config_data = if let Some(config) = encryption_config{
 
             let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
-                secret_key: config.secret,
-                passphrase: config.passphrase,
+                secret_key: hex::encode(config.secret),
+                passphrase: hex::encode(config.passphrase),
                 data: serde_json::to_vec(&notif_data).unwrap(),
             };
 
-            // store the config as json, since we don't need output or any result 
-            // from the task inside the thread there would be no channel to send
-            // data to outside of tokio::spawn, this gets executed asyncly in the 
-            // background thread by tokio runtime.
-            tokio::spawn(
-                {
-                    let secure_cell_config = secure_cell_config.clone();
-                    async move{
-                        let config_path = format!("{}", config.path);
-                        let config_file = tokio::fs::File::create(config_path).await;
-                        if let Err(e) = config_file.unwrap().write_all(
-                            &serde_json::to_string_pretty(&secure_cell_config).unwrap().as_bytes()
-                        ).await{
-                            let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                            let err_instance = crate::error::HoopoeErrorResponse::new(
-                                *FILE_ERROR_CODE, // error hex (u16) code
-                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                crate::error::ErrorKind::File(crate::error::FileEror::ReadWrite(e)), // the actual source of the error caused at runtime
-                                &String::from("NotifBrokerActor.ActixHandler<ProduceNotif>.Wallet::secure_cell_encrypt.config_file.unwrap().write_all"), // current method name
-                                None
-                            ).await;
-                        }
-                    }
-                }
-            );
-
-            match Wallet::secure_cell_encrypt(secure_cell_config){
+            let str_data = match Wallet::secure_cell_encrypt(secure_cell_config){
                 Ok(data) => {
                     use base58::ToBase58;
                     let base58_data = data.to_base58();
@@ -880,19 +906,24 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
                             *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
                             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                             crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                            &String::from("NotifBrokerActor.ActixHandler<ProduceNotif>.Wallet::secure_cell_encrypt"), // current method name
+                            &String::from("NotifBrokerActor.ActixMessageHandler<ProduceNotif>.Wallet::secure_cell_encrypt"), // current method name
                             Some(&zerlog_producer_actor)
                         ).await;
                     });
                     // return the actual data with no encryption
                     serde_json::to_string_pretty(&notif_data).unwrap()
                 }
-            }
+            };
 
+            (str_data, secure_cell_config.to_owned(), config.unique_redis_id)
 
         } else{
-            // return the actual data with no encryption
-            serde_json::to_string_pretty(&notif_data).unwrap()
+            // we can't return a reference to a SecureCellConfig in here cause 
+            // it's a variable which has defined in the current scope and once 
+            // this scope gets executed and dropped the instance hence any pointer 
+            // of it won't be valid. so don't return a mutable pointer to SecureCellConfig
+            // instance in here.
+            (serde_json::to_string_pretty(&notif_data).unwrap(), SecureCellConfig::default(), String::from(""))
         };
         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
@@ -900,18 +931,24 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
 
         let this = self.clone();
 
+        let (
+            stringified_data, 
+            mut secure_cell_config, 
+            unique_redis_id
+        ) = stringified_config_data;
+
         // spawn the future in the background into the given actor context thread
         // by doing this we're executing the future inside the actor thread since
         // every actor has its own thread of execution.
         if local_spawn{
             async move{
-                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
+                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type, &unique_redis_id, &mut secure_cell_config).await;
             }
             .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
             .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
-                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type).await;
+                this.produce(&stringified_data, &exchange_name, &routing_key, &exchange_type, &unique_redis_id, &mut secure_cell_config).await;
             });
         }
         
@@ -924,7 +961,7 @@ impl ActixHandler<ProduceNotif> for NotifBrokerActor{
 /* ********************************************************************************* */
 /* ***************************** CONSUME NOTIF HANDLER ***************************** */
 /* ********************************************************************************* */
-impl ActixHandler<ConsumeNotif> for NotifBrokerActor{
+impl ActixMessageHandler<ConsumeNotif> for NotifBrokerActor{
     
     type Result = ();
     fn handle(&mut self, msg: ConsumeNotif, ctx: &mut Self::Context) -> Self::Result {
