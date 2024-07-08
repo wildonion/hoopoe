@@ -35,6 +35,7 @@
     ======================================================================================== */
 
 use crate::*;
+use base58::FromBase58;
 use constants::CRYPTER_THEMIS_ERROR_CODE;
 use constants::FILE_ERROR_CODE;
 use models::event::NotifData;
@@ -361,9 +362,20 @@ impl NotifBrokerActor{
                                                         // if we have a config means the data has been encrypted
                                                         let data = if !secure_cell_config.clone().data.is_empty(){
                                                             
+                                                            // if the decryption config is available then this is the base58 of encrypted data
+                                                            let base58_data = std::str::from_utf8(&consumed_buffer).unwrap();
+                                                            let encrypted_data_buffer = base58_data.from_base58().unwrap();
+
+                                                            if secure_cell_config.data != encrypted_data_buffer || 
+                                                                secure_cell_config.data.len() != encrypted_data_buffer.len(){
+
+                                                                    log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
+                                                                    return;
+                                                                }
+
                                                             // pass the secure_cell_config instance to decrypt the data, note 
                                                             // that the instance must contains the encrypted data in form of utf8 bytes
-                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ 
+                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ // passing the redis secure_cell_config instance
                                                                 Ok(data) => {
                                                                     // data is the raw utf8 bytes of the actual data
                                                                     std::str::from_utf8(&data).unwrap().to_string()
@@ -387,7 +399,8 @@ impl NotifBrokerActor{
                                                             }
 
                                                         } else{
-                                                            // no decryption config is needed
+                                                            // no decryption config is needed, just return the raw data
+                                                            // there would be no isse with decoding this into NotifData
                                                             log::error!("encrypted data is empty in secure_cell_config instance");
                                                             std::str::from_utf8(&consumed_buffer).unwrap().to_string()
                                                         };
@@ -405,7 +418,7 @@ impl NotifBrokerActor{
                                                                 log::info!("[*] deserialized data: {:?}", notif_event);
 
                                                                 // =================================================================
-                                                                /* -------------------------- send to mpsc channel for ws realtiming
+                                                                /* -------------------------- send to mpsc channel for ws streaming
                                                                 // =================================================================
                                                                     this is the most important part in here, we're slightly sending the data
                                                                     to downside of a jobq mpsc channel, the receiver however will receive data in 
