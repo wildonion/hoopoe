@@ -287,7 +287,7 @@ impl HoopoeWsServer{
                     efficiently from the channel to the websocket connection.
 
                 */
-                wrapped_rx.forward(user_ws_tx).map(|res|{ // forward all items received from the rx to the websocket sender
+                wrapped_rx.forward(user_ws_tx).map(|res|{ // forward all items received from the rx to the websocket channel sender
                     if let Err(e) = res{
                         log::error!("receiver stream can't forward messages to websocket sender: {:?}", e.to_string());
                         tokio::spawn(

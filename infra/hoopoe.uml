@@ -40,11 +40,11 @@ class "**notifs**" {
 ---
 * <b>""action_data""</b>: //""json""  //
 * <b>""action_type""</b>: //""character varying""  //
-* <b>""actioner_info""</b>: //""json""  //
+* <b>""actioner_info""</b>: //""character varying""  //
 * <b>""fired_at""</b>: //""timestamp without time zone""  //
 * <b>""is_seen""</b>: //""boolean""  //
 * <b>""nid""</b>: //""character varying""  //
-* <b>""receiver""</b>: //""json""  //
+* <b>""receiver_info""</b>: //""character varying""  //
 }
 
 class "**seaql_migrations**" {
