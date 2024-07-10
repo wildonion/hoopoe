@@ -21,7 +21,7 @@ use crate::*;
     the client to fetch notifs for an owner in a short polling manner
     this way is used to fetch all notifs for an owern in realtime as
     they're receiving by the RMQ consumer.
-    addr: localhost:2344/v1/stream/notif/?owner=100&room=notif_room
+    addr: localhost:2344/v1/stream/notif/consume/?owner=100&room=notif_room
 */
 #[handler]
 async fn consume(
@@ -50,7 +50,7 @@ async fn consume(
         .upgrade(req, res, |ws| async move{
             // spawn the async task of handling websocket session inside a lightweight thread
             tokio::spawn(async move{
-                HoopoeWsServer::session_handler(ws, notif_broker_receiver, notif_query, zerlog_producer_actor).await;
+                HoopoeWsServer::session_handler(ws, notif_query, notif_broker_receiver, zerlog_producer_actor).await;
             });
         })
         .await

@@ -130,7 +130,6 @@ pub struct ConsumeNotif{
     pub tag: String,
     pub redis_cache_exp: u64,
     pub local_spawn: bool, // either spawn in actor context or tokio threadpool
-    pub cache_on_redis: bool,
     pub store_in_db: bool,
     pub decryption_config: Option<CryptoConfig>
 }
@@ -181,7 +180,7 @@ impl NotifBrokerActor{
     pub async fn consume(&self, exp_seconds: u64,
         consumer_tag: &str, queue: &str, 
         binding_key: &str, exchange: &str,
-        cache_on_redis: bool, store_in_db: bool,
+        store_in_db: bool,
         decryption_config: Option<CryptoConfig>
     ){
 
@@ -363,15 +362,18 @@ impl NotifBrokerActor{
                                                         let data = if !secure_cell_config.clone().data.is_empty(){
                                                             
                                                             // if the decryption config is available then this is the base58 of encrypted data
-                                                            let base58_data = std::str::from_utf8(&consumed_buffer).unwrap();
-                                                            let encrypted_data_buffer = base58_data.from_base58().unwrap();
+                                                            // let base58_data = std::str::from_utf8(&consumed_buffer).unwrap();
+                                                            // let encrypted_data_buffer = base58_data.from_base58().unwrap();
 
-                                                            if secure_cell_config.data != encrypted_data_buffer || 
-                                                                secure_cell_config.data.len() != encrypted_data_buffer.len(){
+                                                            // // make sure that the encrypted data on redis is the same as the one consumed 
+                                                            // // by the consumer, we should first convert the base58 back to the original buffer
+                                                            // if secure_cell_config.data != encrypted_data_buffer || 
+                                                            //     secure_cell_config.data.len() != encrypted_data_buffer.len(){
 
-                                                                    log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
-                                                                    return;
-                                                                }
+                                                            //         log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
+                                                            //         return;
+                                                            //     }
+
 
                                                             // pass the secure_cell_config instance to decrypt the data, note 
                                                             // that the instance must contains the encrypted data in form of utf8 bytes
@@ -434,7 +436,7 @@ impl NotifBrokerActor{
                                                                 // =============================================================================
                                                                 // ------------- if the cache on redis flag was activated we then store on redis
                                                                 // =============================================================================
-                                                                if cache_on_redis{
+                                                                if exp_seconds != 0{
                                                                     match redis_pool.get().await{
                                                                         Ok(mut redis_conn) => {
 
@@ -1006,7 +1008,6 @@ impl ActixMessageHandler<ConsumeNotif> for NotifBrokerActor{
                 routing_key,
                 redis_cache_exp,
                 local_spawn,
-                cache_on_redis,
                 store_in_db,
                 decryption_config
 
@@ -1025,7 +1026,6 @@ impl ActixMessageHandler<ConsumeNotif> for NotifBrokerActor{
                     &queue, 
                     &routing_key, 
                     &exchange_name,
-                    cache_on_redis,
                     store_in_db,
                     decryption_config
                 ).await;
@@ -1040,7 +1040,6 @@ impl ActixMessageHandler<ConsumeNotif> for NotifBrokerActor{
                     &queue, 
                     &routing_key, 
                     &exchange_name,
-                    cache_on_redis,
                     store_in_db,
                     decryption_config
                 ).await;

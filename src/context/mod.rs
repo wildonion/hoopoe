@@ -76,6 +76,7 @@ pub struct AppContext{
 
 impl AppContext{
 
+    // initializing everything once!
     pub async fn init() -> Self{
 
         let app_storage = Storage::new().await;
@@ -85,6 +86,7 @@ impl AppContext{
                 Channels{
                     notif_broker: NotifMpscChannel{
                         sender: notif_broker_tx.clone(),
+                        // making the receiver safe to be shared multiple times and mutated
                         receiver: std::sync::Arc::new(
                             tokio::sync::Mutex::new(
                                 notif_broker_rx
@@ -131,7 +133,7 @@ impl AppContext{
             channels,
             app_storage: app_storage.clone(), 
             actors: Some(actor_instances),  
-            kvan: std::sync::Arc::new( // an in memory, mutable and safe map which can be shared across threads
+            kvan: std::sync::Arc::new( // an in memory, mutable and safe binary tree map which can be shared across threads
                 tokio::sync::Mutex::new(
                     BTreeMap::new()
                 )

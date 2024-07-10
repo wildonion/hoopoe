@@ -15,6 +15,7 @@ sudo apt install -y snapd && sudo snap install core; sudo snap refresh core
 sudo snap install --classic certbot && sudo ln -s /snap/bin/certbot /usr/bin/certbot
 cargo install sqlant && sudo apt install -y openjdk-11-jdk && sudo apt install -y graphviz
 
+# use sqlant and plantuml to extract erd from any db
 sqlant postgresql://postgres:$PASSWORD@localhost/hoopoe > $(pwd)/infra/hoopoe.uml
 java -jar $(pwd)/infra/plantuml.jar $(pwd)/infra/hoopoe.uml
 

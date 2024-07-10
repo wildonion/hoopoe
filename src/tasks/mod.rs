@@ -15,7 +15,7 @@ use types::Job;
 pub struct Task<J, S> where // J is a Future object and must be executed with Box::pin(job);
     J: std::future::Future + Send + Sync + 'static,
     J::Output: Send + Sync + 'static
-    {
+{
     pub status: TaskStatus,
     pub name: String, // like send_mail task 
     pub job: J, // use Box::pin(job) to pin it into the ram and call it; the function that needs to get executed 
@@ -27,7 +27,7 @@ pub struct Task<J, S> where // J is a Future object and must be executed with Bo
 pub enum TaskStatus{
     #[default]
     Executed,
-    Rejected
+    Hanlted
 }
 
 impl<J: std::future::Future + Send + Sync + 'static, S> Task<J, S> 
@@ -46,12 +46,19 @@ impl<J: std::future::Future + Send + Sync + 'static, S> Task<J, S>
 }
 
 impl<J: std::future::Future + Send + Sync + 'static, S> TaskExt<String> for Task<J, S>
-    where J::Output: Send + Sync + 'static{
+    where 
+        J::Output: Send + Sync + 'static, 
+        <J as std::future::Future>::Output: Send + Sync + 'static{
     
     type State = String;
     type Task = Self;
     
     async fn execute(&self, t: String) {
+        
+        let this = self.clone();
+        tokio::spawn(async move{
+
+        });
 
     }
 

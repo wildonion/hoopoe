@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "537baa22-afc3-4f65-b231-50572dcd53eb",
-		"name": "hoopoe",
+		"name": "HOOPOE",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "22927035",
 		"_collection_link": "https://dewoloper.postman.co/workspace/dewo~9f34982c-dde5-4f77-9d5d-46872ed07d4a/collection/22927035-537baa22-afc3-4f65-b231-50572dcd53eb?action=share&source=collection_link&creator=22927035"
@@ -18,18 +18,51 @@
 					"name": "Notif",
 					"item": [
 						{
-							"name": "Register Notif",
+							"name": "Register Notif (Produce)",
 							"request": {
 								"method": "POST",
 								"header": [
 									{
 										"key": "x-api-key",
-										"value": "124kUmD39YUwJRKxaQqTkNzcoVW4P1ZqZ3ahiJWVQqs89bope7GtqU881rWpMyVXskyn2PWsp"
+										"value": "124kUmD39YUwJRKxaQqTkJqRfrAZotpYnrWJc2x9fdibFWHPdRFcGCToDWAqpyM9hcD23JvTi"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true,\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\" // routing pattern or key - will be ignored if type is fanout\n        }\n    },\n    // \"producer_info\": null,\n    \"consumer_info\": null\n    // \"consumer_info\": {\n    //     \"info\": {\n    //         \"queue\": \"TestOnion\",\n    //         \"exchange_name\": \"SavageEx\",\n    //         \"routing_key\": \"\",\n    //         \"tag\": \"cons_tag0\",\n    //         \"redis_cache_exp\": 300,\n    //         \"local_spawn\": true,\n    //         \"cache_on_redis\": true,\n    //         \"store_in_db\": true\n    //     }\n    // }\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    },\n    \"consumer_info\": null\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Register Notif (Consume)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "x-api-key",
+										"value": "124kUmD39YUwJRKxaQqTkJqRfrAZotpYnrWJc2x9fdibFWHPdRFcGCToDWAqpyM9hcD23JvTi"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"cache_on_redis\": true,\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -203,11 +236,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{health-v1}}/?pid=1",
+							"raw": "{{health-v1}}/atomic-mint/?pid=1",
 							"host": [
 								"{{health-v1}}"
 							],
 							"path": [
+								"atomic-mint",
 								""
 							],
 							"query": [
@@ -238,9 +272,12 @@
 							}
 						},
 						"url": {
-							"raw": "{{health-v1}}",
+							"raw": "{{health-v1}}/check",
 							"host": [
 								"{{health-v1}}"
+							],
+							"path": [
+								"check"
 							]
 						}
 					},
@@ -262,9 +299,13 @@
 							}
 						],
 						"url": {
-							"raw": "{{auth-v1}}?exp=4000&scope=write",
+							"raw": "{{auth-v1}}/generate-access-token/?exp=4000&scope=write",
 							"host": [
 								"{{auth-v1}}"
+							],
+							"path": [
+								"generate-access-token",
+								""
 							],
 							"query": [
 								{
@@ -308,17 +349,17 @@
 	"variable": [
 		{
 			"key": "events-v1",
-			"value": "http://localhost:2344/v1/events/",
+			"value": "http://localhost:2344/v1/events",
 			"type": "string"
 		},
 		{
 			"key": "auth-v1",
-			"value": "http://localhost:2344/v1/auth/",
+			"value": "http://localhost:2344/v1/auth",
 			"type": "string"
 		},
 		{
 			"key": "health-v1",
-			"value": "http://localhost:2344/v1/health/",
+			"value": "http://localhost:2344/v1/health",
 			"type": "string"
 		},
 		{
