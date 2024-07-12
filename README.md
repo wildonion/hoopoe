@@ -325,6 +325,9 @@ cargo run --bin hooper -- --help
 
 > you can build and up all images on your machine with `sudo docker compose up -d --build` command.
 
+> [!IMPORTANT]
+> if you want to run the server over **HTTP3** just make sure that ssl certificate keys are setup properly inside the `infra/http3/certs` folder, namely `hoopoecert.pem` and `hoopoekey.pem`.
+
 #### 🚨 me before you!
 
 > [!CAUTION]

@@ -38,6 +38,7 @@ use crate::*;
 use base58::FromBase58;
 use constants::CRYPTER_THEMIS_ERROR_CODE;
 use constants::FILE_ERROR_CODE;
+use futures::executor;
 use models::event::NotifData;
 use actix::prelude::*;
 use actix::Handler as ActixMessageHandler;
@@ -347,7 +348,7 @@ impl NotifBrokerActor{
                                         match delivery{
                                             Ok(delv) => {
 
-                                                log::info!("[*] received delivery from queue: {}", q.name());
+                                                log::info!("[*] received delivery from queue#<{}>", q.name());
 
                                                 // if the consumer receives this data from the queue
                                                 match delv.ack(BasicAckOptions::default()).await{

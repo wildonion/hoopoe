@@ -12,6 +12,7 @@ use tokio::sync::{mpsc::Receiver, Mutex};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use wallexerr::misc::Wallet;
 use workers::zerlog::ZerLogProducerActor;
+use salvo::conn::rustls::{Keycert, RustlsConfig};
 
 
 pub trait HoopoeService<G: Send + Sync>{ // supports polymorphism
@@ -141,6 +142,7 @@ impl HoopoeServer{
         Migrator::status(&connection).await.unwrap();
     }
 
+    // wrapping around the whole apis and make them as a service
     pub fn buildService(&mut self){
         let apis = self.buildRouter();
         let service = Service::new(apis); // dependencry injection
@@ -181,6 +183,28 @@ impl HoopoeServer{
             let serv = service.unwrap();
             server.serve(serv).await; // start server in a loop{} in a tokio lightweight thread of execution
         }
+    }
+
+    pub async fn runOverHTTP3(self){
+        
+        let Self { service, addr, app_ctx, ssl_domain } = self;
+        let serv = service.unwrap(); // contains apis 
+
+        // include_bytes!{} macro loads a file in form of utf8 bytes array,
+        // since it's a macro thus it checks the paths at compile time!
+        let key = include_bytes!("../../infra/certs/http3/hoopoecert.pem").to_vec();
+        let cert = include_bytes!("../../infra/certs/http3/hoopoekey.pem").to_vec();
+        let config = RustlsConfig::new(Keycert::new().cert(cert.as_slice()).key(key.as_slice()));
+
+        let listener = TcpListener::new(addr).rustls(config.clone());
+        let acceptor = QuinnListener::new(config, ("127.0.0.1", 5800))
+            .join(listener)
+            .bind()
+            .await;
+
+        let server = Server::new(acceptor);
+        server.serve(serv).await;
+
     }
 
 }
@@ -364,7 +388,7 @@ impl HoopoeWsServerActor{
                     wrapped_rx.forward(current_user_ws_tx).map(|res|{ // forward all items received from the rx to the websocket channel sender
                         if let Err(e) = res{
                             log::error!("receiver stream can't forward messages to websocket sender: {:?}", e.to_string());
-                            tokio::spawn(
+                            tokio::spawn( // handling forward error in a separate thread
                                 {
                                     async move{
                                         use crate::error::{ErrorKind, HoopoeErrorResponse};
@@ -467,7 +491,7 @@ impl HoopoeWsServerActor{
                                     // sending the notif data to the user tx, the message will be received by the receiver
                                     // and forwarded to the current_user_ws_tx sender of the unbounded mpsc channel.
                                     if let Err(e) = tx.send(ws_message){ // catch the error if the channel is closed
-                                        log::error!("can't send notif message to unbounded channel using tx: {}", e.to_string());
+                                        log::error!("can't send notif message to unbounded channel: {}", e.to_string());
                                     }
                                 }
                             }

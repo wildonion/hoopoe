@@ -181,5 +181,6 @@ async fn main(){
     app.buildService(); // build salvo service
     app.applyMigrations().await; // execute db migration files
     app.run().await; // run server; after this call we can't use app since the run() method isn't &self and takes the ownership of the app instance
+    // app.runOverHTTP3().await; // run server over http3, MAKE SURE SSL CERTS ARE SETUP PROPERLY INSIDE `infra/certs/http3` FOLDER.
 
 }

@@ -23,6 +23,8 @@ use crate::*;
     this way is used to fetch all notifs for an owern in realtime as
     they're receiving by the RMQ consumer.
     addr: localhost:2344/v1/stream/notif/consume/?owner=100&room=notif_room
+    owner is the notification owner which must be equal to the `receiver_info`
+    field inside the notif_data instance received by the consumer. 
 */
 #[handler]
 async fn consume(
