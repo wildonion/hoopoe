@@ -360,20 +360,19 @@ impl NotifBrokerActor{
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // if we have a config means the data has been encrypted
                                                         let data = if !secure_cell_config.clone().data.is_empty(){
-                                                            
-                                                            // if the decryption config is available then this is the base58 of encrypted data
-                                                            // let base58_data = std::str::from_utf8(&consumed_buffer).unwrap();
-                                                            // let encrypted_data_buffer = base58_data.from_base58().unwrap();
+
+                                                            // if the decryption config is available then consumed_buffer is the hex of encrypted data
+                                                            let hexed_data = std::str::from_utf8(&consumed_buffer).unwrap();
+                                                            let encrypted_data_buffer = hex::decode(hexed_data).unwrap();
 
                                                             // // make sure that the encrypted data on redis is the same as the one consumed 
                                                             // // by the consumer, we should first convert the base58 back to the original buffer
-                                                            // if secure_cell_config.data != encrypted_data_buffer || 
-                                                            //     secure_cell_config.data.len() != encrypted_data_buffer.len(){
+                                                            if secure_cell_config.data != encrypted_data_buffer || 
+                                                                secure_cell_config.data.len() != encrypted_data_buffer.len(){
 
-                                                            //         log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
-                                                            //         return;
-                                                            //     }
-
+                                                                    log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
+                                                                    return; // terminate the caller, cancel the rest of computations
+                                                                }
 
                                                             // pass the secure_cell_config instance to decrypt the data, note 
                                                             // that the instance must contains the encrypted data in form of utf8 bytes
@@ -911,6 +910,7 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
         let stringified_config_data = if let Some(config) = encryption_config{
 
+            // hex encoding the secret and passphrase
             let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
                 secret_key: hex::encode(config.secret),
                 passphrase: hex::encode(config.passphrase),
@@ -920,14 +920,14 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
             let str_data = match Wallet::secure_cell_encrypt(secure_cell_config){
                 Ok(data) => {
                     use base58::ToBase58;
-                    let base58_data = data.clone().to_base58();
+                    let stringified_data = hex::encode(&data);
 
                     // the data in secure_cell_config must be the encrypted data for future decryption
                     // we need to update the data field right after the encryption since we're storing 
                     // the secure_cell_config instance on redis which must contains the encrypted data.
                     secure_cell_config.data = data; 
 
-                    base58_data // this can also be a hex or base64
+                    stringified_data // this can also be a hex or base64
                 },
                 Err(e) => {
                     let zerlog_producer_actor = self.zerlog_producer_actor.clone();

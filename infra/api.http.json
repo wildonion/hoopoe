@@ -24,7 +24,7 @@
 								"header": [
 									{
 										"key": "x-api-key",
-										"value": "124kUmD39YUwJRKxaQqTkJqRfrAZotpYnrWJc2x9fdibFWHPdRFcGCToDWAqpyM9hcD23JvTi"
+										"value": "124kUmD39YUwJRKxaQqTkQf9JtfgHCX7XRLKBTjizDimH7HcUZH45Mr3ZksMLFYWygjSh6muf"
 									}
 								],
 								"body": {
@@ -57,12 +57,12 @@
 								"header": [
 									{
 										"key": "x-api-key",
-										"value": "124kUmD39YUwJRKxaQqTkJqRfrAZotpYnrWJc2x9fdibFWHPdRFcGCToDWAqpyM9hcD23JvTi"
+										"value": "124kUmD39YUwJRKxaQqTkQf9JtfgHCX7XRLKBTjizDimH7HcUZH45Mr3ZksMLFYWygjSh6muf"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300,\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"cache_on_redis\": true,\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"

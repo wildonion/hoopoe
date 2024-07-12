@@ -1,13 +1,14 @@
 
 
 
+use actix::Actor;
 use constants::NEXT_USER_ID;
 use context::AppContext;
 use futures::{FutureExt, SinkExt};
 use models::event::EventQuery;
 use rand_chacha::rand_core::le;
 use salvo::websocket::{Message, WebSocket, WebSocketUpgrade};
-use server::HoopoeWsServer;
+use server::HoopoeWsServerActor;
 use tokio::sync::{Mutex, mpsc::Receiver};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use std::sync::Arc;
@@ -50,7 +51,7 @@ async fn consume(
         .upgrade(req, res, |ws| async move{
             // spawn the async task of handling websocket session inside a lightweight thread
             tokio::spawn(async move{
-                HoopoeWsServer::session_handler(ws, notif_query, notif_broker_receiver, zerlog_producer_actor).await;
+                HoopoeWsServerActor::session_handler(ws, notif_query, notif_broker_receiver, zerlog_producer_actor).await;
             });
         })
         .await

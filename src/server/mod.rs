@@ -2,7 +2,7 @@
 
 
 use crate::*;
-use actix::Addr;
+use actix::{Actor, Addr, AsyncContext, Context};
 use constants::{NEXT_USER_ID, ONLINE_USERS, WS_ROOMS};
 use futures::{lock, FutureExt};
 use models::event::EventQuery;
@@ -198,9 +198,33 @@ impl HoopoeServer{
     a room to communicate with them easily, typically this can be 
     achieved easily with actors.
 */
-pub struct HoopoeWsServer;
+pub struct HoopoeWsServerActor;
 
-impl HoopoeWsServer{
+impl Actor for HoopoeWsServerActor{
+    
+    type Context = Context<Self>;
+    
+    fn started(&mut self, ctx: &mut Self::Context) {
+        // we can execute a closure trait inside the run_interval method, which 
+        // contains the actor and the context itself 
+        ctx.run_interval(constants::PING_INTERVAL, |actor, ctx|{
+            log::info!("hoopoe websocket server is alive");
+        });
+    }
+}
+
+
+impl HoopoeWsServerActor{
+
+    async fn check_healt(user_id: usize){
+        let mut interval = tokio::time::interval(constants::PING_INTERVAL);
+        tokio::spawn(async move{
+            loop{ 
+                interval.tick().await; // tick every 5 second in a loop
+                log::info!("websocket session for user#{} is alive", user_id);
+            }
+        });
+    }
 
     pub async fn send_message_to_ws_users_in_room(my_id: usize, msg: Message, this_room: &str) {
         let this_cloned_msg = msg.clone();
@@ -215,8 +239,8 @@ impl HoopoeWsServer{
                 let new_msg = format!("<User#{}> in <Room#{}>: {}", my_id, this_room, msg);
                 let ws_message = Ok(Message::text(new_msg));
                 // sending the notif data to the user tx, the message will be received by the receiver
-                // and forwarded to the user_ws_tx sender of the unbounded mpsc channel, later we can 
-                // stream over user_ws_rx and receive message.
+                // and forwarded to the current_user_ws_tx sender of the unbounded mpsc channel, later we can 
+                // stream over current_user_ws_rx and receive message.
                 if let Err(e) = tx.send(ws_message){ // catch the error if the channel is closed
                     log::error!("can't send notif message to unbounded channel using tx: {}", e.to_string());
                 }
@@ -226,9 +250,13 @@ impl HoopoeWsServer{
         
     }
 
-    pub async fn user_disconnected(user_id: usize){
+    pub async fn user_disconnected(user_id: usize, room: &str){
+        // remove user from room and online users, then log the dead session
+        let mut users_in_this_room = WS_ROOMS.write().await.get(room).unwrap().clone();
+        users_in_this_room.remove(&user_id);
         ONLINE_USERS.write().await.remove(&user_id);
-    }
+        log::error!("websocket session for user#{} is dead", user_id);
+    } 
 
     // mutating an Arced type requires the type to behind a Mutex
     // since Arc is an atomic reference used to move type between 
@@ -237,6 +265,17 @@ impl HoopoeWsServer{
     pub async fn session_handler(ws: WebSocket, notif_query: EventQuery,
         notif_receiver: Arc<Mutex<Receiver<String>>>,
         zerlog_producer_actor: Addr<ZerLogProducerActor>){
+
+            // check that the user is already connected or not, 
+            // avoid having duplicate socket connection for a same user
+            let user_id = notif_query.clone().owner.unwrap().parse::<usize>().unwrap();
+            let get_users = ONLINE_USERS.read().await;
+            if get_users.contains_key(&user_id){
+                log::error!("user #{} is already connected!", user_id);
+                return;
+            }
+
+            Self::check_healt(user_id).await;
 
             /* -------------------------
                 can't move pointers which is not live long enough into 
@@ -250,7 +289,7 @@ impl HoopoeWsServer{
             let current_user_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
 
             // splitting the ws into a sender sink of ws messages and streamer of ws receiver 
-            let (user_ws_tx, mut user_ws_rx) = ws.split();
+            let (current_user_ws_tx, mut current_user_ws_rx) = ws.split();
 
             // we're using an unbounded channel to handle buffering, backpressuring and flushing of messages to the websocket
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel(); // unbounded_channel is not async cause there is no waiting process for an unbounded channel
@@ -268,11 +307,11 @@ impl HoopoeWsServer{
             
             /* -------------------------
                 the rx stream (which receives messages from the unbounded channel) is forwarded 
-                to the user_ws_tx websocket sender, the forward method is used to send all items 
+                to the current_user_ws_tx websocket sender, the forward method is used to send all items 
                 from the stream to the sink (the websocket sender in this case), it returns a 
                 future that completes when the stream is exhausted, doing so simply sends all 
                 messages coming from the unbounded channel to the websocket sender which enables
-                us to stream over user_ws_rx to receive messages to unbounded tx by the user.
+                us to stream over current_user_ws_rx to receive messages to unbounded tx by the user.
                 all user messages will be sent to the unbounded channel instead of sending them
                 directly to the websocket channel doing so handles the flexibility of sending 
                 user messages by using a middleware channel which allows us to handle messages 
@@ -280,8 +319,8 @@ impl HoopoeWsServer{
 
                 user sends ws message ---tx---> unbounded channel 
                 unbounded channel <---wrapped_rx--- receives user message
-                wrapped_rx ---forward(user_ws_tx)---> websocket channel
-                websocket channel <---user_ws_rx--- receives user message
+                wrapped_rx ---forward(current_user_ws_tx)---> websocket channel
+                websocket channel <---current_user_ws_rx--- receives user message
 
                 Why Pass the websocket Sender into the mpsc receiver streamer?
 
@@ -298,8 +337,8 @@ impl HoopoeWsServer{
                         The unbounded channel provides a buffering mechanism that can help 
                         handle situations where user messages are produced faster than they can 
                         be sent over the websocket, while it's unbounded and doesn't apply 
-                        backpressure, it ensures that the producer or user_ws_tx won't be 
-                        blocked by a slow consumer or user_ws_rx.
+                        backpressure, it ensures that the producer or current_user_ws_tx won't be 
+                        blocked by a slow consumer or current_user_ws_rx.
 
                     Stream and Sink integration: 
                         By converting the receiver into a stream, it can be easily integrated 
@@ -322,7 +361,7 @@ impl HoopoeWsServer{
             */
             tokio::spawn(
                 {
-                    wrapped_rx.forward(user_ws_tx).map(|res|{ // forward all items received from the rx to the websocket channel sender
+                    wrapped_rx.forward(current_user_ws_tx).map(|res|{ // forward all items received from the rx to the websocket channel sender
                         if let Err(e) = res{
                             log::error!("receiver stream can't forward messages to websocket sender: {:?}", e.to_string());
                             tokio::spawn(
@@ -359,7 +398,10 @@ impl HoopoeWsServer{
                     String::from("notifs") // the default room
                 };
 
-                // don't block the current thread for mutating room
+                // don't block the current thread for mutating room, every mutating 
+                // process of thread safe data types must be in a separate thread 
+                // or async function, since async function gets handled by the runtime
+                // scheduler and executed in a selected thread by the scheduler at runtime
                 let cloned_room = room.clone();
                 tokio::spawn(async move{
                     // insert the current user into the list of users
@@ -376,7 +418,7 @@ impl HoopoeWsServer{
                 });
                 
 
-                while let Some(result) = user_ws_rx.next().await {
+                while let Some(result) = current_user_ws_rx.next().await {
                     let msg = match result {
                         Ok(msg) => msg,
                         Err(e) => {
@@ -397,7 +439,7 @@ impl HoopoeWsServer{
                 }
 
                 // when we're not receiving anything means we've disconnected
-                Self::user_disconnected(current_user_id).await;
+                Self::user_disconnected(current_user_id, &room).await;
             });
 
 
@@ -423,7 +465,7 @@ impl HoopoeWsServer{
                                 if *user_id == current_user_id{ // send notif data back to the user
                                     let ws_message = Ok(Message::text(notif.clone()));
                                     // sending the notif data to the user tx, the message will be received by the receiver
-                                    // and forwarded to the user_ws_tx sender of the unbounded mpsc channel.
+                                    // and forwarded to the current_user_ws_tx sender of the unbounded mpsc channel.
                                     if let Err(e) = tx.send(ws_message){ // catch the error if the channel is closed
                                         log::error!("can't send notif message to unbounded channel using tx: {}", e.to_string());
                                     }
