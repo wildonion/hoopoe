@@ -1,5 +1,6 @@
 
 
+use models::event::EventQuery;
 use salvo::Error;
 use serde::{Deserialize, Serialize};
 use crate::*;
@@ -59,8 +60,12 @@ pub async fn get_hoop(
     req: &mut Request, 
     res: &mut Response, 
     depot: &mut Depot, 
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl,
+    query_params: QueryParam<EventQuery, true>
 ){
+
+    let query_params = req.parse_queries::<EventQuery>().unwrap();
+    
     res.render("developing...")
 }
 

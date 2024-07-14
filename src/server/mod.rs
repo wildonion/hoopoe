@@ -3,6 +3,7 @@
 
 use crate::*;
 use actix::{Actor, Addr, AsyncContext, Context};
+use actix_web::middleware::Compress;
 use constants::{NEXT_USER_ID, ONLINE_USERS, WS_ROOMS};
 use futures::{lock, FutureExt};
 use models::event::EventQuery;
@@ -24,7 +25,7 @@ pub trait HoopoeService<G: Send + Sync>{ // supports polymorphism
 pub struct HoopoeServer{
     pub service: Option<Service>,
     pub addr: String,
-    pub app_ctx: Option<AppContext>,
+    pub app_ctx: Option<AppContext>, // the whole app context: db, actors and global types
     pub ssl_domain: Option<String>
 }
 
@@ -38,15 +39,35 @@ impl HoopoeServer{
         let app_ctx = self.app_ctx.clone();
         let router = Router::new()
             .push(routers::register_app_controllers())
+            .hoop(Compression::new().enable_brotli(CompressionLevel::Fastest))
             .hoop(Logger::new()) // register middlewares using hoop() method
             .hoop(affix::inject(app_ctx))
             .hoop(cors);
 
-        // adding swagger ui route
+        // adding api ui routes
         let doc = OpenApi::new("Hoopoe Api", "0.1.0").merge_router(&router);
         let router = router
             .push(doc.into_router("/api-doc/openapi.json"))
-            .push(SwaggerUi::new("/api-doc/openapi.json").into_router("swagger"));
+            .unshift(
+                Scalar::new("/api-doc/openapi.json")
+                    .title("Hoopoe - Scalar")
+                    .into_router("scalar"),
+            )
+            .unshift(
+                SwaggerUi::new("/api-doc/openapi.json")
+                    .title("Hoopoe - Swagger UI")
+                    .into_router("swagger")
+            )
+            .unshift(
+                RapiDoc::new("/api-doc/openapi.json")
+                    .title("Hoopoe - RapiDoc")
+                    .into_router("rapidoc"),
+            )
+            .unshift(
+                ReDoc::new("/api-doc/openapi.json")
+                    .title("Hoopoe - ReDoc")
+                    .into_router("redoc"),
+            );
         router
     }
 
@@ -57,16 +78,35 @@ impl HoopoeServer{
             .into_handler();
         let router = Router::new()
             .push(routers::register_app_controllers())
+            .hoop(Compression::new().enable_brotli(CompressionLevel::Fastest))
             .hoop(Logger::new()) // register middlewares using hoop() method
             .hoop(affix::inject(app_ctx))
             .hoop(cors);
-
 
         // adding swagger ui route
         let doc = OpenApi::new("Hoopoe Api", "0.1.0").merge_router(&router);
         let router = router
             .push(doc.into_router("/api-doc/openapi.json"))
-            .push(SwaggerUi::new("/api-doc/openapi.json").into_router("swagger"));
+            .unshift(
+                Scalar::new("/api-doc/openapi.json")
+                    .title("Hoopoe - Scalar")
+                    .into_router("scalar"),
+            )
+            .unshift(
+                SwaggerUi::new("/api-doc/openapi.json")
+                    .title("Hoopoe - Swagger UI")
+                    .into_router("swagger")
+            )
+            .unshift(
+                RapiDoc::new("/api-doc/openapi.json")
+                    .title("Hoopoe - RapiDoc")
+                    .into_router("rapidoc"),
+            )
+            .unshift(
+                ReDoc::new("/api-doc/openapi.json")
+                    .title("Hoopoe - ReDoc")
+                    .into_router("redoc"),
+            );
         router
     }
 
@@ -440,7 +480,7 @@ impl HoopoeWsServerActor{
                         })
                         .or_insert(users); // if the key is not there insert a new user ids
                 });
-                
+
 
                 while let Some(result) = current_user_ws_rx.next().await {
                     let msg = match result {

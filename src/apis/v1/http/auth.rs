@@ -13,7 +13,7 @@ use interfaces::passport::Passport;
 
 
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 struct GenTokenQueries {
     exp: Option<i64>,
     scope: Option<String>
@@ -34,7 +34,8 @@ pub async fn generate_access_token(
 
         });
     */
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl,
+    params: QueryParam<GenTokenQueries, true> // query param is required, showcasing in swagger ui
 ){
 
 

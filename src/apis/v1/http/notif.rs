@@ -46,18 +46,24 @@ pub async fn register_notif(
 
         });
     */
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl,
+    register_notif_req: JsonBody<RegisterNotif> // used to extract the request body as well as showcasing in swagger ui
 ){
 
+    // if we're here means the passport verification was true and we 
+    // can access the passed in token_string to the request header
+    let passport_verification_status = depot.get::<String>("passport_token_time").unwrap();
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context
     let zerlog_producer_actor = app_ctx.as_ref().unwrap().actors.clone().unwrap().broker_actors.zerlog_actor;
     let app_ctx = app_ctx.clone();
 
+    // extracting the request body
     let register_notif_req = req.extract::<RegisterNotif>().await.unwrap();
     let get_producer_info = register_notif_req.clone().producer_info;
     let get_consumer_info = register_notif_req.clone().consumer_info;
 
+    // there is a producer info in body
     if get_producer_info.is_some(){
         let producer_info = get_producer_info.unwrap();
         let mut notif = producer_info.info;
@@ -71,7 +77,7 @@ pub async fn register_notif(
                 as the data coming at a same time, kindly put the sending
                 message logic to actor inside a loop{}.
         */
-        tokio::spawn( // running the producing notif job in the background in a free thread
+        tokio::spawn( // running the producing notif job in the background in a separate thread
             {
                 let cloned_app_ctx = app_ctx.clone();
                 let cloned_notif = notif.clone();
@@ -100,7 +106,7 @@ pub async fn register_notif(
 
         // in here the background task might have halted, executed or even 
         // crashed but the response is sent already to the caller regardless
-        // of what ever has happened.
+        // of what ever has happened inside the tokio::spawn
 
         // fill the response object, salvo returns it by itself to the caller
         res.status_code = Some(StatusCode::OK);
@@ -116,7 +122,7 @@ pub async fn register_notif(
             }
         ));
 
-    } else if get_consumer_info.is_some(){
+    } else if get_consumer_info.is_some(){ // there is a consumer info in body
         let consumer_info = get_consumer_info.unwrap();
         let mut notif = consumer_info.info;
         notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
@@ -129,7 +135,7 @@ pub async fn register_notif(
                 you would have to send message to its actor to start it as an 
                 async task in the background.
         */
-        tokio::spawn( // running the consuming notif job in the background in a free thread
+        tokio::spawn( // running the consuming notif job in the background in a separate thread
             {
                 let cloned_app_ctx = app_ctx.clone();
                 let cloned_notif = notif.clone();
@@ -178,7 +184,7 @@ pub async fn register_notif(
             }
         ));
 
-    } else{
+    } else{ // neither producer nor consumer are passed
 
         // fill the response object, salvo returns it by itself to the caller
         let server_time = format!("{}", chrono::Local::now().to_string());
@@ -210,7 +216,8 @@ pub async fn get_notif(
     req: &mut Request, 
     res: &mut Response,
     depot: &mut Depot,
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl,
+    notif_query: QueryParam<EventQuery, true> // query param is required, showcasing in swagger ui
 ){
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context
@@ -544,7 +551,7 @@ pub async fn get_notif(
 
 pub fn register_controller() -> Router{
     Router::with_path("/v1/events/notif/")
-        .hoop(check_passport)
+        .hoop(check_passport) // before falling into each router this gets executed first
         .oapi_tag("Events") // the passport verifier middleware
         .post(register_notif)
         .get(get_notif)

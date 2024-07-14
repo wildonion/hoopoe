@@ -142,7 +142,8 @@ pub async fn mint(
     req: &mut Request,
     res: &mut Response,
     depot: &mut Depot,
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl,
+    prod: JsonBody<Product>, // used to extract the request body as well as showcasing in swagger ui
 ){
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context

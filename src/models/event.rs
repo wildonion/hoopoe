@@ -9,7 +9,7 @@ use crate::*;
 
 
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct EventQuery{
     pub owner: Option<String>, // the entity owner
     pub id: Option<i32>, // any entity id 
@@ -19,23 +19,23 @@ pub struct EventQuery{
     pub page_size: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct UpdateHoopRequest{
     pub  hoop_id: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct NewHoopRequest{
     
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct GenerateTokenTimeQuery{
     pub exp_time: Option<u64>, // in seconds
     pub scope: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub enum TokenTimeScope{
     #[default]
     Write,

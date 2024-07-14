@@ -41,11 +41,11 @@ pub async fn check_passport(
         Ok(token_time) => {
 
             depot.insert("passport_verified", true);
+            depot.insert("passport_token_time", token_time);
         },
         Err(resp_err) => {
 
-            ctrl.skip_rest(); // skip executing all rest handlers
-
+            ctrl.skip_rest(); // skip other handlers executing cause there would be no need to execute newer handlers
             depot.insert("passport_verified", false);
             
             /* -------------------
