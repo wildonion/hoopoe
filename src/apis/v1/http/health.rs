@@ -137,12 +137,26 @@ pub async fn check_health(
     
 }
 
+
+#[endpoint]
+pub async fn home(
+    req: &mut Request, 
+    res: &mut Response,
+    depot: &mut Depot,
+    ctrl: &mut FlowCtrl
+){
+
+    res.render(Text::Html(constants::HOME_HTML));
+
+} 
+
 #[endpoint]
 pub async fn mint(
     req: &mut Request,
     res: &mut Response,
     depot: &mut Depot,
     ctrl: &mut FlowCtrl,
+    // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
     prod: JsonBody<Product>, // used to extract the request body as well as showcasing in swagger ui
 ){
 
@@ -217,5 +231,8 @@ pub fn register_controller() -> Router{
             Router::with_path("atomic-mint")
                 .post(mint)
         )
-    
+        .push(
+            Router::with_path("home")
+                .get(home)
+        )
 }

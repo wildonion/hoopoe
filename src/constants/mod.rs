@@ -72,6 +72,13 @@ pub static WS_ROOMS: Lazy<WsRooms> = Lazy::new(||{ WsRooms::default() }); // thr
 pub const APP_NAME: &str = "Hoopoe";
 pub const APP_DOMAIN: &str = "hoopoe.app";
 
+pub static HOME_HTML: &str = r#"
+
+    <h1>Welcome Home</h1>
+
+"#;
+
+
 // every code has 2 bytes long since the code value is larger than 
 // 255 we've used u16 which is 2 chars in hex
 pub static SERVER_IO_ERROR_CODE: &u16 = &0xFFFE;
