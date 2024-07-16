@@ -35,6 +35,8 @@ pub async fn generate_access_token(
         });
     */
     ctrl: &mut FlowCtrl,
+    // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
+    secret: HeaderParam<String, true>, // used to extract the token time from the header as well as showcasing in swagger ui
     params: QueryParam<GenTokenQueries, true> // query param is required, showcasing in swagger ui
 ){
 

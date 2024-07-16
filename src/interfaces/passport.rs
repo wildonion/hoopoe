@@ -73,7 +73,7 @@ impl Passport for salvo::Request{
         let secret_key = &config.vars.SECRET_KEY;
 
         let headers = req.headers();
-        let get_secret_key = headers.get("x-api-key");
+        let get_secret_key = headers.get("secret");
         let Some(header_secret_key) = get_secret_key else{
             
             let server_time = format!("{}", chrono::Local::now().to_string());
@@ -127,7 +127,7 @@ impl Passport for salvo::Request{
         let zerlog_producer_actor = app_state.as_ref().unwrap().actors.clone().unwrap().broker_actors.zerlog_actor;
 
         let headers = req.headers();
-        let get_secret_key = headers.get("x-api-key");
+        let get_secret_key = headers.get("token_time");
         let Some(header_secret_key) = get_secret_key else{
             
             let server_time = format!("{}", chrono::Local::now().to_string());

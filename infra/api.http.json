@@ -23,8 +23,8 @@
 								"method": "POST",
 								"header": [
 									{
-										"key": "x-api-key",
-										"value": "124kUmD39YUwJRKxaQqTkQf9JtfgHCX7XRLKBTjizDimH7HcUZH45Mr3ZksMLFYWygjSh6muf"
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkTRZGDr9L6fszxLz6xKvXrqJSJQNo9vAMjYs5tbbiRPskTGUgRegd"
 									}
 								],
 								"body": {
@@ -56,8 +56,8 @@
 								"method": "POST",
 								"header": [
 									{
-										"key": "x-api-key",
-										"value": "124kUmD39YUwJRKxaQqTkQf9JtfgHCX7XRLKBTjizDimH7HcUZH45Mr3ZksMLFYWygjSh6muf"
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkRUAJQtFUBmfjrpL99YjTeaJ1jBEDgt7sCVdKKdvoUi4n6Ennr8e2"
 									}
 								],
 								"body": {
@@ -282,6 +282,23 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Home",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{health-v1}}/home",
+							"host": [
+								"{{health-v1}}"
+							],
+							"path": [
+								"home"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -294,7 +311,7 @@
 						"method": "POST",
 						"header": [
 							{
-								"key": "x-api-key",
+								"key": "secret",
 								"value": "{{secret_key}}"
 							}
 						],

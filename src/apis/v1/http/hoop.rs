@@ -61,7 +61,8 @@ pub async fn get_hoop(
     res: &mut Response, 
     depot: &mut Depot, 
     ctrl: &mut FlowCtrl,
-    query_params: QueryParam<EventQuery, true>
+    // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
+    query_params: QueryParam<EventQuery, true> // query param is required, showcasing in swagger ui
 ){
 
     let query_params = req.parse_queries::<EventQuery>().unwrap();

@@ -47,9 +47,11 @@ pub async fn register_notif(
         });
     */
     ctrl: &mut FlowCtrl,
+    // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
+    token_time: HeaderParam<String, true>, // used to extract the token time from the header as well as showcasing in swagger ui
     register_notif_req: JsonBody<RegisterNotif> // used to extract the request body as well as showcasing in swagger ui
 ){
-
+ 
     // if we're here means the passport verification was true and we 
     // can access the passed in token_string to the request header
     let passport_verification_status = depot.get::<String>("passport_token_time").unwrap();
@@ -217,6 +219,7 @@ pub async fn get_notif(
     res: &mut Response,
     depot: &mut Depot,
     ctrl: &mut FlowCtrl,
+    // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
     notif_query: QueryParam<EventQuery, true> // query param is required, showcasing in swagger ui
 ){
 
