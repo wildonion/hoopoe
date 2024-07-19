@@ -23,7 +23,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 serde = {version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-ractor = "0.10"
 redis = { version = "0.25", features = ["tokio-comp", "cluster-async", "json"] }
 redis-async = "0.17"
 sha2 = "0.10"
@@ -31,7 +30,7 @@ is_type = "0.2.1"
 rayon = "1.10.0"
 rand = "0.8"
 rslock = "0.3.0"
-tonic = "0.11.0"
+tonic = "0.12"
 futures = "0.3"
 deadpool-lapin = { version = "0.12.1", features = ["serde", "rt_tokio_1"] }
 deadpool-redis = "0.15.1"
@@ -48,7 +47,7 @@ env_logger = "0.11"
 bytes = { version = "1", features = ["serde"] }
 wallexerr = "0.3.3"
 hex = "0.4"
-clap = { version = "4.5.7", features = ["derive"] }
+clap = { version = "4.5.9", features = ["derive"] }
 thiserror = "1.0"
 percentage = "0.1.0"
 sea-orm = { version = "0.12", features = [ 
@@ -61,9 +60,8 @@ sea-orm = { version = "0.12", features = [
   "with-json",
   "with-uuid"
 ]}
-trait-variant = "0.1"
-prost = "0.12"
-prost-types = "0.12"
+prost = "0.13"
+prost-types = "0.13"
 themis = "0.14.0"
 base58 = "0.2.0"
 rand_chacha = "0.3"

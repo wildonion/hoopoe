@@ -143,24 +143,30 @@ tokio::spawn( // running the producing notif job in the background in a free thr
             "routing_key": "" // routing pattern or key - will be ignored if type is fanout
         };
         async move{
-            match cloned_app_state.clone().actors.as_ref().unwrap()
-                    .producer_actors.notif_actor.send(cloned_notif).await
+            match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                    .broker_actors.notif_actor.send(cloned_notif).await
                 {
-                    Ok(_) => { () },
+                    Ok(_) => { 
+                        
+                        // in here you could access the notif for an owner using 
+                        // a redis key like: notif_owner:3 which retrieve all data
+                        // on the redis for the receiver with id 3   
+                        () 
+
+                    },
                     Err(e) => {
                         let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                         let err_instance = crate::error::HoopoeErrorResponse::new(
                             *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                             crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                            &String::from("register_notif.producer_actors.notif_actor.send"), // current method name
+                            &String::from("register_notif.producer_actor.notif_actor.send"), // current method name
                             Some(&zerlog_producer_actor)
                         ).await;
                         return;
                     }
                 }
-            }
-    }
+        }
 );
 ```
 
@@ -183,8 +189,8 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
         async move{
             // consuming notif by sending the ConsumeNotif message to 
             // the consumer actor,
-            match cloned_app_state.clone().actors.as_ref().unwrap()
-                    .consumer_actors.notif_actor.send(cloned_notif).await
+            match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                    .broker_actors.notif_actor.send(cloned_notif).await
                 {
                     Ok(_) => { () },
                     Err(e) => {
@@ -193,7 +199,7 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
                             *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                             source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                             crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                            &String::from("register_notif.consumer_actors.notif_actor.send"), // current method name
+                            &String::from("register_notif.consumer_actor.notif_actor.send"), // current method name
                             Some(&zerlog_producer_actor)
                         ).await;
                         return;
@@ -385,12 +391,3 @@ automatically it'll pull the images from the specified registry in `image` key i
 #### last but not least!
 
 use postman or swagger ui to check the server health, continue with registering notif producer and consumer.
-
-
-### When developing?!
-
-- always update:
-    - cicd.yml `uses` section
-    - erd pictures every time you are finished with developing database tables
-    - crates and Rust edition!
-    - postman collection

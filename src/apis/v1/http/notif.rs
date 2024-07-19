@@ -96,7 +96,7 @@ pub async fn register_notif(
                                     *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                                     source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                                     crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                    &String::from("register_notif.producer_actors.notif_actor.send"), // current method name
+                                    &String::from("register_notif.producer_actor.notif_actor.send"), // current method name
                                     Some(&zerlog_producer_actor)
                                 ).await;
                                 return;
@@ -161,7 +161,7 @@ pub async fn register_notif(
                                     *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
                                     source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
                                     crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                    &String::from("register_notif.consumer_actors.notif_actor.send"), // current method name
+                                    &String::from("register_notif.consumer_actor.notif_actor.send"), // current method name
                                     Some(&zerlog_producer_actor)
                                 ).await;
                                 return;

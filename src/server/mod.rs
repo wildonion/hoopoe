@@ -258,9 +258,11 @@ impl HoopoeServer{
     in building ws application the message must be sent to each peer
     socket in a room through the mpsc channel from there i'll be sent 
     through the socket back to the client address in that room so 
-    the server actor or object must contain all the peer socket in
+    the server actor or object must contain all the peer sockets in
     a room to communicate with them easily, typically this can be 
-    achieved easily with actors.
+    achieved easily with actors in such a way to build a new actor
+    per each session that gets connected to the ws server, the 
+    msg sending part would be easy by using actor msg sending logic.
 */
 pub struct HoopoeWsServerActor;
 

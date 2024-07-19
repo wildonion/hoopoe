@@ -16,7 +16,6 @@ use crate::config::EnvExt;
 use crate::storage::engine::Storage;
 use actix::{Actor, Addr};
 use indexmap::IndexMap;
-use ractor::concurrency::JoinHandle;
 use serde::{Serialize, Deserialize};
 use crate::types::*;
 use crate::constants::*;

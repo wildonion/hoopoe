@@ -30,6 +30,10 @@ use crate::models::server::Response as HoopoeResponse;
     hence using the GAT as the return type of async trait method 
     wasn't supported therefore having future objects in trait method 
     return type was invalid.
+    it's notable that traits with async methods can't be object safe 
+    and Boxed with Box<dyn we can't use the builtin async method 
+    instead we should either use the async_trait crate or remove 
+    the async keywords.
 */
 pub trait Passport{
 
