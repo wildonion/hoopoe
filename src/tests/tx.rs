@@ -1,10 +1,21 @@
 
-use futures::lock;
-use ractor::Message;
+
+use std::sync::atomic::AtomicU8;
+use interfaces::payment::PaymentProcess;
 use rand_chacha::ChaCha12Core;
 use wallexerr::misc::Wallet;
 use crate::interfaces::tx::TransactionExt;
 use crate::*;
+use actix::prelude::*;
+use actix::Handler as ActixMessageHandler;
+
+
+
+#[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
+#[rtype(result = "()")]
+struct Execute{
+    pub tx: Transaction
+}
 
 pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Wallet>>> = Lazy::new(||{
     let wallet = Wallet::new_ed25519();
@@ -15,7 +26,7 @@ pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Walle
     ) // a safe and shareable wallet object between threads
 });
 
-/* --------------------- a fintech object to do any financial process
+/* --------------------- a fintech object solution to do any financial process
     atomic tx syncing execution to avoid deadlocks, race conditions and double spendings using tokio select spawn arc mutex channels
     produce tx actor objects to rmq then consume them in txpool service and update the balance in there
     use notif prodcons actor worker to produce and consume tx objects
@@ -37,7 +48,10 @@ pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Walle
     use hex::encode() to generate hex string from utf8 bytes
     use hex::decode() to generate utf8 bytes from hex string
     use base58 and base64 to generate base58 or base64 from utf8 bytes  
- */
+
+    every tx object must atomic: Arc<Mutex<Transaction>> or Arc<RwLock<Transaction>>
+
+*/
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct Transaction{
     amount: f64, 
@@ -92,15 +106,15 @@ impl Transaction{
         
     }
 
-    pub fn on_error<E>(e: E) where E: FnMut() -> () + Send + Sync + 'static{
+    pub fn on_error<E>(e: E) where E: FnMut() -> () + Send + Sync + 'static{ // error is of type a closure trait
 
     }
 
-    pub fn on_success<S>(s: S) where S: FnMut() -> () + Send + Sync + 'static{
+    pub fn on_success<S>(s: S) where S: FnMut() -> () + Send + Sync + 'static{ // success is of type a closure trait
         
     }
 
-    pub fn on_reject<R>(r: R) where R: FnMut() -> () + Send + Sync + 'static{
+    pub fn on_reject<R>(r: R) where R: FnMut() -> () + Send + Sync + 'static{ // reject is of type a closure trait
         
     }
     
@@ -174,7 +188,11 @@ impl TransactionExt for Transaction{
             tx_data.hash = tx_hash;
         }
 
-        // update from and to balances and calculate user and sys treasury
+        // update from and to balances
+        // calculate user and sys treasury
+        // 2.5 percent of each tx must goes to sys treasury
+        // destination amount = current amount - 2.5 % of current amount
+        // sys treasury = 2.5 % of current amount 
         // ...
 
         tx_data
@@ -190,4 +208,76 @@ impl TransactionExt for Transaction{
 
     async fn aborted(&self){}
 
+}
+
+#[derive(Clone)]
+struct StatelessTransactionPool;
+
+impl Actor for StatelessTransactionPool{
+    
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+
+    }
+}
+
+// send Execute message to the actor to execute a tx 
+impl ActixMessageHandler<Execute> for StatelessTransactionPool{
+    type Result = ();
+
+    fn handle(&mut self, msg: Execute, ctx: &mut Self::Context) -> Self::Result {
+        let tx = msg.tx;
+        
+        let cloned_tx = tx.clone();
+        tokio::spawn(async move{
+            cloned_tx.clone().commit().await;
+        });
+
+        // or local spawn
+        let local_spawn_cloned_tx = tx.clone();
+        async move{
+            local_spawn_cloned_tx.clone().commit().await;
+        }.into_actor(self)
+        .spawn(ctx);
+
+    }
+}
+
+
+
+//         SOLID BASED DESIGN PATTERN FOR PAYMENT
+// there should be always a rely solution on abstractions like 
+// implementing trait for struct and extending its behaviour 
+// instead of changing the actual code base and concrete impls. 
+struct PayPal;
+struct ZarinPal;
+
+struct PaymentWallet{
+    pub owner: String,
+    pub transactions: Vec<Transaction>
+}
+
+impl PaymentProcess<PayPal> for PaymentWallet{
+    type Status = AtomicU8;
+
+    // future traits as objects must be completelly a separate type
+    // which can be achieved by pinning the boxed version of future obj 
+    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+
+    type Wallet = Self;
+
+    async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {
+
+        // either clone or borrow it to avoid from moving out of the self 
+        // cause self is behind reference which is not allowed by Rust 
+        // to move it around or take its ownership.
+        let txes: &Vec<Transaction> = self.transactions.as_ref();
+        
+        // process all transactions with the paypal gateway
+        // ...
+
+        todo!()
+
+    }
 }
