@@ -410,7 +410,7 @@ impl NotifBrokerActor{
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                                         // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
 
-                                                        // either decrypted or the raw data
+                                                        // either decrypted or the raw data as string
                                                         log::info!("[*] received data: {}", data);
                                                         
                                                         let get_notif_event = serde_json::from_str::<NotifData>(&data);
@@ -470,23 +470,6 @@ impl NotifBrokerActor{
                                                                     
                                                                                 },
                                                                                 Err(e) => {
-
-                                                                                    // ------------------------------------------------------------------
-                                                                                    // followings are commented to prevent producing high amount of logs
-                                                                                    // ------------------------------------------------------------------
-                                                                                    /* 
-                                                                                    use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                                                    let error_content = &e.to_string();
-                                                                                    let error_content_ = error_content.as_bytes().to_vec();
-                                                                                    let mut error_instance = HoopoeErrorResponse::new(
-                                                                                        *constants::STORAGE_IO_ERROR_CODE, // error code
-                                                                                        error_content_, // error content
-                                                                                        ErrorKind::Storage(crate::error::StorageError::Redis(e)), // error kind
-                                                                                        "NotifBrokerActor.redis_get", // method
-                                                                                        Some(&zerlog_producer_actor)
-                                                                                    ).await;
-                                                                                    */
-
                                                                                     // we can't get the key means this is the first time we're creating the key
                                                                                     // or the key is expired already, we'll create a new key either way and put
                                                                                     // the init message in there.
@@ -928,7 +911,7 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
                     // the secure_cell_config instance on redis which must contains the encrypted data.
                     secure_cell_config.data = data; 
 
-                    stringified_data // this can also be a hex or base64
+                    stringified_data // this can also be a base58 or base64
                 },
                 Err(e) => {
                     let zerlog_producer_actor = self.zerlog_producer_actor.clone();

@@ -9,3 +9,4 @@ pub mod mail;
 pub mod product;
 pub mod passport;
 pub mod payment;
+pub mod crypter;
