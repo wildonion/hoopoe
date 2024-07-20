@@ -60,8 +60,67 @@ use std::error::Error;
 use std::io::Read;
 use std::sync::Arc;
 use crate::models::event::*;
+use crate::interfaces::crypter::Crypter;
 
 
+
+impl Crypter for String{
+    fn decrypt(&self, secure_cell_config: &mut SecureCellConfig){
+        match Wallet::secure_cell_decrypt(secure_cell_config){ // passing the redis secure_cell_config instance
+            Ok(data) => {
+                secure_cell_config.data = data
+            },
+            Err(e) => {
+
+                tokio::spawn(async move{
+                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_decrypt"), // current method name
+                        None
+                    ).await;
+                });
+
+                // don't update data field in secure_cell_config instance
+                // the encrypted data remains the same as before.
+            }
+        };
+
+    }
+    fn encrypt(&self, secure_cell_config: &mut SecureCellConfig){
+       match Wallet::secure_cell_encrypt(secure_cell_config){
+            Ok(encrypted) => {
+                
+                let stringified_data = hex::encode(&encrypted);
+                // update the data field with the encrypted content bytes
+                secure_cell_config.data = encrypted; 
+
+            },
+            Err(e) => {
+
+                // log the error in the a lightweight thread of execution inside tokio threads
+                // since we don't need output or any result from the task inside the thread thus
+                // there is no channel to send data to outside of tokio::spawn
+                tokio::spawn(async move{
+                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
+                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
+                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_encrypt"), // current method name
+                        None
+                    ).await;
+                });
+                
+                // don't update data field in secure_cell_config instance
+                // the raw data remains the same as before.
+            }
+        };
+    }
+
+}
 
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
@@ -368,12 +427,22 @@ impl NotifBrokerActor{
 
                                                             // // make sure that the encrypted data on redis is the same as the one consumed 
                                                             // // by the consumer, we should first convert the base58 back to the original buffer
-                                                            if secure_cell_config.data != encrypted_data_buffer || 
+                                                            if secure_cell_config.data.clone() != encrypted_data_buffer || 
                                                                 secure_cell_config.data.len() != encrypted_data_buffer.len(){
 
                                                                     log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
                                                                     return; // terminate the caller, cancel the rest of computations
                                                                 }
+
+                                                            /*  ====-----====-----====-----====-----====-----
+                                                                easier way for decryption using Crypter trait
+                                                                ====-----====-----====-----====-----====-----
+                                                            */ 
+                                                            let encrypted_data_buffer = secure_cell_config.data.clone(); // data is the encrypted buffer
+                                                            let stringified_encrypted_data_buffer = serde_json::to_string_pretty(&encrypted_data_buffer).unwrap();
+                                                            stringified_encrypted_data_buffer.decrypt(&mut secure_cell_config);
+                                                            let raw_data = secure_cell_config.data.clone();
+                                                            let raw_data_str = std::str::from_utf8(&raw_data).unwrap().to_string();
 
                                                             // pass the secure_cell_config instance to decrypt the data, note 
                                                             // that the instance must contains the encrypted data in form of utf8 bytes
@@ -900,6 +969,16 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
                 passphrase: hex::encode(config.passphrase),
                 data: serde_json::to_vec(&notif_data).unwrap(),
             };
+
+            /*  ====-----====-----====-----====-----====-----
+                easier way for encryption using Crypter trait
+                ====-----====-----====-----====-----====-----
+            */
+            let notif_data_str = serde_json::to_string_pretty(&notif_data).unwrap();
+            notif_data_str.encrypt(secure_cell_config);
+            let encrypted_data = secure_cell_config.data.clone(); // it now contains the encrypted data
+            let encrypted_data_hex_string = hex::encode(&encrypted_data);
+            
 
             let str_data = match Wallet::secure_cell_encrypt(secure_cell_config){
                 Ok(data) => {
