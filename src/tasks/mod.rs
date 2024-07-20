@@ -32,7 +32,7 @@ pub struct Task1<J: std::future::Future<Output = O>, S, O> where // J is a Futur
     pub name: String, // like send_mail task 
     pub job: J, // use Box::pin(job) to pin it into the ram and call it; the function that needs to get executed 
     pub sender: tokio::sync::mpsc::Sender<S>, // use this to send the result of the task into the channel
-    pub worker: tokio::sync::Mutex<tokio::task::JoinHandle<O>>, // execute the task inside the background worker
+    pub worker: std::sync::Mutex<tokio::task::JoinHandle<O>>, // execute the task inside the background worker, this is a thread which is safe to be mutated in other threads 
     pub lock: tokio::sync::Mutex<()>, // the task itself is locked and can't be used by other threads
 }
 
@@ -46,7 +46,7 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> T
             job: job.clone(),
             sender,
             worker: { // this is the worker that can execute the task inside of itself, it's basically a lightweight thread
-                tokio::sync::Mutex::new(
+                std::sync::Mutex::new(
                     tokio::spawn(job)
                 )
             },
@@ -64,11 +64,26 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> T
 
     pub async fn switch_task(&mut self, taks: J){
 
-        let mut get_worker = self.worker.lock().await;
+        let mut get_worker = self.worker.lock().unwrap();
         (*get_worker) = tokio::spawn(taks);
 
     }
 
+    // task lifecycles
+    pub fn halt(&mut self){
+        self.status = TaskStatus::Hanlted;
+    }
+
+}
+
+// once the task gets dropped drop any incomplete futures inside the worker 
+impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> Drop for Task1<J, S, O> where 
+    O: Send + Sync + 'static{
+    fn drop(&mut self) { // use std::sync::Mutex instead of tokio cause drop() method is not async 
+        if let Ok(fut) = self.worker.lock(){
+            fut.abort(); // abort the current future inside the joinhandle
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
