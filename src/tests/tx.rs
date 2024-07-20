@@ -210,8 +210,11 @@ impl TransactionExt for Transaction{
 
 }
 
-#[derive(Clone)]
-struct StatelessTransactionPool;
+
+struct StatelessTransactionPool{
+    pub lock: std::sync::Mutex<()>, // the pool is locked and busy 
+    pub worker: tokio::sync::Mutex<tokio::task::JoinHandle<Transaction>> // background worker thread to execute a transaction
+}
 
 impl Actor for StatelessTransactionPool{
     
@@ -238,7 +241,7 @@ impl ActixMessageHandler<Execute> for StatelessTransactionPool{
         let local_spawn_cloned_tx = tx.clone();
         async move{
             local_spawn_cloned_tx.clone().commit().await;
-        }.into_actor(self)
+        }.into_actor(self) // convert the future into the actor so we can call the spawn method to execute the future in actor thread
         .spawn(ctx);
 
     }
