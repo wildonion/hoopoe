@@ -51,12 +51,20 @@ impl Database{
 
 }
 
-// since we have background worker thread it mus be dropped when 
-// the database is dropped 
+/* 
+    once the instance of Database gets dropped, the background worker
+    thread must also gets dropped and cancel the current future inside of it
+    it's notable that awaiting a cancelled task might complete as usual if the task was already completed at the time 
+    it was cancelled, but most likely it will fail with a cancelled JoinError.
+    be aware that tasks spawned using spawn_blocking cannot be aborted because they are not async. 
+    if you call abort on a spawn_blocking task, then this will not have any effect, and the task will 
+    continue running normally, the exception is if the task has not started running yet; in that case, 
+    calling abort may prevent the task from starting.
+*/
 impl Drop for Database{
     fn drop(&mut self) {
         if let Ok(fut) = self.background_worker_thread.lock(){
-            fut.abort() // abort the future object or the task from executing
+            fut.abort() // abort the future object or the task from executing in the background worker joinhandle, opposite of await for solving the task
         }
     }
 }

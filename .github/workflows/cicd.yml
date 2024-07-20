@@ -16,9 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4 # use this is an action to check the repo codes
       - name: Login to DockerHub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin docker.youwho.club
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin docker.hoopoe.app
       - name: Build and Push
-        run: | # 1 - build services | 2 - push services to the custom registry hosted on docker.youwho.club
+        run: | # 1 - build services | 2 - push services to the custom registry hosted on docker.hoopoe.app
           sudo docker compose -f "docker-compose.yml" build
           sudo docker compose -f "docker-compose.yml" push
   pull-from-registry-on-server:

@@ -1,6 +1,8 @@
 
 
 use std::sync::atomic::AtomicU8;
+use tokio::task::JoinHandle;
+
 use crate::*;
 
 /* tight coupled structs: use trait interfaces to extend them
@@ -42,7 +44,7 @@ struct Engine{
     pub buffer: Buffer<Event>, // buffer of events
     pub state: AtomicU8, // the thread safe state of the current engine
     pub lock: tokio::sync::Mutex<()>, // the engine is busy or got locked
-    pub worker: tokio::task::JoinHandle<()> // the background worker thread 
+    pub worker: tokio::sync::Mutex<tokio::task::JoinHandle<()>> // the background worker thread which is safe to be mutated in other threads
 }
 
 // a global and thread safe (Send + Sync + 'static) 
@@ -59,4 +61,4 @@ pub static ENGINE: Lazy<std::sync::Arc<tokio::sync::Mutex<Engine>>> =
                 }
             )
         )
-    });
+});
