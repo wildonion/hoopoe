@@ -8,6 +8,13 @@ use workers::notif::{ConsumeNotif, ProduceNotif};
 use crate::*;
 
 
+#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+#[derive(Extractible)]
+#[salvo(extract(default_source(from="body")))]
+pub struct UserSecureCellConfig{
+    pub secret_key: String, 
+    pub passphrase: String, 
+}
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 pub struct EventQuery{

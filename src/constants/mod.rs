@@ -71,6 +71,7 @@ pub static WS_ROOMS: Lazy<WsRooms> = Lazy::new(||{ WsRooms::default() }); // thr
 
 pub const APP_NAME: &str = "Hoopoe";
 pub const APP_DOMAIN: &str = "hoopoe.app";
+pub const ASSETS_IMG_DIR: &str = "assets/images";
 
 pub static HOME_HTML: &str = r#"
 
