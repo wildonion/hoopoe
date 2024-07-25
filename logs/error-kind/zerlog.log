@@ -30,3 +30,23 @@ code: 65451 | message: invalid parameter | due to: Themis Error
  | time: 1720354467974 | method name: NotifBrokerActor.consume.Wallet::secure_cell_decrypt
 code: 65531 | message: invalid type: integer `1`, expected struct NotifData at line 1 column 1 | due to: Serde Error
  | time: 1720354467975 | method name: NotifBrokerActor.decode_serde
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721740962644 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721741051085 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721741195169 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721741369955 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721811678166 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721812008098 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721813395485 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721815026992 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721815033092 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65451 | message: invalid parameter | due to: Themis Error
+ | time: 1721817375695 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt

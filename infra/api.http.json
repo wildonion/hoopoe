@@ -255,6 +255,43 @@
 					"response": []
 				},
 				{
+					"name": "Upload File (AES256)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "pic",
+									"type": "file",
+									"src": "/Users/wildonion/Desktop/onion.jpeg"
+								},
+								{
+									"key": "secret_key",
+									"value": "124",
+									"type": "text"
+								},
+								{
+									"key": "passphrase",
+									"value": "124",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{health-v1}}/upload",
+							"host": [
+								"{{health-v1}}"
+							],
+							"path": [
+								"upload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Check",
 					"protocolProfileBehavior": {
 						"disableBodyPruning": true

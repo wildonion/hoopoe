@@ -282,7 +282,7 @@ impl Actor for HoopoeWsServerActor{
 
 impl HoopoeWsServerActor{
 
-    async fn check_healt(user_id: usize){
+    async fn check_health(user_id: usize){
         let mut interval = tokio::time::interval(constants::PING_INTERVAL);
         tokio::spawn(async move{
             loop{ 
@@ -341,7 +341,7 @@ impl HoopoeWsServerActor{
                 return;
             }
 
-            Self::check_healt(user_id).await;
+            Self::check_health(user_id).await;
 
             /* -------------------------
                 can't move pointers which is not live long enough into 
