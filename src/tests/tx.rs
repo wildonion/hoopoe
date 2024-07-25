@@ -75,6 +75,7 @@ pub enum TxType{
     Buy,
     Airdrop,
     Claim,
+    Sell
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -126,6 +127,7 @@ pub enum TxStatus{
     Started,
     Committed,
     Dropped,
+    Mined,
     Rejected(FailedTx),
 }
 
