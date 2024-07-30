@@ -1,7 +1,7 @@
 
 
 
-
+use deadpool_redis::redis::AsyncCommands;
 use std::error::Error;
 use constants::{MAILBOX_CHANNEL_ERROR_CODE, STORAGE_IO_ERROR_CODE};
 use context::AppContext;

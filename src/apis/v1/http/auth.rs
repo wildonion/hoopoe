@@ -3,6 +3,7 @@
 
 use constants::{CRYPTER_THEMIS_ERROR_CODE, STORAGE_IO_ERROR_CODE};
 use context::AppContext;
+use deadpool_redis::redis::AsyncCommands;
 use log::kv::source;
 use wallexerr::misc::{SecureCellConfig, Wallet};
 use crate::*;

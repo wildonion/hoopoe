@@ -67,11 +67,45 @@ pub struct RegisterNotif{
     pub consumer_info: Option<ConsumeNotifInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct HoopEvent{
+#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+pub struct HoopEventForm{
     pub etype: String, 
     pub manager: i32,
     pub entrance_fee: i64,
+    pub title: String,
+    pub description: String,
+    pub started_at: i64,
+    pub duration: i64,
+    pub capacity: i64,
+    pub participants: Vec<i64>,
+    pub invitations: Vec<HoopEventFriendInvitationForm>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
+pub enum EventType{
+    SocialGathering,
+    Streaming,
+    Proposal,
+    None
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+pub struct HoopEventFriendInvitationForm{
+    pub entrance_fee: i64,
+    pub friend_id: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+pub struct HoopEventFormForDb{
+    pub etype: String, 
+    pub manager: i32,
+    pub entrance_fee: i64,
+    pub title: String,
+    pub description: String,
+    pub started_at: i64,
+    pub duration: i64,
+    pub capacity: i64,
+    pub cover: String
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
@@ -113,6 +147,12 @@ pub struct DbHoopData{
     pub etype: String,
     pub manager: i32,
     pub entrance_fee: i64,
+    pub title: String,
+    pub description: String,
+    pub started_at: i64,
+    pub duration: i64,
+    pub capacity: i64,
+    pub cover: String,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

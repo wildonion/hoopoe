@@ -6,7 +6,6 @@ use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context, Handler as ActixHandler};
 use chrono::{DateTime, FixedOffset};
 use deadpool_redis::{Connection, Manager, Pool};
-use redis::{AsyncCommands, Commands};
 use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Statement, Value};
 use crate::workers::zerlog::ZerLogProducerActor;
 use crate::types::RedisPoolConnection;

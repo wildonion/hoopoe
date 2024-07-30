@@ -169,18 +169,20 @@ impl ProductExt for Product{
             /*  https://github.com/wildonion/nftport-minter-service-actor
                 step0) up and run the nftport-minter-service-actor service actor
                 step1) in main service: send product info to notif producer actor to send to rmq
-                step2) in mint service: 
+                step2) lock the product id in main service so other users can't start minting at
+                    the time of minting the product
+                step3) in mint service: 
                     notif consumer actor receives the product info and starts the minting process
                     once it finishes with the process the result will be sent to rmq using its
                     notif producer actor
-                step3) in main service: 
+                step4) in main service: 
                     notif consumer actor begins to start consuming in the background it can be either
                     where the http server is being started, by callig an api to register it or inside
                     a loop{} to keep the app running constantly to receive messages from the queue as
                     they're generating by the producer in meanwhile, however in either way we know the 
                     queue! as soon as its actor gets started, it receives all products constantly from 
                     the rmq, if the product was minted or there was any error then we release the id 
-                    from the locker
+                    from the global locker in main service
                 t1 => every locking process on the ids must be inside tokio spawn to avoid blocking
                 t2 => get notif_owner:{} key which contains all notif data values for the owner
                 t3 => notify client with short polling
@@ -291,7 +293,7 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
             async move{
                 let mut write_lock = lock_ids.lock().await;
                 if (*write_lock).contains(&pid){
-                    log::info!("rejecting client request cause the id is being minted!");
+                    log::info!("rejecting client request cause the id is still being minted!");
                     // reject the request since the product is being minted
                     tx.send(true).await; // sending the true flag as rejecting the request
                 } else{

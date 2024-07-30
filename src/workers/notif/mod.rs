@@ -35,9 +35,11 @@
     ======================================================================================== */
 
 use crate::*;
+use deadpool_redis::redis::AsyncCommands;
 use base58::FromBase58;
 use constants::CRYPTER_THEMIS_ERROR_CODE;
 use constants::FILE_ERROR_CODE;
+use deadpool_redis::redis::RedisResult;
 use futures::executor;
 use models::event::NotifData;
 use actix::prelude::*;
@@ -63,64 +65,6 @@ use crate::models::event::*;
 use crate::interfaces::crypter::Crypter;
 
 
-
-impl Crypter for String{
-    fn decrypt(&self, secure_cell_config: &mut SecureCellConfig){
-        match Wallet::secure_cell_decrypt(secure_cell_config){ // passing the redis secure_cell_config instance
-            Ok(data) => {
-                secure_cell_config.data = data
-            },
-            Err(e) => {
-
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_decrypt"), // current method name
-                        None
-                    ).await;
-                });
-
-                // don't update data field in secure_cell_config instance
-                // the encrypted data remains the same as before.
-            }
-        };
-
-    }
-    fn encrypt(&self, secure_cell_config: &mut SecureCellConfig){
-       match Wallet::secure_cell_encrypt(secure_cell_config){
-            Ok(encrypted) => {
-                
-                let stringified_data = hex::encode(&encrypted);
-                // update the data field with the encrypted content bytes
-                secure_cell_config.data = encrypted; 
-
-            },
-            Err(e) => {
-
-                // log the error in the a lightweight thread of execution inside tokio threads
-                // since we don't need output or any result from the task inside the thread thus
-                // there is no channel to send data to outside of tokio::spawn
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_encrypt"), // current method name
-                        None
-                    ).await;
-                });
-                
-                // don't update data field in secure_cell_config instance
-                // the raw data remains the same as before.
-            }
-        };
-    }
-
-}
 
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
@@ -197,7 +141,7 @@ pub struct ConsumeNotif{
 
 #[derive(Clone)]
 pub struct NotifBrokerActor{
-    pub notif_broker_sender: tokio::sync::mpsc::Sender<String>,
+    pub notif_broker_sender: tokio::sync::mpsc::Sender<String>, // use to send notif data to mpsc channel for ws
     pub app_storage: std::option::Option<Arc<Storage>>, // REQUIRED: communicating with third party storage
     pub notif_mutator_actor: Addr<NotifMutatorActor>, // REQUIRED: communicating with mutator actor to write into redis and db 
     pub zerlog_producer_actor: Addr<ZerLogProducerActor> // REQUIRED: send any error log to the zerlog queue

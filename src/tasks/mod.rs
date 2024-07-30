@@ -1,7 +1,10 @@
 
 
+use std::sync::atomic::AtomicU64;
+
 use crate::*;
 use interfaces::task::TaskExt;
+use tracing::span_enabled;
 use types::Job;
 
 
@@ -49,7 +52,8 @@ pub struct Task1<J: std::future::Future<Output = O>, S, O> where // J is a Futur
     pub lock: std::sync::Mutex<()>, // the task itself is locked and can't be used by other threads
 }
 
-impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> Task1<J, S, O> 
+impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> 
+    Task1<J, S, O> 
     where O: Send + Sync + 'static{
 
     pub async fn new(job: J, sender: tokio::sync::mpsc::Sender<S>) -> Self{
@@ -80,7 +84,22 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> T
         self.lock.try_lock().is_err() // is_err() can be either true or false, trying to acquire the lock
     }
 
-    pub async fn switch_task(&mut self, taks: J){
+    // method to execute the job in the task worker
+    pub async fn execute(&mut self){
+
+        // wailt until the lock gets freed cause we're pushing tasks into the tree 
+        // if we slide down into the while loop means the method returns true which
+        // means the lock couldn't get acquired
+        while self.is_busy(){ 
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+
+        let t = self.job.clone(); // clone to prevent from moving
+        let mut get_worker = self.worker.try_lock().unwrap(); // lock the worker
+        (*get_worker) = tokio::spawn(t);
+    }
+
+    pub async fn switch_task(&mut self, task: J){
         
         // wailt until the lock gets freed cause we're pushing tasks into the tree 
         // if we slide down into the while loop means the method returns true which
@@ -90,7 +109,7 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S> T
         }
 
         let mut get_worker = self.worker.lock().unwrap();
-        (*get_worker) = tokio::spawn(taks);
+        (*get_worker) = tokio::spawn(task);
 
     }
 
@@ -128,7 +147,8 @@ pub enum TaskStatus{
 }
 
 type FutureTraitObject<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O> + Send + Sync + 'static>>;
-impl<J: std::future::Future + Send + Sync + 'static + Clone, S> Task<J, S> 
+impl<J: std::future::Future + Send + Sync + 'static + Clone, S> 
+    Task<J, S> 
     where J::Output: Send + Sync + 'static{
 
     // spawn an async task inside tokio threads upon tokio scheduler
@@ -168,5 +188,36 @@ impl<J: std::future::Future<Output: Send + Sync + 'static> +
         let job = this.clone().job.clone();
         tokio::spawn(job); // job is of type future, we're executing it inside another free thread
 
+    }
+}
+
+//          a thread safe task tree
+// use smart pointers to break the cycle of self ref 
+// types, in here we're creating a node for the entire 
+// task tree which contains a reference to the itself
+pub struct TaskNode<
+    J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, 
+    S, O: Send + Sync + 'static>{
+    pub key: String,
+    pub value: Task1<J, S, O>,
+    pub weight: std::sync::atomic::AtomicU8,
+    pub parent: std::sync::Arc<TaskNode<J, S, O>>, // the parent itself
+    pub children: std::sync::Mutex<std::sync::Arc<TaskNode<J, S, O>>> // vector of children
+}
+
+impl<J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S, O: Send + Sync + 'static> 
+    TaskNode<J, S, O>{
+    
+    /* execute tasks in bfs and dfs order */
+
+    pub fn executex_bfs(&mut self){
+        // execute all tasks in bfs order
+        
+        
+    }
+
+    pub fn execute_dfs(&mut self){
+        // execute all tasks in dfs order
+        
     }
 }

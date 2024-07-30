@@ -8,7 +8,7 @@ use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
 use crate::workers::zerlog::ZerLogProducerActor;
 use crate::entities::{self, hoops};
-use crate::models::event::{DbHoopData, HoopEvent};
+use crate::models::event::{DbHoopData, HoopEventFormForDb};
 use crate::storage::engine::Storage;
 use crate::constants::{self, PING_INTERVAL};
 use serde_json::json;
@@ -16,14 +16,14 @@ use serde_json::json;
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct StoreHoopEvent{
-    pub hoop: HoopEvent,
+    pub hoop: HoopEventFormForDb,
     pub local_spawn: bool
 }
 
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct RawStoreHoopEvent{
-    pub hoop: HoopEvent,
+    pub hoop: HoopEventFormForDb,
     pub local_spawn: bool
 }
 
@@ -63,7 +63,7 @@ impl HoopMutatorActor{
         Self { app_storage, zerlog_producer_actor }
     }
 
-    pub async fn raw_store(&mut self, hoop: HoopEvent) -> Option<DbHoopData>{
+    pub async fn raw_store(&mut self, hoop: HoopEventFormForDb) -> Option<DbHoopData>{
 
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();
@@ -76,7 +76,13 @@ impl HoopMutatorActor{
             [ // pass the followings to the query
                 hoop.etype.into(),
                 hoop.manager.into(),
-                hoop.entrance_fee.into()
+                hoop.entrance_fee.into(),
+                hoop.duration.into(),
+                hoop.started_at.into(),
+                hoop.cover.into(),
+                hoop.title.into(),
+                hoop.description.into(),
+                hoop.capacity.into(),
             ]
         );
 
@@ -102,6 +108,12 @@ impl HoopMutatorActor{
                                 etype: res.try_get("", "etype").unwrap(),
                                 manager: res.try_get("", "manager").unwrap(),
                                 entrance_fee: res.try_get("", "entrance_fee").unwrap(),
+                                cover: res.try_get("", "cover").unwrap(),
+                                started_at: res.try_get("", "started_at").unwrap(),
+                                title: res.try_get("", "title").unwrap(),
+                                description: res.try_get("", "description").unwrap(),
+                                capacity: res.try_get("", "capacity").unwrap(),
+                                duration: res.try_get("", "duration").unwrap(),
                                 created_at: res.try_get("", "created_at").unwrap(),
                                 updated_at: res.try_get("", "updated_at").unwrap(),
                             }
@@ -140,7 +152,7 @@ impl HoopMutatorActor{
 
     }
     
-    pub async fn store(&mut self, hoop: HoopEvent) -> Option<entities::hoops::Model>{
+    pub async fn store(&mut self, hoop: HoopEventFormForDb) -> Option<entities::hoops::Model>{
         
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();
@@ -153,6 +165,12 @@ impl HoopMutatorActor{
                 "etype": hoop.etype,
                 "manager": hoop.manager,
                 "entrance_fee": hoop.entrance_fee,
+                "description": hoop.description,
+                "title": hoop.title,
+                "capacity": hoop.capacity,
+                "duration": hoop.duration,
+                "started_at": hoop.started_at,
+                "cover": hoop.cover,
             })
         ){
             Ok(_) => {},
@@ -229,7 +247,7 @@ impl HoopMutatorActor{
 
     }
 
-    pub async fn update(&mut self, hoop: HoopEvent){
+    pub async fn update(&mut self, hoop: HoopEventFormForDb){
 
         let storage = self.app_storage.as_ref().clone().unwrap();
         let db = storage.get_seaorm_pool().await.unwrap();

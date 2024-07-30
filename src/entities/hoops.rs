@@ -9,9 +9,17 @@ pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
+    pub title: String,
+    pub description: String,
+    pub cover: String,
     pub etype: String,
     pub manager: i32,
     pub entrance_fee: i64,
+    pub duration: i64,
+    pub capacity: i64,
+    pub started_at: DateTimeWithTimeZone,
+    pub is_finished: Option<bool>,
+    pub is_locked: Option<bool>,
     #[sea_orm(created_at)]
     pub created_at: DateTimeWithTimeZone,
     #[sea_orm(updated_at)]

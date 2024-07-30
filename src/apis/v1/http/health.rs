@@ -18,133 +18,13 @@ use base58::{ToBase58, FromBase58};
 
 
 
-// use for encrypting the image bytes
-impl Crypter for &[u8]{
-    fn encrypt(&self, secure_cell_config: &mut wallexerr::misc::SecureCellConfig){
-        match wallexerr::misc::Wallet::secure_cell_encrypt(secure_cell_config){ // passing the redis secure_cell_config instance
-            Ok(data) => {
-                secure_cell_config.data = data
-            },
-            Err(e) => {
-
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *constants::CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_decrypt"), // current method name
-                        None
-                    ).await;
-                });
-
-                // don't update data field in secure_cell_config instance
-                // the encrypted data remains the same as before.
-            }
-        };
-    }
-
-    fn decrypt(&self, secure_cell_config: &mut wallexerr::misc::SecureCellConfig){
-        match wallexerr::misc::Wallet::secure_cell_decrypt(secure_cell_config){
-            Ok(encrypted) => {
-                
-                let stringified_data = hex::encode(&encrypted);
-                // update the data field with the encrypted content bytes
-                secure_cell_config.data = encrypted; 
-
-            },
-            Err(e) => {
-
-                // log the error in the a lightweight thread of execution inside tokio threads
-                // since we don't need output or any result from the task inside the thread thus
-                // there is no channel to send data to outside of tokio::spawn
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *constants::CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_encrypt"), // current method name
-                        None
-                    ).await;
-                });
-                
-                // don't update data field in secure_cell_config instance
-                // the raw data remains the same as before.
-            }
-        };
-
-    }
-
-} 
-
-
-// use for encrypting the image bytes
-impl Crypter for Vec<u8>{
-    fn encrypt(&self, secure_cell_config: &mut wallexerr::misc::SecureCellConfig){
-        match wallexerr::misc::Wallet::secure_cell_encrypt(secure_cell_config){ // passing the redis secure_cell_config instance
-            Ok(data) => {
-                secure_cell_config.data = data
-            },
-            Err(e) => {
-
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *constants::CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_decrypt"), // current method name
-                        None
-                    ).await;
-                });
-
-                // don't update data field in secure_cell_config instance
-                // the encrypted data remains the same as before.
-            }
-        };
-    }
-
-    fn decrypt(&self, secure_cell_config: &mut wallexerr::misc::SecureCellConfig){
-        match wallexerr::misc::Wallet::secure_cell_decrypt(secure_cell_config){
-            Ok(encrypted) => {
-                
-                let stringified_data = hex::encode(&encrypted);
-                // update the data field with the encrypted content bytes
-                secure_cell_config.data = encrypted; 
-
-            },
-            Err(e) => {
-
-                // log the error in the a lightweight thread of execution inside tokio threads
-                // since we don't need output or any result from the task inside the thread thus
-                // there is no channel to send data to outside of tokio::spawn
-                tokio::spawn(async move{
-                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                        *constants::CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                        &String::from("CrypterInterface.encrypt.Wallet::secure_cell_encrypt"), // current method name
-                        None
-                    ).await;
-                });
-                
-                // don't update data field in secure_cell_config instance
-                // the raw data remains the same as before.
-            }
-        };
-
-    }
-
-}
 
 #[endpoint]
 pub async fn check_health(
     req: &mut Request, 
     res: &mut Response, 
     depot: &mut Depot, 
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl // with this we can control the flow of each route like executing the next handler
 ){
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context
@@ -268,7 +148,7 @@ pub async fn home(
     req: &mut Request, 
     res: &mut Response,
     depot: &mut Depot,
-    ctrl: &mut FlowCtrl
+    ctrl: &mut FlowCtrl // with this we can control the flow of each route like executing the next handler
 ){
 
     res.render(Text::Html(constants::HOME_HTML));
@@ -280,7 +160,7 @@ pub async fn mint(
     req: &mut Request,
     res: &mut Response,
     depot: &mut Depot,
-    ctrl: &mut FlowCtrl,
+    ctrl: &mut FlowCtrl, // with this we can control the flow of each route like executing the next handler
     // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
     prod: JsonBody<Product>, // used to extract the request body as well as showcasing in swagger ui
 ){
@@ -321,7 +201,6 @@ pub async fn mint(
             // if you want to use while let Some the prod must be cloned in every iteration
             // hence using if let Some is the best option in here to avoid using clone.
             if let Some(product) = product_receiver.recv().await{
-                log::info!("received updated product info: {:?}", product);
                 
                 let server_time = format!("{}", chrono::Local::now().to_string());
                 res.status_code = Some(StatusCode::OK);
@@ -333,7 +212,8 @@ pub async fn mint(
                         status: StatusCode::OK.as_u16(),
                         meta: Some(
                             serde_json::json!({
-                                "server_time": server_time
+                                "server_time": server_time,
+                                "minted_product": product
                             })
                         )
                     }
@@ -350,7 +230,7 @@ pub async fn picer(
     req: &mut Request,
     res: &mut Response,
     depot: &mut Depot,
-    ctrl: &mut FlowCtrl,
+    ctrl: &mut FlowCtrl, // with this we can control the flow of each route like executing the next handler
     // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
     secure_cell_config: FormBody<UserSecureCellConfig>, // used to extract the request body as well as showcasing in swagger ui
 ){
@@ -375,6 +255,10 @@ pub async fn picer(
                     let mut img_buffer = vec![];
                     let img_bytes = img.read_to_end(&mut img_buffer).await;
 
+
+                    // consider uploading the image to aws or digispaces
+                    // ...
+
                     // encrypt the content of the file
                     let mut secure_cell_config = wallexerr::misc::SecureCellConfig{ 
                         secret_key: secure_cell_config.clone().secret_key, 
@@ -390,8 +274,9 @@ pub async fn picer(
                     f.write_all(&encrypted_data).await;
                     
                     // let the encrypted file only be there 
-                    std::fs::remove_file(dest);
+                    tokio::fs::remove_file(dest).await;
 
+                    // fill the response object
                     let server_time = format!("{}", chrono::Local::now().to_string());
                     res.status_code = Some(StatusCode::OK);
                     res.render(Json(
@@ -408,7 +293,7 @@ pub async fn picer(
                         }
                     )); // the minting was successfully started
                 },
-                Err(e) => {
+                Err(e) => { // can't copy the file into dest path 
                     
                     // fill the response objcet 
                     let server_time = format!("{}", chrono::Local::now().to_string());

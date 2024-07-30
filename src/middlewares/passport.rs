@@ -41,7 +41,7 @@ pub async fn check_passport(
         Ok(token_time) => {
 
             depot.insert("passport_verified", true);
-            depot.insert("passport_token_time", token_time);
+            depot.insert("passport_token_time", token_time); // as well as inject the correct token time
         },
         Err(resp_err) => {
 

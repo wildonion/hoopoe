@@ -2,6 +2,8 @@
 
 use std::sync::atomic::AtomicU8;
 use interfaces::payment::PaymentProcess;
+use models::event::ActionType;
+use notif::ProduceNotif;
 use rand_chacha::ChaCha12Core;
 use wallexerr::misc::Wallet;
 use crate::interfaces::tx::TransactionExt;
@@ -11,10 +13,18 @@ use actix::Handler as ActixMessageHandler;
 
 
 
-#[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 struct Execute{
-    pub tx: Transaction
+    pub tx: Transaction,
+}
+
+#[derive(Message, Clone)]
+#[rtype(result = "()")]
+struct Send2Pool{
+    pub tx: Transaction,
+    pub tx_producer: Addr<NotifBrokerActor>, // use this actor to send produce message to it
+    pub spawn_local: bool
 }
 
 pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Wallet>>> = Lazy::new(||{
@@ -185,6 +195,7 @@ impl TransactionExt for Transaction{
             }
         );
 
+        // update tx_sig and hash field simultaneously as they're coming from the background thread
         while let Some((tx_signature, tx_hash)) = rx.recv().await{
             tx_data.tx_sig = tx_signature;
             tx_data.hash = tx_hash;
@@ -227,11 +238,61 @@ impl Actor for StatelessTransactionPool{
     }
 }
 
+// msg handler to send the tx object to the rmq, the consumer service
+// which is the tx-pool service will consume each one and execute them
+// asyncly in the background worker thread
+impl ActixMessageHandler<Send2Pool> for StatelessTransactionPool{
+    
+    type Result = ();
+    fn handle(&mut self, msg: Send2Pool, ctx: &mut Self::Context) -> Self::Result {
+        
+        let tx = msg.tx;
+        let producer = msg.tx_producer;
+        let spawn_local = msg.spawn_local;
+        let cloned_tx = tx.clone();
+
+        let prod_notif = 
+            ProduceNotif{
+                local_spawn: true,
+                notif_data: NotifData{ 
+                    id: Uuid::new_v4().to_string(), 
+                    receiver_info: String::from("txpool"), 
+                    action_data: serde_json::to_value(&cloned_tx).unwrap(), 
+                    actioner_info: String::from("wallet-service"), 
+                    action_type: ActionType::EventCreated, 
+                    fired_at: chrono::Local::now().timestamp(), 
+                    is_seen: false 
+                },
+                exchange_name: format!("{}.notif:TxPool", APP_NAME),
+                exchange_type: String::from("fanout"),
+                routing_key: String::from(""),
+                encryption_config: None, // don't encrypt the data 
+            };
+
+        // background worker thread using tokio
+        let cloned_producer = producer.clone();
+        let cloned_prod_notif = prod_notif.clone();
+        tokio::spawn(async move{
+            cloned_producer.send(cloned_prod_notif).await;
+        });
+
+        if spawn_local{
+            // spawn in local thread of the actor itself
+            async move{
+                producer.send(prod_notif).await;
+            }.into_actor(self) // convert the future into the actor so we can call the spawn method to execute the future in actor thread
+            .spawn(ctx);
+        }
+
+    }
+
+}
 // send Execute message to the actor to execute a tx 
 impl ActixMessageHandler<Execute> for StatelessTransactionPool{
     type Result = ();
 
     fn handle(&mut self, msg: Execute, ctx: &mut Self::Context) -> Self::Result {
+        
         let tx = msg.tx;
         
         let cloned_tx = tx.clone();
@@ -239,14 +300,8 @@ impl ActixMessageHandler<Execute> for StatelessTransactionPool{
             cloned_tx.clone().commit().await;
         });
 
-        // or local spawn
-        let local_spawn_cloned_tx = tx.clone();
-        async move{
-            local_spawn_cloned_tx.clone().commit().await;
-        }.into_actor(self) // convert the future into the actor so we can call the spawn method to execute the future in actor thread
-        .spawn(ctx);
-
     }
+
 }
 
 
@@ -255,12 +310,12 @@ impl ActixMessageHandler<Execute> for StatelessTransactionPool{
 // there should be always a rely solution on abstractions like 
 // implementing trait for struct and extending its behaviour 
 // instead of changing the actual code base and concrete impls. 
-struct PayPal;
-struct ZarinPal;
+struct PayPal; // paypal gateway
+struct ZarinPal; // zarinpal gateway
 
 struct PaymentWallet{
     pub owner: String,
-    pub transactions: Vec<Transaction>
+    pub transactions: Vec<Transaction> // transactions that need to be executed
 }
 
 impl PaymentProcess<PayPal> for PaymentWallet{
@@ -269,7 +324,7 @@ impl PaymentProcess<PayPal> for PaymentWallet{
     // future traits as objects must be completelly a separate type
     // which can be achieved by pinning the boxed version of future obj 
     type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
-
+    
     type Wallet = Self;
 
     async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {

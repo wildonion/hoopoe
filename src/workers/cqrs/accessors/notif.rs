@@ -1,6 +1,6 @@
 
 
-
+use deadpool_redis::redis::AsyncCommands;
 use std::error::Error;
 use std::net;
 use std::str::FromStr;
@@ -9,7 +9,6 @@ use actix::{Actor, AsyncContext, Context, Handler};
 use chrono::{DateTime, FixedOffset};
 use constants::STORAGE_IO_ERROR_CODE;
 use deadpool_redis::{Connection, Manager, Pool};
-use redis::{AsyncCommands, Commands};
 use sea_orm::{ConnectionTrait, QueryResult, Statement, Value};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use crate::models::event::DbNotifData;

@@ -226,6 +226,9 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
 🗞️ HOOPOE LOGS                             ==> https://api.hoopoe.app/logs
 🗂️ HOOPOE ASSETS FOLDER                    ==> https://api.hoopoe.app/assets
 🍀 SWAGGER UI                              ==> https://api.hoopoe.app/swagger
+🍀 RAPIDOC UI                              ==> https://api.hoopoe.app/rapidoc
+🍀 SCALAR UI                               ==> https://api.hoopoe.app/scalar
+🍀 REDOC UI                                ==> https://api.hoopoe.app/redoc
 ```
 
 ## 🗃️ wikis, docs, erds, schemas and collections

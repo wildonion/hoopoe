@@ -10,7 +10,6 @@ use config::EnvExt;
 use redis_async::client::PubsubConnection;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use redis::Client as RedisClient;
 use uuid::Uuid;
 use sea_orm::{Database, DatabaseConnection, ConnectOptions};
 use rslock::LockManager;
@@ -40,7 +39,6 @@ use crate::config::{Env as ConfigEnv, Context};
 #[derive(Default)]
 pub struct Bucket{
     pub mode: Mode,
-    pub redis: Option<RedisClient>,
     pub redis_async_pubsub_conn: Option<Arc<PubsubConnection>>,
     pub locker: Option<lockers::dlm::DistLock>,
     pub seaorm_pool: Option<DatabaseConnection>,
@@ -99,7 +97,7 @@ impl Storage{
         };
 
         /* redis async, none async and actor setup */
-        let none_async_redis_client = redis::Client::open(redis_conn_url.as_str()).unwrap();
+        // let none_async_redis_client = redis::Client::open(redis_conn_url.as_str()).unwrap();
         // let redis_actor = RedisActor::start(redis_actor_conn_url.as_str());
         let mut redis_conn_builder = ConnectionBuilder::new(redis_host, redis_port.to_owned()).unwrap();
         redis_conn_builder.password(redis_password.to_owned());
@@ -138,7 +136,6 @@ impl Storage{
                     bucket: Some(
                         Bucket{
                             mode: Mode::Off,
-                            redis: None,
                             redis_async_pubsub_conn: None,
                             locker: None,
                             seaorm_pool: None,
@@ -166,7 +163,6 @@ impl Storage{
                         bucket: Some(
                             Bucket{
                                 mode: Mode::On,
-                                redis: Some(none_async_redis_client.clone()),
                                 redis_async_pubsub_conn: Some(async_redis_pubsub_conn.clone()),
                                 locker: Some(lockers::dlm::DistLock::new_redlock(Some(std::sync::Arc::new(rl)))),
                                 seaorm_pool: Some(seaorm_pg_db),
@@ -203,13 +199,6 @@ impl Storage{
     pub async fn get_redis_pool(&self) -> Option<std::sync::Arc<RedisPoolConnection>>{
         match self.bucket.as_ref().unwrap().mode{
             Mode::On => self.bucket.as_ref().unwrap().redis_pool.clone(),
-            Mode::Off => None,
-        }
-    }
-
-    pub async fn get_redis(&self) -> Option<&RedisClient>{
-        match self.bucket.as_ref().unwrap().mode{
-            Mode::On => self.bucket.as_ref().unwrap().redis.as_ref(), 
             Mode::Off => None,
         }
     }

@@ -173,6 +173,7 @@ impl HoopoeServer{
         ).await.unwrap();
         let fresh = args.fresh;
         if fresh{
+            log::info!("fresh db...");
             Migrator::fresh(&connection).await.unwrap();
             Migrator::refresh(&connection).await.unwrap();
         } else{
@@ -232,8 +233,8 @@ impl HoopoeServer{
 
         // include_bytes!{} macro loads a file in form of utf8 bytes array,
         // since it's a macro thus it checks the paths at compile time!
-        let key = include_bytes!("../../infra/certs/http3/hoopoecert.pem").to_vec();
-        let cert = include_bytes!("../../infra/certs/http3/hoopoekey.pem").to_vec();
+        let cert = include_bytes!("../../infra/certs/http3/hoopoecert.pem").to_vec(); // ssl pubkey, will verify data with this
+        let key = include_bytes!("../../infra/certs/http3/hoopoekey.pem").to_vec(); // ssl prvkey, will sign data with this
         let config = RustlsConfig::new(Keycert::new().cert(cert.as_slice()).key(key.as_slice()));
 
         let listener = TcpListener::new(addr).rustls(config.clone());
@@ -531,7 +532,8 @@ impl HoopoeWsServerActor{
                                 if *user_id == current_user_id{ // send notif data back to the user
                                     let ws_message = Ok(Message::text(notif.clone()));
                                     // sending the notif data to the user tx, the message will be received by the receiver
-                                    // and forwarded to the current_user_ws_tx sender of the unbounded mpsc channel.
+                                    // and forwarded to the current_user_ws_tx sender of the unbounded mpsc channel, from there
+                                    // we'll receive the data by streaming over the receiver of the related user.
                                     if let Err(e) = tx.send(ws_message){ // catch the error if the channel is closed
                                         log::error!("can't send notif message to unbounded channel: {}", e.to_string());
                                     }

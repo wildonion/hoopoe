@@ -36,6 +36,21 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
+                        ColumnDef::new(Hoops::Title)
+                            .string()
+                            .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::Description)
+                            .string()
+                            .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::Cover)
+                            .string()
+                            .not_null()
+                    )
+                    .col(
                         ColumnDef::new(Hoops::Etype)
                             .not_null()
                             .char_len(10)
@@ -49,6 +64,31 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(Hoops::EntranceFee)
                             .big_integer()
                             .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::Duration)
+                            .big_integer()
+                            .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::Capacity)
+                            .big_integer()
+                            .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::StartedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::IsFinished)
+                            .boolean()
+                            .default(false)
+                    )
+                    .col(
+                        ColumnDef::new(Hoops::IsLocked)
+                            .boolean()
+                            .default(false)
                     )
                     .col(
                         ColumnDef::new(Hoops::CreatedAt)
@@ -90,8 +130,16 @@ enum Hoops {
     Table, // reserved for table name
     Id, // primary key to bring the entity into life
     Etype,
+    Title,
+    Description,
     Manager,
     EntranceFee,
+    IsLocked,
+    IsFinished,
+    Duration, // in seconds
+    Capacity,
+    Cover,
+    StartedAt,
     CreatedAt,
     UpdatedAt
 }

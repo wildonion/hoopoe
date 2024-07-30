@@ -83,12 +83,7 @@ use std::{fs::OpenOptions, io::BufReader};
 use rand::Rng;
 use rand::random;
 use sha2::{Digest, Sha256};
-use redis::Client as RedisClient;
-use redis::AsyncCommands; // this trait is required to be imported in here to call set() methods on the cluster connection
-use redis::RedisResult;
-use redis::Commands;
 use redis_async::client::{self, PubsubConnection, ConnectionBuilder};
-use redis::RedisError;
 use uuid::Uuid;
 use log::{info, error};
 use env_logger::Env;

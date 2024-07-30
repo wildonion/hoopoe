@@ -241,8 +241,6 @@ pub enum ActixMailBoxError{
 
 #[derive(Error)]
 pub enum StorageError{
-    #[error("[REDIS] - failed to do redis operation")]
-    Redis(#[from] redis::RedisError),
     #[error("[REDIS ASYNC] - failed to subscribe to channel")]
     RedisAsync(#[from] redis_async::error::Error),  
     #[error("[REDIS ACTOR] - failed to get redis pool")]
@@ -423,17 +421,6 @@ impl From<chrono::ParseError> for HoopoeErrorResponse{
             code: *crate::constants::CHRONO_ERROR_CODE, 
             msg: error.source().unwrap().to_string().as_bytes().to_vec(),
             kind: ErrorKind::Time(TimeError::Chrono(error)), 
-            method_name: String::from("") 
-        }
-    }
-}
-
-impl From<redis::RedisError> for HoopoeErrorResponse{
-    fn from(error: redis::RedisError) -> Self {
-        Self{ 
-            code: *crate::constants::STORAGE_IO_ERROR_CODE, 
-            msg: error.source().unwrap().to_string().as_bytes().to_vec(),
-            kind: ErrorKind::Storage(StorageError::Redis(error)),
             method_name: String::from("") 
         }
     }

@@ -282,6 +282,20 @@ pub mod workerthreadpool{
 
         }
 
+        type AsyncJob<I, F> = Box<dyn FnOnce(I) -> F + Send + Sync + 'static>;
+        fn create_async_job<I, O, F>(job: impl FnOnce(I) -> F + Send + Sync + 'static) -> AsyncJob<I, F> // static dispatch for job
+            where F: std::future::Future<Output = O>, 
+                  O: Send + Sync + 'static
+            {
+                Box::new(job)
+            }
+        async fn run(){
+            let async_job = create_async_job::<u8, String, _>(|status|async move{String::from("")});
+            tokio::spawn(async move{
+                async_job(0).await;
+            });
+        }
+                  
 
     }
 

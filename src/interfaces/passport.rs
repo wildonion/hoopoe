@@ -1,6 +1,6 @@
 
 
-
+use deadpool_redis::redis::AsyncCommands;
 use std::error::Error;
 use crate::{error::HoopoeErrorResponse, *};
 use config::EnvExt;
