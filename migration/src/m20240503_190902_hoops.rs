@@ -126,7 +126,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Hoops {
+pub enum Hoops {
     Table, // reserved for table name
     Id, // primary key to bring the entity into life
     Etype,

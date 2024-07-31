@@ -183,7 +183,7 @@ impl<J: std::future::Future<Output: Send + Sync + 'static> +
     type Task = Self;
     
     async fn execute(&self, t: String) {
-        
+         
         let this = self.clone();
         let job = this.clone().job.clone();
         tokio::spawn(job); // job is of type future, we're executing it inside another free thread
@@ -212,12 +212,14 @@ impl<J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S, O: S
 
     pub fn executex_bfs(&mut self){
         // execute all tasks in bfs order
-        
-        
+        // level order traversal
+
     }
 
     pub fn execute_dfs(&mut self){
         // execute all tasks in dfs order
+        // inorder, preorder, postorder traversal
         
     }
+
 }

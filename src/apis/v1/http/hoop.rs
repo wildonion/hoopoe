@@ -7,15 +7,6 @@ use crate::*;
 
 
 
-// todo 
-// check token middleware from gem server
-// get event cover in add_hoop api
-// store images in aws s3 or digispaces
-// user_hoops table => joined_at, left_at, user_id, hoop_id, is_invited
-
-
-
-
 /* -ˋˏ✄┈┈┈┈
  ------------------------
 |  Hoop CRUD controller
@@ -32,7 +23,7 @@ use crate::*;
 |
 
 
-NOTE: authenticating and KYCing process will be done using gem server
+NOTE: authorizing and KYCing process will be done using gem server
 
 */
 
@@ -46,6 +37,9 @@ pub async fn add_hoop(
     hoop_info: FormBody<HoopEventForm>
 ){
     
+    // check token and kyc middlewares from gem server
+    // store cover in aws s3 or digispaces
+
     let cover = req.file("cover").await;
     let etype = match hoop_info.etype.as_str(){
         "social" => EventType::SocialGathering,

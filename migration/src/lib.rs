@@ -2,6 +2,7 @@ pub use sea_orm_migration::prelude::*;
 
 mod m20240503_190902_hoops;
 mod m20240508_213126_notifs;
+mod m20240731_082953_users_hoops;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20240503_190902_hoops::Migration),
             Box::new(m20240508_213126_notifs::Migration),
+            Box::new(m20240731_082953_users_hoops::Migration),
         ]
     }
 }

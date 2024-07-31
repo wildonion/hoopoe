@@ -3,35 +3,21 @@
 hide circle
 skinparam linetype ortho
 
-class "**geography_columns**" {
----
-* <b>""coord_dimension""</b>: //""integer""  //
-* <b>""f_geography_column""</b>: //""name""  //
-* <b>""f_table_catalog""</b>: //""name""  //
-* <b>""f_table_name""</b>: //""name""  //
-* <b>""f_table_schema""</b>: //""name""  //
-* <b>""srid""</b>: //""integer""  //
-* <b>""type""</b>: //""text""  //
-}
-
-class "**geometry_columns**" {
----
-* <b>""coord_dimension""</b>: //""integer""  //
-* <b>""f_geometry_column""</b>: //""name""  //
-* <b>""f_table_catalog""</b>: //""character varying""  //
-* <b>""f_table_name""</b>: //""name""  //
-* <b>""f_table_schema""</b>: //""name""  //
-* <b>""srid""</b>: //""integer""  //
-* <b>""type""</b>: //""character varying""  //
-}
-
 class "**hoops**" {
 # <b>""id""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
 ---
+* <b>""capacity""</b>: //""bigint""  //
+* <b>""cover""</b>: //""character varying""  //
 * <b>""created_at""</b>: //""timestamp with time zone""  //
+* <b>""description""</b>: //""character varying""  //
+* <b>""duration""</b>: //""bigint""  //
 * <b>""entrance_fee""</b>: //""bigint""  //
 * <b>""etype""</b>: //""character""  //
+* <b>""is_finished""</b>: //""boolean""  //
+* <b>""is_locked""</b>: //""boolean""  //
 * <b>""manager""</b>: //""integer""  //
+* <b>""started_at""</b>: //""timestamp with time zone""  //
+* <b>""title""</b>: //""character varying""  //
 * <b>""updated_at""</b>: //""timestamp with time zone""  //
 }
 
@@ -53,15 +39,18 @@ class "**seaql_migrations**" {
 * <b>""applied_at""</b>: //""bigint""  //
 }
 
-class "**spatial_ref_sys**" {
-# <b>""srid""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
+class "**users_hoops**" {
+# <b>""id""</b>: //""integer"" <b><color:goldenrod>(PK) </color></b> //
 ---
-* <b>""auth_name""</b>: //""character varying""  //
-* <b>""auth_srid""</b>: //""integer""  //
-* <b>""proj4text""</b>: //""character varying""  //
-* <b>""srtext""</b>: //""character varying""  //
+* <b>""hoop_id""</b>: //""integer"" <b><color:701fc6>(FK) </color></b> //
+* <b>""is_invited""</b>: //""boolean""  //
+* <b>""joined_at""</b>: //""bigint""  //
+* <b>""left_at""</b>: //""bigint""  //
+* <b>""user_id""</b>: //""integer""  //
 }
 
+
+"**users_hoops**" }o--|| "**hoops**"
 
 
 @enduml
