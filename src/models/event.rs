@@ -70,15 +70,15 @@ pub struct RegisterNotif{
 #[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
 pub struct HoopEventForm{
     pub etype: String, 
-    pub manager: i32,
-    pub entrance_fee: i64,
+    pub manager: String,
+    pub entrance_fee: String,
     pub title: String,
     pub description: String,
-    pub started_at: i64,
-    pub duration: i64,
-    pub capacity: i64,
-    pub participants: Vec<i64>,
-    pub invitations: Vec<HoopEventFriendInvitationForm>
+    pub started_at: String,
+    pub duration: String, // in seconds
+    pub capacity: String,
+    pub participants: Vec<String>,
+    pub invitations: String // this gets decoded into a vector of map like: Map<String, i64>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
@@ -87,12 +87,6 @@ pub enum EventType{
     Streaming,
     Proposal,
     None
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
-pub struct HoopEventFriendInvitationForm{
-    pub entrance_fee: i64,
-    pub friend_id: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]

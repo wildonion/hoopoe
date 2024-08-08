@@ -33,6 +33,7 @@ pub struct Env{
     pub DB_ENGINE: String,  
     pub DB_NAME: String,
     pub DATABASE_URL: String,
+    pub GEM_BASE_URL: String,
 }
 
 
@@ -83,6 +84,7 @@ impl EnvExt for Env{
                 DB_ENGINE: std::env::var("DB_ENGINE").expect("DB_ENGINE must be there!"),
                 DB_NAME: std::env::var("DB_NAME").expect("DB_NAME must be there!"),
                 DATABASE_URL: std::env::var("DATABASE_URL").expect("DATABASE_URL must be there!"),
+                GEM_BASE_URL: std::env::var("GEM_BASE_URL").expect("GEM_BASE_URL must be there!"),
             }
         };
 

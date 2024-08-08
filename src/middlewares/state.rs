@@ -13,5 +13,6 @@ pub async fn set_data(
     ctrl: &mut FlowCtrl
 ){
 
+    // other api handlers can obtain the username 
     depot.insert("username", "hooper");
 }

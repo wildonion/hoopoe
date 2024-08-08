@@ -59,9 +59,9 @@ pub struct NotifDataResponse{
 }
 
 /*
-    future types as separate objects must be pinned into the ram 
-    to break their cycle of self-ref types and add some indirection
-    so the return type would be: Box::pin(async move{});
+    future trait types as separate objects must be pinned into the ram 
+    to break their cycle of self-ref types and add some indirection to 
+    them, the return type would be: Box::pin(async move{});
 */
 #[derive(MessageResponse)]
 pub struct ResponseNotifData(pub std::pin::Pin<Box<dyn std::future::Future<Output = Option<Option<NotifDataResponse>>> + Send + Sync + 'static>>);

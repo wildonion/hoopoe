@@ -7,7 +7,7 @@ use tonic::IntoRequest;
 use std::sync::Arc;
 use actix::{Actor, AsyncContext, Context};
 use crate::workers::zerlog::ZerLogProducerActor;
-use crate::entities::{self, hoops};
+use crate::entities::{self, hoops, users_hoops};
 use crate::models::event::{DbHoopData, HoopEventFormForDb};
 use crate::storage::engine::Storage;
 use crate::constants::{self, PING_INTERVAL};

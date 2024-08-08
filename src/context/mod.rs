@@ -1,7 +1,16 @@
 
 
 
-// app context
+/* 
+                                app context
+    in static based lang we sould initialize all global structures once 
+    to avoid costs of runtime overhead by reinitializing every time we
+    need them again. there would be great to have a thread safe structure 
+    to store all that global structures in there and move that structure 
+    between apis and threads, it contains all initialized structures that
+    is going to be used in every api by extracting them from the depot
+    structure.
+*/
 
 use std::any::Any;
 use std::collections::{BTreeMap, HashMap};

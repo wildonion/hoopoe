@@ -2,6 +2,6 @@
 
 pub mod prelude;
 
-pub mod users_hoops;
-pub mod notifs;
 pub mod hoops;
+pub mod notifs;
+pub mod users_hoops;

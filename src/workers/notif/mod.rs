@@ -66,6 +66,11 @@ use crate::interfaces::crypter::Crypter;
 
 
 
+#[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
+#[rtype(result = "()")]
+pub struct HealthMsg{
+    pub shutdown: bool
+}
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
 #[rtype(result = "()")]
@@ -940,7 +945,9 @@ impl ActixMessageHandler<ProduceNotif> for NotifBrokerActor{
                     let zerlog_producer_actor = self.zerlog_producer_actor.clone();
                     // log the error in the a lightweight thread of execution inside tokio threads
                     // since we don't need output or any result from the task inside the thread thus
-                    // there is no channel to send data to outside of tokio::spawn
+                    // there is no channel to send data to outside of tokio::spawn, the writing however
+                    // consists of file and rmq (network) operations which are none blocking async io
+                    // processes need to get executed in a light thread instead of cpu thread.
                     tokio::spawn(async move{
                         let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
                         let err_instance = crate::error::HoopoeErrorResponse::new(
@@ -1056,4 +1063,13 @@ impl ActixMessageHandler<ConsumeNotif> for NotifBrokerActor{
 
     }
 
+}
+
+impl ActixMessageHandler<HealthMsg> for NotifBrokerActor{
+    type Result = ();
+    fn handle(&mut self, msg: HealthMsg, ctx: &mut Self::Context) -> Self::Result {
+        if msg.shutdown{
+            ctx.stop(); // stop the already running actor
+        }
+    }
 }

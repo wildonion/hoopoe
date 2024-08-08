@@ -5,7 +5,7 @@ use std::error::Error;
 use crate::{error::HoopoeErrorResponse, *};
 use config::EnvExt;
 use constants::STORAGE_IO_ERROR_CODE;
-use models::{server::Response, user::UserData};
+use models::{server::Response, user::{CheckTokenResponse, UserData}};
 use types::*;
 use self::context::AppContext;
 use crate::models::server::Response as HoopoeResponse;
@@ -39,7 +39,7 @@ pub trait Passport{
 
     type Request;
 
-    async fn get_user(&self) -> Result<UserData, salvo::Response>;
+    async fn get_user(&self, server_url: &str) -> Result<UserData, salvo::Response>; // used for check token request
     async fn check_secret(&self, app_state: Option<AppContext>) -> Result<String, salvo::Response>;
     async fn verify_token_time(&self, app_state: Option<AppContext>, scope: &str) -> Result<String, salvo::Response>;
 }
@@ -50,22 +50,68 @@ pub trait Passport{
 impl Passport for salvo::Request{
 
     type Request = Self;
+    async fn get_user(&self, base_url: &str) -> Result<UserData, salvo::Response>{
 
-    async fn get_user(&self) -> Result<UserData, salvo::Response>{
-
+        let mut resp = salvo::Response::new();
         let req = self; // self is a mutable reference to the HttpRequest object
 
-        let jwt = "";
+        // the jwt is inside the request header
+        let get_headers = req.headers();
+        let get_jwt = get_headers.get("Authorization");
+
+        // if there wasn't an auth header return an error response
+        if get_jwt.is_none(){
+            let server_time = format!("{}", chrono::Local::now().to_string());
+            resp.status_code = Some(StatusCode::NOT_ACCEPTABLE);
+            resp.render(Json(
+                HoopoeResponse::<&[u8]>{ 
+                    data: &[], 
+                    message: "ERROR: empty header auth key", 
+                    is_err: true, 
+                    status: StatusCode::NOT_ACCEPTABLE.as_u16(),
+                    meta: Some(
+                        serde_json::json!({
+                            "server_time": server_time
+                        })
+                    )
+                }
+            ));
+            return Err(resp);
+        }
+
+        // building the request fetcher
+        let jwt = get_jwt.unwrap().to_str().unwrap();
         let api = requests::Fetch::builder(
             "/health/check-token", 
             jwt,
-            &String::from("")
+            base_url
         );
-
-
-        Ok(
-            UserData{}
-        )
+        let json_data = api.get().await;
+        match serde_json::from_value::<CheckTokenResponse>(json_data.clone()){
+            Ok(check_token_resp) => {
+                Ok(check_token_resp.data)
+            },
+            Err(e) => { // we can't decode the resp into CheckTokenResponse perhaps server didn't send 200 response
+                let err = e.to_string();
+                let server_time = format!("{}", chrono::Local::now().to_string());
+                resp.status_code = Some(StatusCode::NOT_ACCEPTABLE);
+                resp.render(Json(
+                    HoopoeResponse::<&[u8]>{ 
+                        data: &[], 
+                        message: &format!("ERROR: {}, invalid given jwt", err), 
+                        is_err: true, 
+                        status: StatusCode::NOT_ACCEPTABLE.as_u16(),
+                        meta: Some(
+                            serde_json::json!({
+                                "server_time": server_time,
+                                "check_token_server_response": json_data
+                            })
+                        )
+                    }
+                ));
+                return Err(resp);
+            }
+        }
 
     }
 

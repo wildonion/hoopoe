@@ -31,5 +31,5 @@ use crate::*;
 pub trait TaskExt<S: Send + Sync + 'static>{ // polymorphism: task schema
     type State;
     type Task;
-    async fn execute(&self, task: S);
+    async fn execute_this(&self, task: S);
 }

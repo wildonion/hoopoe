@@ -18,6 +18,7 @@ pub struct Model {
     pub duration: i64,
     pub capacity: i64,
     pub started_at: DateTimeWithTimeZone,
+    pub end_at: DateTimeWithTimeZone,
     pub is_finished: Option<bool>,
     pub is_locked: Option<bool>,
     #[sea_orm(created_at)]
@@ -27,6 +28,15 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::users_hoops::Entity")]
+    UsersHoops,
+}
+
+impl Related<super::users_hoops::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UsersHoops.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}
