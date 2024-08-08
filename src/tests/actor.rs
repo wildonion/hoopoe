@@ -6,7 +6,14 @@
 
     https://ryhl.io/blog/actors-with-tokio/
     https://medium.com/@maturationofthe/leveraging-rusts-tokio-library-for-asynchronous-actor-model-cf6d477afb19
+    https://www.reddit.com/r/rust/comments/xec77k/rayon_or_tokio_for_heavy_filesystem_io_workloads/
 
+    runtime takes the async task and put it inside the thread queue 
+    then at an appropriate time the scheduler pop the task out of the
+    thread queue to execute it and if a thread is free it tries to steal
+    the task from other threads, once the task gets executed the runtime 
+    waker of future object poll the task result out and other codes can 
+    fill the placeholder to use the actual value of the solved task.
     async tasks execution flow in user space level (not os threads):
     >_ code             : developer put a future on the stack
     >_ code             : hey runtime scheduler, developer did an await on the task in a lightweight thread of execution of an actor which has its own stack!
@@ -16,11 +23,12 @@
     >_ runtime scheduler: hey i've just received the result of the future you wanted earlier from the waker, here is the result.
     >_ code             : as i was saying, ....to outside of this current thread! great other threads and scopes can now use the result as they're receiving the result from the channel that i've sent earlier.           
 
-    in those days that async wasn't there we had been using the queue concepts 
-    to queue some tasks then execute them one by one but with the arrival of the
-    async tasks/jobs/processes we can just wait for multiple tasks while we're 
-    executing others simultaneously and concurrently, here is the concurrency model 
-    for actor worker object (actix): 
+    the threadpool of tokio is used for light io and rayon is used for cpu heavy io and is global and shared 
+    across the program to speedup the execution with jobq mpsc channel like the one in actor object to execute 
+    received message or future task/job in its own thread. however in those days that async wasn't there we had 
+    been using the queue concepts to queue some tasks then execute them one by one but with the arrival of the 
+    async tasks/jobs/processes we can just wait for multiple tasks while we're executing others simultaneously 
+    and concurrently, here is the concurrency model for actor worker object (actix): 
         > example of executing async task: 
             - handle each socket in the background asyncly in a tokio spawn like writing bytes to a networking interface like tcp based protocols (ws, http, rmq, redis and rpc)
             - mutating an object in a separate thread by locking on the mutex to acquire the lock to avoid blocking the current thread
@@ -164,27 +172,6 @@ impl Acter{
     }
     
 }
-
-struct Scheduler{
-    pub queue: Queue,
-}
-
-type ErrType = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub struct Agent<J, T> where J: FnMut(fn() -> T) -> Result<(), ErrType>{ //// generic `J` is a closure type that accept a function as its argument 
-    job: J, //// the job itself
-    res: T, //// job response
-    task: Task
-}
-pub type Task = Job; //// the type of the Task is of type Job structure
-pub struct Job{ // the job that must be received by the receiver
-    pub id: Uuid,
-    pub task: Box<dyn FnOnce() + Send + Sync + 'static>, //// the task that can be shared between worker threadpool for solving
-} 
-pub struct Queue{ // a queue which contains all the incoming jobs from the sender 
-    pub tasks: Vec<Task>,   
-}
-pub struct JobHandler; // a threadpool structure to handle the poped-out job from the queue
-
 
 
 pub mod workerthreadpool{
@@ -372,13 +359,23 @@ pub mod workerthreadpool{
             }
 
         }
-
-
-        //// spawning native threads are too slow since thread handling in rust is depends 
-        //// on user base context switching means that based on the load of the IO in the 
-        //// app rust might solve the data load inside another cpu core and use multiprocessing approach:
-        ////     • https://www.reddit.com/r/rust/comments/az9ogy/help_am_i_doing_something_wrong_or_do_threads/
-        ////     • https://www.reddit.com/r/rust/comments/cz4bt8/is_there_a_simple_way_to_create_lightweight/
+        
+        /* 
+            NOTE: the process of heavy cpu io must not be blocking that's why rayon is not 
+            going to be used for none blocking operations cause it moves the tasks into the cpu 
+            core instead of using threads per cpu it uses one thread per each cpu core, tokio 
+            however can be used for io blocking tasks cause it uses lightweight thread of 
+            execution and it blocks a light thread.
+            lightweight threads in tokio is user thread space and naitive threads in rayon is os 
+            threads, the first ones have less overhead than the seconds ones.
+            spawning native threads are too slow since thread handling in rust is depends 
+            on user base context switching means that based on the load of the IO in the 
+            app rust might solve the data load inside another cpu core and use multiprocessing 
+            approach, it's like rayon threadpool which are global threads and shared across the app
+            which causes the race with other threads and steal tasks   
+                • https://www.reddit.com/r/rust/comments/az9ogy/help_am_i_doing_something_wrong_or_do_threads/
+                • https://www.reddit.com/r/rust/comments/cz4bt8/is_there_a_simple_way_to_create_lightweight/
+        */
         struct Worker{
             id: Uuid,
             thread: Option<thread::JoinHandle<()>>, //// thread is of type JoinHandld struct which return nothing or ()

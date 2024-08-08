@@ -6,11 +6,27 @@ use crate::*;
 // NODEJS LIKE ASYNC METHOD ORDER OF EXECUTION
 /* ------------------------------------------- */
 /*  https://lunatic.solutions/blog/rust-without-the-async-hard-part/
+    https://rustmagazine.org/issue-4/how-tokio-schedule-tasks/#:~:text=Tokio%20uses%20work%20stealing%20to,other%20workers'%20queues%20to%20execute.&text=In%20the%20above%20figure%2C%20there,are%20purely%20CPU%2Dbound%20tasks
     
     ----------------------------------------------------------------------
               Golang and Rust (goroutines and futures)!
     ==========>>>==========>>>==========>>>==========>>>==========>>>=====
-    
+    future objects in Rust are async taks that will be execute in a free 
+    thread by the async runtime based on task or work stealing algo.
+    in Rust async task in lightweight thread execution is handled by the 
+    tokio runtime scheduler. it distributes workloads (tasks) across cpus
+    based on work stealing approach (task scheduler algo):
+    every worker or lightweight thread has its own queue allows task to be 
+    queued in there for future execution which will be told by the runtime 
+    to execute which task at when!? actually the runtime also stores all 
+    the threads in a queue and then go for their execution based on its algo.
+    tokio uses work stealing approach, so when a worker's run queue is empty, 
+    it tries to “steal” tasks from other workers' queues to execute
+    with tokio::spawn we're telling the runtime: schedule this task
+    to be executed outside of the main or current thread. 
+    the migration of threads between processors is expensive, as it involves 
+    context switch operations. under the stealing paradigm, this phenomenon 
+    occurs less frequently, resulting in less overhead.
     Rust has future objects but Go has goroutines in Go there is a default 
     runtime scheduler to execute computational tasks or goroutines but in 
     Rust we should use tokio runtime scheduler to execute async or future 
@@ -182,10 +198,47 @@ use crate::*;
     other scopes and codes got executed and compiled and are waiting to fill the placeholder with the solved value,
     however thanks to the static type based langs allows other scopes know the exact type of the result of the future
     before it gets solved.
+    tokio runtime executes task in the background thread which allows the tasks to run concurrently with other tasks 
+    without blocking threads, we can execute other codes without waiting for the task to complete, putting await on 
+    the future object ensures that the task is completed. std thread join blocks the current thread until the joined
+    thread finishes tokio spawn on the other hand execute async io tasks in a none blocking manner inside a light thread 
+    so it’s better not to block in tokio light threads although we can block it like when we’re dealing with mutexes, 
+    awaiting on tokio threads won’t block the thread at all.
+    we can block in both io light and cpu threads but it would be better to do none blocking async operations in io 
+    light threads and heavy blocking computations like dl processing in cpu threads, it's great to use rayon cpu based 
+    threadpool for cpu blocking and tokio lightweight threadpool for none blocking operations.
+    tokio is a none blocking runtime scheduler and event loop like nodejs, each task falls into a thread from a threadpool, 
+    each thread has its own run queue to execute future tasks, since all threads are lightweight blocking inside of them 
+    is ok, we could leverage channels or mutex for data atomic syncing between thread or tasks, tokio runtime start scheduling 
+    on reaching tasks come with an await. all tokio tasks must be executed in lightweight thread and must not get 
+    blocked in there cause it's a none blocking io runtime in some case there might be some io thread waiting for 
+    some network connections held by the cpu thread increasing cost of io task execution in lightweight thread.
+    blocking operations should generally be avoided in threads that are also handling I/O tasks because it reduces 
+    concurrency. For CPU-bound tasks, using a dedicated thread pool or OS threads might be more appropriate to avoid 
+    blocking the main event loop. io tasks are future objects that will be executed in lightweight threads cause they 
+    involve waiting for external operations to complete they spend most of their time waiting for these operations 
+    to complete rather than using the CPU. in io execution the thread contains the tasks sits idle instead of blocking 
+    during the wait, use async/await syntax for I/O-bound operations to keep the main thread free for other tasks and 
+    avoid blocking in lightweight threads as much as possible. Mutex operations blocks the current thread to prevent 
+    other tasks from using the thread or the mutating the data hence it's better to put them inside a separate thread 
+    to mutate data asyncly if we want other tasks get executed simultaneously. isolate io threads from cpu threads if 
+    the task is like a mathematical computations which requires cpu threads to be blocked separately rather than 
+    processing them in io lightweight threads. blocking operations are generally best handled by dedicated CPU threads 
+    or thread pools, while non-blocking I/O operations should be managed by lightweight threads (tasks) in an asynchronous 
+    runtime like tokio this approach maximizes efficiency and concurrency.
+    goroutine is a lightweight tasks executed in a light thread by the go runtime it's like tokio spawn lightweight 
+    thread of execution for none blocking async io tasks, Mutex generally blocks the threads to mutate data to prevent 
+    other threads from doing so at the same time in comparison with channels it's expensive and costs overhead, we 
+    should use tokio mutex in none blocking io light threads and std mutex in a cpu threads, don't use std mutex in io light threads
+    lightweight threads none blocking io tasks => tokio::spawn(): file, networking and db operations, streaming over jobq based channels
+    cpu threads blocking tasks                 => rayon::spawn(): cryptography, dl and ml logics, mathematical operations
+    
+    Notes:
+    don't block the lightweight thread at all, wait on them until complete the job, used for io processes  
+    use channels instead of mutex for atomic syncing cause mutex blocks thread prevent mutating data by other threads at the same time
+    use std thread spawn or rayon spawn to spawn heavy computational task into the cpu threads 
+    separate io and cpu tasks threads from each other to avoid blocking while we're awaiting for other tasks to complete
 */
-
-
-use crate::*;
 
 pub async fn atomic_map_demo(){
 
@@ -335,6 +388,98 @@ pub async fn atomic_map_demo(){
         }
     
     */
+
+
+    /* 
+        mutex block the threads to avoid mutating data by other threads at the same time, lock gets released 
+        once the mutex goes out of scope:
+        atomic syncing with blocking: arc mutex send sync static 
+        atomic syncing without blocking: send sync static channels
+        we can't move a pointer into the tokio spawn unless the pointer lives statically we should wrap the 
+        type around thread safe smart pointers like arc as an atomic immutable reference and mutex as an atomic 
+        mutable reference
+        atomic syncing and sharing data between lightweight threads of task execution:
+        1 - channels (fastest) -> data must be send sync and have valid lifetimes during thread execution or move the entire ownership
+        2 - static lazy arc mutex or rwlock (slowest) -> this can be mutated globally across the app at any time
+        NOTE - a lightweight thread with its task must be executed in the background and 
+               get any data inside of it using channels, there is another way to get the
+               data however and is joining the thread to get the data directly without 
+               using channels, this way call ask for the thread data directly
+               to return the data to the caller.
+        NOTE - execute task per lightweight thread then use channels to send data to other threads without
+               having race conditions or use mutex to mutate data per only one thread at the same time.
+    */
+    static DATA: Lazy<std::sync::Arc<tokio::sync::Mutex<String>>> = Lazy::new(|| std::sync::Arc::new(tokio::sync::Mutex::new(String::from(""))));
+    let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
+    let safe_rx = std::sync::Arc::new(tokio::sync::Mutex::new(rx));
+    
+    let cloned_tx = tx.clone();
+    let cloned_tx1 = tx.clone();
+    
+    // sending data to channel in a lightweight thread of the tokio
+    // threadpool, doing so is done in the background and we're not 
+    // worry about blocking for io since we're using a light thread 
+    // and blocking the thread for executing the task is being done
+    // in the background by the runtime scheduler.
+    tokio::spawn(async move{
+        println!("inside the first spawn :::: sending data");
+        let resp = String::from("output");
+        cloned_tx.send(resp).await;
+    });
+
+    let cloned_rx = safe_rx.clone();
+    let cloned_rx1 = safe_rx.clone();
+
+    /////////////////////////////////////////////////
+    ///////// USE CHANNELS INSTEAD OF MUTEX /////////
+    /////////////////////////////////////////////////
+    tokio::spawn(async move{
+        println!("inside the second spawn :::: receiving data");
+        while let Some(mut resp) = cloned_rx.lock().await.recv().await{
+            println!("received data from channel: {:?}", resp);
+            resp = String::from("muteated_output");
+            
+            // sending while we're receiving, we'll receive the new changed
+            cloned_tx1.send(resp).await; 
+        }
+    });
+
+    // we can join on each tokio scope to get the thread content directly 
+    // without using channels, channels are being used to send data inside
+    // the thread to ouside of the thread
+    let receiving_task = tokio::spawn(async move{
+        while let Some(mut resp) = cloned_rx1.lock().await.recv().await{
+            println!("received data from channel: {:?}", resp);
+        }
+        return String::from("wildonion");
+    });
+    
+
+    /////////////////////////////////////////////////
+    ///////// USE MUTEX INSTEAD OF CHANNELS /////////
+    /////////////////////////////////////////////////
+    // note that it's better to lock on a data inside 
+    // another thread to avoid blocking executions cause
+    // locking can block the execution! even if it's async!
+    let locking_task = tokio::spawn(async move{
+        let mut get_data = DATA.lock().await;
+        (*get_data) = String::from("globally_mutated");
+    });
+    
+    // control the execution flow of async tasks
+    tokio::select!{
+        _ = locking_task => {
+            // if the locking task solves earlier do the 
+            // following and cancel other branches
+            // ...
+        },
+        _ = receiving_task => {
+            // if the receiving task solves earlier do the 
+            // following and cancel other branches
+            // ...
+        }
+    }
+
 }
 
 pub async fn test_code_order_exec(){
