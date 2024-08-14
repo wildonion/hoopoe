@@ -226,7 +226,7 @@ impl TransactionExt for Transaction{
 
 struct StatelessTransactionPool{
     pub lock: std::sync::Mutex<()>, // the pool is locked and busy 
-    pub worker: tokio::sync::Mutex<tokio::task::JoinHandle<Transaction>> // background worker thread to execute a transaction
+    pub worker: std::sync::Mutex<tokio::task::JoinHandle<Transaction>> // background worker thread to execute a transaction
 }
 
 impl Actor for StatelessTransactionPool{
@@ -336,6 +336,31 @@ impl PaymentProcess<PayPal> for PaymentWallet{
         
         // process all transactions with the paypal gateway
         // ...
+
+        todo!()
+
+    }
+}
+
+impl PaymentProcess<ZarinPal> for PaymentWallet{
+    type Status = AtomicU8;
+
+    // future traits as objects must be completelly a separate type
+    // which can be achieved by pinning the boxed version of future obj 
+    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+    
+    type Wallet = Self;
+
+    async fn pay<O: Send + Sync + 'static>(&self, gateway: ZarinPal) -> Self::Output<O> {
+
+        // either clone or borrow it to avoid from moving out of the self 
+        // cause self is behind reference which is not allowed by Rust 
+        // to move it around or take its ownership.
+        let txes: &Vec<Transaction> = self.transactions.as_ref();
+        
+        // process all transactions with the paypal gateway
+        // ...
+        
 
         todo!()
 
