@@ -1,11 +1,7 @@
 
 
 
-
-use serde::{Serialize, Deserialize};
-
-use crate::models::user::UserData;
-
+use crate::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Fetch{
@@ -42,6 +38,63 @@ impl Fetch{
 
     }
 
+    pub async fn delete(&self, body: serde_json::Value) -> serde_json::Value{
+        
+        let check_token_endpoint = format!("{}{}", self.base_url, self.path);
+        let jwt = self.auth_token.clone();
+                    
+        let req = reqwest::Client::new();
+        let res = req
+            .delete(check_token_endpoint)
+            .header("Authorization", &jwt)
+            .json(&body) // json value can only be sent using json() method
+            .send()
+            .await
+            .unwrap();
+        
+        let json_data = res.json::<serde_json::Value>().await.unwrap();
+        json_data
+
+    }
+
+    pub async fn put(&self, body: serde_json::Value) -> serde_json::Value{
+        
+        let check_token_endpoint = format!("{}{}", self.base_url, self.path);
+        let jwt = self.auth_token.clone();
+                    
+        let req = reqwest::Client::new();
+        let res = req
+            .put(check_token_endpoint)
+            .header("Authorization", &jwt)
+            .json(&body) // json value can only be sent using json() method
+            .send()
+            .await
+            .unwrap();
+        
+        let json_data = res.json::<serde_json::Value>().await.unwrap();
+        json_data
+
+    }
+
+    pub async fn patch(&self, body: serde_json::Value) -> serde_json::Value{
+        
+        let check_token_endpoint = format!("{}{}", self.base_url, self.path);
+        let jwt = self.auth_token.clone();
+                    
+        let req = reqwest::Client::new();
+        let res = req
+            .patch(check_token_endpoint)
+            .header("Authorization", &jwt)
+            .json(&body) // json value can only be sent using json() method
+            .send()
+            .await
+            .unwrap();
+        
+        let json_data = res.json::<serde_json::Value>().await.unwrap();
+        json_data
+
+    }
+
     pub async fn post(&self, body: serde_json::Value) -> serde_json::Value{
 
         let check_token_endpoint = format!("{}{}", self.base_url, self.path);
@@ -56,8 +109,8 @@ impl Fetch{
             .await
             .unwrap();
         
-        let status_code = res.status().as_u16();
-        serde_json::json!({"data": &[None::<String>], "status": status_code, "is_err": true})
+        let json_data = res.json::<serde_json::Value>().await.unwrap();
+        json_data
         
     }
 
