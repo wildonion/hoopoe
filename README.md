@@ -59,16 +59,17 @@ i'm hoopoe, the social event platform allows your hoop get heard!
 ### proper way to write and handle async task execution! 
 
 > [!IMPORTANT]
-> every async task must be spawned in a free thread using a background worker which can be done via `tokio::spawn()`, it's like creating a worker per each async task.
+> every async task must be spawned in a light io thread using a background worker which can be done via `tokio::spawn()`, it's like creating a worker per each async task, async tasks or jobs are none blocking io operations which requires a none blocking scope to execute them.
 
 ```rust
-async fn heavy_process(){
+async fn heavy_io_process_(){
     // it can be one of the following tasks:
     // --> consuming task: send consume message to consumer actor
     // --> producing task: send produce message to producer actor
     // --> storing in db: send data to mutator actor 
     // --> storing in redis: cache on redis with exp key
-    // --> locking logic 
+    // --> locking logic
+    // --> db operations 
 }
 
 let (tx, rx) = channel::<String>(); // channel for stringified data
@@ -76,7 +77,7 @@ let tx = tx.clone();
 // spawn in the background and use channel to receive 
 // data whenever the data is sent to the channel
 tokio::spawn(async move{
-    let res = heavy_process().await;
+    let res = heavy_io_process_().await;
     tx.send(res).await;
 });
 while let Some(data) = rx.recv().await{
@@ -93,7 +94,7 @@ while let Some(data) = rx.recv().await{
 // and once it's solved we then proceed with the rest
 // of flow and cacnel other branches or async tasks
 let task = tokio::spawn(async move{
-    let res = heavy_process().await;
+    let res = heavy_io_process_().await;
     tx.send(res).await;
 });
 

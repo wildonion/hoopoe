@@ -12,7 +12,92 @@
 			"item": [
 				{
 					"name": "Hoop",
-					"item": []
+					"item": [
+						{
+							"name": "Add Hoop",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJfaWQiOjYsInVzZXJfcm9sZSI6IlVzZXIiLCJ0b2tlbl90aW1lIjoxNzE3NTY5ODU3MDM5OTkwNjE4LCJpc19yZWZyZXNoIjpmYWxzZSwiZXhwIjoxODE3NDQ4MjU3LCJpYXQiOjE3MTc1Njk4NTd9.jyzdJD9jLUIrHgRXhoX3_FL_SwhFU9Q_hqh1fhm7EOWk6URwGewBhRRWn0WzQ-EENNc5vTO9DUheQO2JuLTswQ",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "cover",
+											"type": "file",
+											"src": "/Users/wildonion/Desktop/onion.png"
+										},
+										{
+											"key": "etype",
+											"value": "chatroom",
+											"type": "text"
+										},
+										{
+											"key": "manager",
+											"value": "1",
+											"type": "text"
+										},
+										{
+											"key": "entrance_fee",
+											"value": "20",
+											"type": "text"
+										},
+										{
+											"key": "title",
+											"value": "first event ",
+											"type": "text"
+										},
+										{
+											"key": "description",
+											"value": "let's gather together",
+											"type": "text"
+										},
+										{
+											"key": "started_at",
+											"value": "17578657778",
+											"type": "text"
+										},
+										{
+											"key": "duration",
+											"value": "160",
+											"type": "text"
+										},
+										{
+											"key": "capacity",
+											"value": "200",
+											"type": "text"
+										},
+										{
+											"key": "participants",
+											"value": "[2, 4, 6]",
+											"type": "text"
+										},
+										{
+											"key": "invitations",
+											"value": "[{\"entrance_fee\": 10, \"friend_id\": 8}]",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{hoop-v1}}",
+									"host": [
+										"{{hoop-v1}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
 				},
 				{
 					"name": "Notif",
@@ -409,6 +494,11 @@
 		{
 			"key": "auth-v1",
 			"value": "http://localhost:2344/v1/auth",
+			"type": "string"
+		},
+		{
+			"key": "hoop-v1",
+			"value": "http://localhost:2344/v1/hoop",
 			"type": "string"
 		},
 		{
