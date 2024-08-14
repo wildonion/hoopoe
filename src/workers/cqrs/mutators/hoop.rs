@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 use actix::prelude::*;
 use tonic::IntoRequest;
 use std::sync::Arc;
+use std::thread;
 use actix::{Actor, AsyncContext, Context};
 use crate::workers::zerlog::ZerLogProducerActor;
 use crate::entities::{self, hoops, users_hoops};
@@ -310,6 +311,8 @@ impl Handler<RawStoreHoopEvent> for HoopMutatorActor{
 
         let mut this = self.clone();
         
+        // store the hoop in a light io thread since 
+        // db operations are io thread must not get blocked
         if local_spawn{
             async move{
                 this.raw_store(hoop).await;

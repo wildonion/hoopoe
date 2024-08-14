@@ -14,6 +14,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use wallexerr::misc::Wallet;
 use workers::zerlog::ZerLogProducerActor;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
+use migration::{Migrator, MigratorTrait};
 
 
 pub trait HoopoeService<G: Send + Sync>{ // supports polymorphism
@@ -139,8 +140,10 @@ impl HoopoeServer{
 
     }
 
-    pub async fn injectService<T: Send + Sync, N, G: Send + Sync>(&mut self, service: impl HoopoeService<T>)
+    pub async fn injectService<T: Send + Sync, N, G: Send + Sync>(&mut self, mut service: impl HoopoeService<T>)
         where N: HoopoeService<G, Service: Send + Sync>{ // binding Service GAT to traits
+            
+            service.run().await;
 
             // service is an static dispatch which is an instance 
             // of any type who implements the HoopoeService trait
@@ -161,26 +164,27 @@ impl HoopoeServer{
 
         let app_ctx = &self.app_ctx;
         let db_url = &app_ctx.as_ref().unwrap().config.as_ref().unwrap().vars.DATABASE_URL;
-
+ 
         /* -ˋˏ✄┈┈┈┈ migrating on startup
             >_ ORM checks on its own that the db is up to create the pool connection
             it won't start the app if the db is off, makes sure you've started
             the pg db server
-        */
+        */ 
         let args = cli::ServerKind::parse();
         let connection = sea_orm::Database::connect(
             db_url
         ).await.unwrap();
         let fresh = args.fresh;
+        // migration process at runtime
         if fresh{
             log::info!("fresh db...");
             Migrator::fresh(&connection).await.unwrap();
             Migrator::refresh(&connection).await.unwrap();
-        } else{
+        } else{ 
             Migrator::up(&connection, None).await.unwrap();
-        }
-        
+        }       
         Migrator::status(&connection).await.unwrap();
+
     }
 
     // wrapping around the whole apis and make them as a service
@@ -205,7 +209,7 @@ impl HoopoeServer{
     pub async fn run(self){ 
         let Self { service, addr, ssl_domain, app_ctx } = self;
         if ssl_domain.is_some() && !ssl_domain.as_ref().unwrap().is_empty(){
-            
+
             let mut apis = Self::internalBuildRouter(app_ctx);
             let serv = service.unwrap();
 
@@ -229,7 +233,7 @@ impl HoopoeServer{
     pub async fn runOverHTTP3(self){
         
         let Self { service, addr, app_ctx, ssl_domain } = self;
-        let serv = service.unwrap(); // contains apis 
+        let serv = service.unwrap(); // contains apis
 
         // include_bytes!{} macro loads a file in form of utf8 bytes array,
         // since it's a macro thus it checks the paths at compile time!
