@@ -104,7 +104,9 @@
 //-----------------------------------------------------------------------------------------------------
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use constants::PRODUC_IDS;
 use interfaces::product::ProductExt;
+use salvo::concurrency_limiter;
 use serde::{Deserialize, Serialize};
 use crate::{constants::PURCHASE_DEMO_LOCK_MUTEX, *};
 
@@ -253,6 +255,12 @@ impl ProductExt for Product{
     step4) otherwise we can proceed to minting process
 */
 pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+
+    /* ___ IMPORTANT
+      ╰┈➤ in handling async future io tasks remember to use Mutex in a separate light io threads
+        to avoid blocking the main or actual thread the request is being handled in like always 
+        do the lock process of PURCHASE_DEMO_LOCK_MUTEX inside a separate thread of tokio::spawn()
+    */
 
     let Product { pid, buyer_id, is_minted } = product.clone();
 

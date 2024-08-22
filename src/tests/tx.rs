@@ -5,6 +5,7 @@ use interfaces::payment::PaymentProcess;
 use models::event::ActionType;
 use notif::ProduceNotif;
 use rand_chacha::ChaCha12Core;
+use salvo::rate_limiter::QuotaGetter;
 use wallexerr::misc::Wallet;
 use crate::interfaces::tx::TransactionExt;
 use crate::*;
@@ -128,20 +129,34 @@ impl Transaction{
     pub fn on_reject<R>(r: R) where R: FnMut() -> () + Send + Sync + 'static{ // reject is of type a closure trait
         
     }
+
+    pub fn queueTx(&mut self){
+        self.status = TxStatus::Queued
+    }
+
+    pub fn pendingTx(&mut self){
+        self.status = TxStatus::Pending
+    }
+
+    pub fn commitTx(&mut self){
+        self.status = TxStatus::Committed
+    }
     
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq)]
 pub enum TxStatus{
     #[default]
     Started,
+    Queued,
+    Pending,
     Committed,
     Dropped,
     Mined,
     Rejected(FailedTx),
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq)]
 pub struct FailedTx{
     time: i64,
     cause: String
@@ -208,8 +223,8 @@ impl TransactionExt for Transaction{
         // sys treasury = 2.5 % of current amount 
         // ...
 
+        tx_data.commitTx(); // commit the tx
         tx_data
-
 
     }
 
@@ -225,10 +240,31 @@ impl TransactionExt for Transaction{
 
 
 struct StatelessTransactionPool{
-    pub lock: std::sync::Mutex<()>, // the pool is locked and busy 
-    pub worker: std::sync::Mutex<tokio::task::JoinHandle<Transaction>> // background worker thread to execute a transaction
+    pub lock: tokio::sync::Mutex<()>, // the pool is locked and busy 
+    pub worker: tokio::sync::Mutex<tokio::task::JoinHandle<()>>, // background worker thread to execute a transaction
+    pub queue: std::sync::Arc<tokio::sync::Mutex<Vec<Transaction>>>, // a queue contains all queued transactions
+    pub broadcaster: tokio::sync::mpsc::Sender<Transaction>
 }
 
+impl StatelessTransactionPool{
+    
+    pub fn new(broadcaster: tokio::sync::mpsc::Sender<Transaction>) -> Self{
+        Self { 
+            lock: tokio::sync::Mutex::new(()), 
+            worker: tokio::sync::Mutex::new(tokio::spawn(async move{ () })), 
+            broadcaster,
+            queue: std::sync::Arc::new(tokio::sync::Mutex::new(vec![]))
+        }
+    }
+
+    pub async fn push(&mut self, tx: Transaction){
+        let mut get_queue = self.queue.lock().await;
+        (*get_queue).push(tx.clone());
+        let sender = self.broadcaster.clone();
+        sender.send(tx).await;
+    }
+
+}
 impl Actor for StatelessTransactionPool{
     
     type Context = Context<Self>;
@@ -250,6 +286,11 @@ impl ActixMessageHandler<Send2Pool> for StatelessTransactionPool{
         let producer = msg.tx_producer;
         let spawn_local = msg.spawn_local;
         let cloned_tx = tx.clone();
+
+        // send only queued transaction to the pool
+        if tx.status != TxStatus::Queued{
+            return;
+        }
 
         let prod_notif = 
             ProduceNotif{
@@ -287,6 +328,7 @@ impl ActixMessageHandler<Send2Pool> for StatelessTransactionPool{
     }
 
 }
+
 // send Execute message to the actor to execute a tx 
 impl ActixMessageHandler<Execute> for StatelessTransactionPool{
     type Result = ();
@@ -304,65 +346,258 @@ impl ActixMessageHandler<Execute> for StatelessTransactionPool{
 
 }
 
-
-
-//         SOLID BASED DESIGN PATTERN FOR PAYMENT
-// there should be always a rely solution on abstractions like 
-// implementing trait for struct and extending its behaviour 
-// instead of changing the actual code base and concrete impls. 
-struct PayPal; // paypal gateway
-struct ZarinPal; // zarinpal gateway
-
-struct PaymentWallet{
-    pub owner: String,
-    pub transactions: Vec<Transaction> // transactions that need to be executed
-}
-
-impl PaymentProcess<PayPal> for PaymentWallet{
-    type Status = AtomicU8;
-
-    // future traits as objects must be completelly a separate type
-    // which can be achieved by pinning the boxed version of future obj 
-    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+pub async fn any_type_dyn_stat_dispatch(){
     
-    type Wallet = Self;
-
-    async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {
-
-        // either clone or borrow it to avoid from moving out of the self 
-        // cause self is behind reference which is not allowed by Rust 
-        // to move it around or take its ownership.
-        let txes: &Vec<Transaction> = self.transactions.as_ref();
+    // ---------------------------------------------------------
+    //         SOLID BASED DESIGN PATTERN FOR PAYMENT
+    // ---------------------------------------------------------
+    // there should be always a rely solution on abstractions like 
+    // implementing trait for struct and extending its behaviour 
+    // instead of changing the actual code base and concrete impls. 
+    struct PayPal; // paypal gateway
+    struct ZarinPal; // zarinpal gateway
+    
+    struct PaymentWallet{
+        pub owner: String,
+        pub id: uuid::Uuid,
+        pub transactions: Vec<Transaction> // transactions that need to be executed
+    }
+    
+    impl PaymentProcess<PayPal> for PaymentWallet{
+        type Status = AtomicU8;
+    
+        // future traits as objects must be completelly a separate type
+        // which can be achieved by pinning the boxed version of future obj 
+        type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
         
-        // process all transactions with the paypal gateway
-        // ...
+        type Wallet = Self;
+    
+        async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {
+    
+            // either clone or borrow it to avoid from moving out of the self 
+            // cause self is behind reference which is not allowed by Rust 
+            // to move it around or take its ownership.
+            let txes: &Vec<Transaction> = self.transactions.as_ref();
+            
+            // process all transactions with the paypal gateway
+            // ...
+    
+            todo!()
+    
+        }
+    }
+    
+    impl PaymentProcess<ZarinPal> for PaymentWallet{
+        type Status = AtomicU8;
+    
+        // future traits as objects must be completelly a separate type
+        // which can be achieved by pinning the boxed version of future obj 
+        type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+        
+        type Wallet = Self;
+    
+        async fn pay<O: Send + Sync + 'static>(&self, gateway: ZarinPal) -> Self::Output<O> {
+    
+            // either clone or borrow it to avoid from moving out of the self 
+            // cause self is behind reference which is not allowed by Rust 
+            // to move it around or take its ownership.
+            let txes: &Vec<Transaction> = self.transactions.as_ref();
+            
+            // process all transactions with the paypal gateway
+            // ...
+            
+    
+            todo!()
+    
+        }
+    }
 
-        todo!()
+    // spawn a tokio thread for every request in a lightweight
+    async fn getCode<O: Send + Sync + 'static>(param: O) 
+        -> impl std::future::Future<Output=O> + Send + Sync + 'static{
+        // the return type is a type which impls the trait directly through 
+        // static dispatch
+        async move{
+            param
+        }
+    }
+    tokio::spawn(getCode(String::from("wildonion")));
+
+    /* 
+        Access different types through a single interface to use common method of traits with either default 
+        or trait implementations we can impl the trait broadly for any possible types using impl Trair for T{} 
+        instead of implementing for every single type manually box pin, box dyn trait impl trait for dyn stat 
+        and poly implementations.
+        is, the type has been erased. As such, a dyn Trait reference contains two pointers. One pointer goes 
+        to the data (e.g., an instance of a struct). Another pointer goes to a map of method call names to 
+        function pointers (known as a virtual method table or vtable).
+        At run-time, when a method needs to be called on the dyn Trait, the vtable is consulted to get the 
+        function pointer and then that function pointer is called.
+        See the Reference for more information on trait objects and object safety.
+        Trade-offs
+        The above indirection is the additional runtime cost of calling a function on a dyn Trait. Methods 
+        called by dynamic dispatch generally cannot be inlined by the compiler.
+        However, dyn Trait is likely to produce smaller code than impl Trait / generic parameters as the 
+        method won't be duplicated for each concrete type.
+    */
+    trait AnyTypeCanBe1<T>: Send + Sync + 'static{
+        fn getNickName(&self) -> String{
+            String::from("")
+        }
+    }
+    impl<T: Send + Sync + 'static> AnyTypeCanBe1<T> for T{}
+    struct InGamePlayer{}
+    let player = InGamePlayer{};
+    player.getNickName(); // don't need to impl AnyTypeCanBe1 for InGamePlayer cause it's already implemented for any T
+
+    
+    // handling pushing into the map using trait polymorphism
+    trait AnyTypeCanBe{}
+    impl<T> AnyTypeCanBe for T{} // impl AnyTypeCanBe for every T, reduces the time of implementing trait
+    let any_map1: std::collections::HashMap<String, Box<dyn AnyTypeCanBe + Send + Sync + 'static>>;
+    let mut any_map1 = std::collections::HashMap::new();
+    any_map1.insert(String::from("wildonion"), Box::new(0));
+    // or 
+    // any_map1.insert(String::from("wildonion"), Box::new(String::from("")));
+
+    // to have any types we can dynamically dispatch the Any trait which is an object safe trait
+    type AnyType = Box<dyn std::any::Any + Send + Sync + 'static>;
+    let any_map: std::collections::HashMap<String, AnyType>; // the value can be any type impls the Any trait
+    let boxed_trait_object: Box<dyn AnyTypeCanBe>; // Boxed trait object
+    let arced_trait_object: std::sync::Arc<dyn AnyTypeCanBe>; // thread safe trait object
+
+    fn getTrait(t: &(dyn AnyTypeCanBe + Send)){ // dynamic dispatch
 
     }
+    fn getTrait1(t: impl AnyTypeCanBe + Send){ // static dispatch
+        
+    }
+
+
 }
 
-impl PaymentProcess<ZarinPal> for PaymentWallet{
-    type Status = AtomicU8;
-
-    // future traits as objects must be completelly a separate type
-    // which can be achieved by pinning the boxed version of future obj 
-    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+pub async fn solidDesignPattern(){
     
-    type Wallet = Self;
-
-    async fn pay<O: Send + Sync + 'static>(&self, gateway: ZarinPal) -> Self::Output<O> {
-
-        // either clone or borrow it to avoid from moving out of the self 
-        // cause self is behind reference which is not allowed by Rust 
-        // to move it around or take its ownership.
-        let txes: &Vec<Transaction> = self.transactions.as_ref();
+    /* ---------------------------------------------
+        a nice abstract and solid based codes:
+        traits and macrocosm and features:
+        traits are all about extending interface of struct and 
+        designing the real world absatract problems which don't 
+        need to be implemented directly on the object itself. 
+        dynamic dispatch: the trait must be object safe trait and since traits are not sized hence it would be: Box<dyn Trait> as the separate type
+        static dispatch : the trait must be implemented directly for the type and we're returning the trait using `impl Trait` syntax
+        polymorphism    : passing different types to trait to support different implementation through a single interface
+        dep injection   : combine all of the aboves
         
-        // process all transactions with the paypal gateway
-        // ...
-        
+        pass different types to method through a single interface using trait 
+        handling dep injection using Box<dyn and Mutex<dyn
+    */
 
-        todo!()
-
+    // use Box<dyn AnyType> for dynamic typing and dispatch
+    // use impl AnyType for static typing and dispatch 
+    // use trait for polymorphism like wallet payment portal
+    // pass Box<dyn AnyType in struct for dep injection  
+    // use Box::pin() to pin the future trait objects into the ram
+    // use onion, macrocosm and features to create plugin
+    trait ServiceExt{
+        fn getInstance(&self) -> &Box<dyn ServiceExt>;
     }
+    struct Service{
+        pub instance: Box<dyn ServiceExt> // injecting ServiceExt trait dependency 
+    }
+    impl ServiceExt for Service{
+        fn getInstance(&self) -> &Box<dyn ServiceExt> {
+            &self.instance
+        }
+    }
+    fn getService(service: impl ServiceExt){
+        let instance1 = service.getInstance();
+        let instance2 = instance1.getInstance();
+        instance2.getInstance();
+    }
+    
+    enum PortalError{
+        Success,
+        Failed
+    }
+
+    // buffer transaction events
+    struct Buffer<T>{
+        pub events: std::sync::Arc<std::sync::Mutex<Vec<T>>>,
+        pub size: usize
+    }
+    struct Event;
+    struct Transaction{
+        pub events: Buffer<Event>,
+    }
+
+    // the ZarinPalPortal struct
+    struct ZarinPalPortal;
+
+    // account structure for ZarinPalPortal gateway
+    struct Account<ZarinPalPortal>{
+        pub txes: Vec<Transaction>,
+        pub payment_portals: Vec<Box<dyn Portal<ZarinPalPortal, Gate = String>>>, // dynamic dispatch, will be triggered at runtime | default type param for the GAT
+    }
+
+    // main struct: wallet which contains different accounts
+    struct Wallet<P>{
+        pub accounts: Vec<Account<P>>,
+    }
+
+    // portal trait
+    trait Portal<P>{ // polymorphism, access different types through a single interface
+        type Gate: Send + Sync + 'static;
+        fn pay(&self, portal: P) -> Result<(), PortalError>;
+    }
+    
+    // wallet must support different portals
+    impl Portal<ZarinPalPortal> for Wallet<ZarinPalPortal>{
+        type Gate = String;
+        fn pay(&self, portal: ZarinPalPortal) -> Result<(), PortalError> {
+            Ok(())
+        }
+    }
+    
+    // ---=====---=====---=====---=====---=====---=====---=====---=====
+    // ---=====---=====---=====---=====---=====---=====---=====---=====
+
+    trait BuilderExt<T>{
+        type Builder;
+        fn build(&self, instance: T) -> std::io::Result<()>;
+    } 
+
+    // dependency injection,
+    // don't return Self in trait for dynamic dispatch
+    // default type param for GAT
+    // static dispatch
+    pub struct Context<A>{
+        pub builder: Box<dyn BuilderExt<A, Builder = A>> 
+    }
+
+    pub struct Account1{
+        pub owner: String,  
+    }
+    impl Account1{
+        pub fn transfer(&mut self, token: u64, to: String) -> Self{
+            // fetching heap data fields moves out the self so we should either use & or call clone on the self
+            // cause we are not allowed to move out of the self since it's behind &
+            let owner = &self.owner; 
+            todo!()
+        }
+    }
+    pub struct Builder;
+
+    impl BuilderExt<Account1> for Builder{
+        type Builder = Account1;
+        fn build(&self, mut instance: Account1) -> std::io::Result<()> {
+            instance.transfer(10, String::from("0x02"));
+            Ok(())
+        }
+    }
+
+    let account = Account1{owner: String::from("0x00")};
+    let ctx = Context::<Account1>{builder: Box::new(Builder)};
+
+
 }

@@ -177,14 +177,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         std::env::var("DATABASE_URL").unwrap()
     ).await.unwrap();
     let fresh = args.fresh;
-    if fresh{
-        Migrator::fresh(&connection).await.unwrap();
-        Migrator::refresh(&connection).await.unwrap();
-    } else{
-        Migrator::up(&connection, None).await.unwrap(); // executing database tasks like creating tables on startup
-    }
+    // if fresh{
+    //     Migrator::fresh(&connection).await.unwrap();
+    //     Migrator::refresh(&connection).await.unwrap();
+    // } else{
+    //     Migrator::up(&connection, None).await.unwrap(); // executing database tasks like creating tables on startup
+    // }
     
-    Migrator::status(&connection).await.unwrap();
+    // Migrator::status(&connection).await.unwrap();
     
     /* ******************************* IMPORTANT *******************************
        there must be some sleep or loop{} to keeps the app awake

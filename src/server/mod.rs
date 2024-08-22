@@ -176,14 +176,14 @@ impl HoopoeServer{
         ).await.unwrap();
         let fresh = args.fresh;
         // migration process at runtime
-        if fresh{
-            log::info!("fresh db...");
-            Migrator::fresh(&connection).await.unwrap();
-            Migrator::refresh(&connection).await.unwrap();
-        } else{ 
-            Migrator::up(&connection, None).await.unwrap();
-        }       
-        Migrator::status(&connection).await.unwrap();
+        // if fresh{
+        //     log::info!("fresh db...");
+        //     Migrator::fresh(&connection).await.unwrap();
+        //     Migrator::refresh(&connection).await.unwrap();
+        // } else{ 
+        //     Migrator::up(&connection, None).await.unwrap();
+        // }       
+        // Migrator::status(&connection).await.unwrap();
 
     }
 
@@ -230,6 +230,7 @@ impl HoopoeServer{
         }
     }
 
+    // surely needs ssl cert files 
     pub async fn runOverHTTP3(self){
         
         let Self { service, addr, app_ctx, ssl_domain } = self;

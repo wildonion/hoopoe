@@ -75,6 +75,7 @@ pub struct HoopEventForm{
     pub title: String,
     pub description: String,
     pub started_at: String,
+    pub end_at: String,
     pub duration: String, // in seconds
     pub capacity: String,
     pub participants: Vec<String>,

@@ -23,6 +23,7 @@ use crate::workers::notif::{NotifBrokerActor};
 use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::storage::engine::Storage;
+use crate::workers::scheduler::Scheduler;
 use actix::{Actor, Addr};
 use indexmap::IndexMap;
 use serde::{Serialize, Deserialize};
@@ -60,6 +61,7 @@ pub struct CqrsActors{
 pub struct ActorInstaces{
     pub broker_actors: BrokerActor,
     pub cqrs_actors: CqrsActors,
+    pub scheduler_actor: Addr<Scheduler>,
 }
 
 
@@ -69,11 +71,13 @@ pub struct Channels{
 
 pub struct NotifMpscChannel{
     pub sender: tokio::sync::mpsc::Sender<String>,
-    pub receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>>
+    // thread safe receiver since receiver must be mutable by default thus having 
+    // it in another thread requires to wrapp it around Arc and Mutex
+    pub receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>> 
 }
 
 #[derive(Clone)]
-pub struct AppContext{
+pub struct AppContext{ // we'll extract this instance from the depot in each api handler
     pub config: Option<std::sync::Arc<Context<ConfigEnv>>>,
     pub app_storage: Option<std::sync::Arc<Storage>>,
     pub actors: Option<ActorInstaces>,
@@ -111,6 +115,7 @@ impl AppContext{
         let notif_actor = NotifBrokerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone(), notif_broker_tx.clone()).start();
         let hoop_mutator_actor = HoopMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let hoop_accessor_actor = HoopAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+        let scheduler_actor = Scheduler::new(notif_actor.clone(), app_storage.clone(), notif_broker_tx.clone(), zerlog_producer_actor.clone()).start();
         
         let actor_instances = ActorInstaces{
             broker_actors: BrokerActor{
@@ -127,6 +132,7 @@ impl AppContext{
                     hoop_accessor_actor: hoop_accessor_actor.clone()
                 },
             },
+            scheduler_actor: scheduler_actor,
         };
         
         Self { 

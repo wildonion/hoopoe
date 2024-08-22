@@ -393,6 +393,10 @@ impl std::fmt::Display for HoopoeErrorResponse{
             to unwrap the exact source of the error without crashing the app at runtime.
   -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 */
+// impl From trait for every possible error of the HoopoeErrorResponse enables
+// use to call ? operator on the type which returns the HoopoeErrorResponse struct
+// the Rust compiler knows how to map and build the actual error from the type that
+// caused the error.
 impl From<std::io::Error> for HoopoeErrorResponse{ // building error instance from std::io::Errro, supports any tcp based server error 
     fn from(error: std::io::Error) -> Self {
         Self{ 

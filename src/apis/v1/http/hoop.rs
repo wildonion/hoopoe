@@ -6,6 +6,7 @@ use middlewares::check_token::check_token;
 use models::{event::{EventQuery, EventType, HoopEventForm}, user::UserData};
 use salvo::{http::form::FormData, Error};
 use serde::{Deserialize, Serialize};
+use models::server::Response as HoopoeResponse;
 use crate::*;
 
 
@@ -41,9 +42,11 @@ pub async fn add_hoop(
     hoop_info: FormBody<HoopEventForm>,
 ){
 
-
-    // trying to get the user data in here 
+    // extracting the required user_data from the depot, this gets filled 
+    // inside the middleware setup, if we're here means the middleware 
+    // has injected the right data into the depot.
     let user_data = depot.get::<UserData>("user_data").unwrap();
+    
 
     // extracting necessary structures from the app context
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context
@@ -51,11 +54,45 @@ pub async fn add_hoop(
     let sea_orm_pool = app_ctx.clone().unwrap().app_storage.clone().unwrap().get_seaorm_pool().await.unwrap();
     let actors = app_ctx.clone().unwrap().actors.unwrap();
     let hoop_mutator_actor_controller = actors.clone().cqrs_actors.mutators.hoop_mutator_actor;
+    let mut redis_conn = redis_pool.get().await.unwrap();
+
 
     let cover = req.file("cover").await.unwrap();
-    let decoded = serde_json::from_str::
+    let inv_info = serde_json::from_str::
         <Vec<std::collections::HashMap<String, i64>>>
         (&hoop_info.invitations.clone()).unwrap();
+
+
+    // setting up the exp time of the event inside the redis as an expirable key
+    // later on the scheduler actor can subscribe to redis expire channel 
+    let hoop_end_time = hoop_info.end_at.parse::<i64>().unwrap();
+    let hoop_start_time = hoop_info.started_at.parse::<i64>().unwrap();
+    if hoop_end_time < hoop_start_time{
+        // reject the request
+        let server_time = format!("{}", chrono::Local::now().to_string());
+        res.status_code = Some(StatusCode::NOT_ACCEPTABLE);
+        res.render(Json(
+            HoopoeResponse::<&[u8]>{ 
+                data: &[], 
+                message: "invalid end time", 
+                is_err: true, 
+                status: StatusCode::NOT_ACCEPTABLE.as_u16(),
+                meta: Some(
+                    serde_json::json!({
+                        "server_time": server_time
+                    })
+                )
+            }
+        ));
+    }
+
+    // set an exp key to check the end time of the event every 
+    // 10 mins without sending io calls to db
+    let now = chrono::Local::now();
+    let ten_mins_later = chrono::Local::now() + chrono::Duration::minutes(10);
+    let duration_in_seconds = ten_mins_later.timestamp() - now.timestamp();
+    let key = format!("hoop_{}_at_{}", hoop_info.title, hoop_info.started_at);
+    let _: () = redis_conn.set_ex(key, &user_data.username, duration_in_seconds as u64).await.unwrap();
 
     let etype = match hoop_info.etype.as_str(){
         "social" => EventType::SocialGathering,
@@ -110,50 +147,7 @@ pub async fn get_hoop(
     let sea_orm_pool = app_ctx.clone().unwrap().app_storage.clone().unwrap().get_seaorm_pool().await.unwrap();
     let actors = app_ctx.clone().unwrap().actors.unwrap();
     let hoop_mutator_actor_controller = actors.clone().cqrs_actors.mutators.hoop_mutator_actor;
-    let redis_conn = redis_pool.get().await.unwrap();
 
-
-    // trying to get the user data in here 
-    let user_data = depot.get::<UserData>("user_data").unwrap();
-
-    /* --------------------------------------------------------------------------------------------------------
-        event scheduler (check the endTime of the event constantly to close the event) 
-        resource-intensive with regular checking in a loop{}:
-            1 - an actor task or cron scheduler to check the end time of the hoop constantly to update the is_finished field
-            2 - loop tokio spawn interval tick then include!{} hoop_scheduler.rs to call the method 
-
-        the optimal and none intensive solution would be using of key space notifications 
-        which allows allow clients to subscribe to Pub/Sub channels in order to receive 
-        events affecting the Redis data set in some wayin Redis, however the followings 
-        are the steps must be taken to complete the logic. We're consuming that we have a 
-        user_id as the key and some value with an exportable key for 10mins later 
-        after login time. 
-
-            let login_time = chrono::Local::now();
-            let ten_mins_later = login_time + chrono::Duration::minutes(10);
-            redis_conn.set_exp(user_id, ten_mins_later);
-
-            1 - configuring Redis to enable key space notifications 
-            2 - when the key expires Redis publish its event to a prebuilt expiration channel 
-            2 - we then subscribe to the __keyevent@0__:expired channel
-            3 - we'll receive the event from the channel 
-            4 - trigger the notification for the related user id (expired key) 
-            5 - publish triggered notif to rmq producer using notif_borker_actor
-            6 - consume notif from rmq broker to cache on redis and store in db for future short pollings 
-            7 - send received notif to mpsc sender of the ws server 
-            8 - receive the notif from the mpsc channel inside ws server setup
-
-        at this time to send notif to client we can either 
-        cache the notif on Redis or store it on db, allows clients use short polling approach to 
-        fetch the notif through an interval process.
-        or another approach which is more resource intensive for push notification strategies 
-        is by using a channel (MPSC) to send the notif to a websocket server actor configuration 
-        thread from there send to the ws peer actor in realtime.
-        the ws setup could be an actor based setup which is more simpler to send messages to 
-        peer sessions from ws server through actor concepts like: 
-        atomic syncing with mutex rwlock and channels, os/async io threads or tasks, 
-        select, mailbox mpsc channels and task scheduler interval.
-    */
 
     // get live hoops (those ones that are not finished or expired)
     // get all owner hoops
@@ -162,6 +156,7 @@ pub async fn get_hoop(
     let query_params = req.parse_queries::<EventQuery>().unwrap();
 
     res.render("developing...")
+
 }
 
 #[endpoint]

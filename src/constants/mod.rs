@@ -1,7 +1,7 @@
 
 
 
-use std::sync::atomic::{AtomicU8, AtomicUsize};
+use std::sync::{atomic::{AtomicU8, AtomicUsize}, Mutex};
 use salvo::websocket::Message;
 use tokio::{sync::mpsc, time::Duration};
 use crate::*;
@@ -68,6 +68,8 @@ pub type WsRooms = RwLock<HashMap<String, HashSet<usize>>>; // a mapping between
 pub static ONLINE_USERS: Lazy<WsUsers> = Lazy::new(||{ WsUsers::default() }); // all online users
 pub static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1); // used as a thread safe user id, this would be simply a usize in actor state cause actors are an isolated and thread safe objects 
 pub static WS_ROOMS: Lazy<WsRooms> = Lazy::new(||{ WsRooms::default() }); // thread safe map between event room and all user ids in that room 
+
+pub static PRODUC_IDS: Lazy<Arc<Mutex<Vec<i32>>>> = Lazy::new(||{Arc::new(Mutex::new(vec![]))});
 
 pub const APP_NAME: &str = "Hoopoe";
 pub const APP_DOMAIN: &str = "hoopoe.app";
