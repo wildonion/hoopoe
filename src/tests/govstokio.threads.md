@@ -35,3 +35,41 @@ waiting means please block the thread so i can get the result but executing the 
 
 ### Conclusion:
 While Go's goroutines can handle blocking I/O without freezing the entire program, they do so by relying on the Go runtime's ability to manage and schedule OS threads. This is different from Tokio's approach, where tasks are non-blocking by design, and concurrency is achieved through an event-driven model. Both approaches are effective, but they cater to different programming paradigms and use cases.
+
+### What Does "Pausing" Mean?
+
+When you `await` a future in Rust, the following happens:
+
+1. **Suspension of the Current Task**: The current asynchronous function (or "task") is suspended at the point where the `await` is called. This means that the function will not proceed to the next line of code until the future being awaited is ready to yield a result.
+
+2. **Non-blocking Wait**: This suspension does **not** block the entire thread. Instead, it allows the runtime (e.g., the Tokio runtime) to schedule and run other asynchronous tasks or operations on the same thread. The runtime can continue executing other tasks in the same thread while the current task is waiting.
+
+3. **Event Loop**: The Tokio runtime, or any async runtime, works on an event loop model. When you `await` a future, the event loop is notified that the current task is not ready to continue. The event loop then picks another task from the queue and runs it. When the awaited future is ready (e.g., when an I/O operation completes or a timer expires), the runtime resumes the suspended task exactly where it left off.
+
+4. **Resumption**: Once the awaited future is ready, the task is resumed, and the code after the `await` is executed. This happens in the same thread where the task was originally running unless the runtime decides to move it to another thread (which usually doesn't happen unless you use specific APIs).
+
+### Key Points About `await`:
+
+- **Non-blocking**: The key aspect of `await` is that it doesn't block the thread. Instead, it allows other tasks to run in that thread. If you had multiple async tasks running, they could be interleaved by the runtime without any of them blocking the others.
+
+- **Cooperative Multitasking**: The async model in Rust is based on cooperative multitasking, where tasks yield control at certain points (like when `await` is called) so that other tasks can be scheduled.
+
+- **Single-Threaded Context**: If you're using a single-threaded async runtime, all tasks run on the same thread, but they don't block each other because of this cooperative nature. If you're using a multi-threaded runtime, tasks can be moved between threads, but the principle remains the same.
+
+### Practical Example:
+
+Here's an analogy:
+
+- Imagine you have several workers (async tasks) who are all using the same desk (thread). When one worker needs to wait for a long operation (like fetching data), they get up from the desk (the task is suspended) and let another worker sit down and use the desk (another task runs).
+- The first worker doesn't block the desk (the thread) while waiting—they're effectively pausing their work but allowing others to use the resources.
+
+### Misunderstanding About Thread Blocking:
+
+`await` **does not block** the thread like a traditional blocking operation (`std::thread::sleep` or I/O blocking). Instead, it allows the runtime to manage other tasks while waiting. The thread is free to do other work until the awaited future completes.
+
+### Summary:
+
+- **Pausing**: When we say `await` "pauses" the execution, it means the current async function is suspended until the awaited future is ready, but this suspension is non-blocking.
+- **Runtime Flexibility**: The runtime can continue running other tasks on the same thread, making full use of the available resources without any blocking, hence the term "non-blocking wait."
+
+This allows asynchronous programs to be efficient and responsive, as multiple tasks can progress concurrently without traditional thread blocking.

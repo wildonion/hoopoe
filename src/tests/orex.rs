@@ -65,7 +65,7 @@ use crate::*;
     to execute which task at when!? actually the runtime also stores all 
     the threads in a queue and then go for their execution based on its algo.
     tokio uses work stealing approach, so when a worker's run queue is empty, 
-    it tries to “steal” tasks from other workers' queues to execute
+    it tries to "steal" tasks from other workers' queues to execute
     with tokio::spawn we're telling the runtime: schedule this task
     to be executed outside of the main or current thread. 
     the migration of threads between processors is expensive, as it involves 
@@ -661,5 +661,123 @@ pub async fn openFile1(path: &str) -> Result<String, Box<dyn std::error::Error +
     let signature = wallet.self_ed25519_sign(&content, &prvkey).unwrap();
 
     Ok(signature)
+
+}
+
+// none blocking execution of all io tasks in lightweight threads 
+pub async fn runAsynclyAndConcurrently(){
+
+    /* 
+        in the context of os threads the runtime and the whole thread gets blocked 
+        by waiting or joining on the thread hence the thread won't be able to execute
+        other taks until the awaited one has finished running on the other hand 
+        with tokio light threads the runtime won't gets blocked it executes async io
+        tasks in a none blocking way by suspending the function execution and pausing
+        it in there but continue with executing other async tasks in a none blocking 
+        manner:
+            we use await on the future 
+            runtime uses a thread to execute the future 
+            the thread tells the eventloop that the future is not ready, 
+            pop another future out of your queue and execute it in my context
+            also don't block me go for executing other async tasks in other 
+            threads, i'll notify the caller as soon as the future completes.
+
+
+        in the context of light threads the thread won't gets blocked and execute
+        task in a none blocking way like the current asynchronous function (or "task") 
+        is suspended at the point where the await is called. this means that the 
+        function will not proceed to the next line of code until the future being 
+        awaited is ready to yield a result, this suspension does not block the entire 
+        thread. instead, it allows the runtime (e.g., the tokio runtime) to schedule 
+        and run other asynchronous tasks or operations on the same thread. the runtime 
+        can continue executing other tasks in the same thread while the current 
+        task is waiting. when you await a future, the event loop is notified that the 
+        current task is not ready to continue. the event loop then picks another task 
+        from the queue and runs it. When the awaited future is ready (e.g., when an 
+        I/O operation completes or a timer expires), the runtime resumes the suspended 
+        task exactly where it left off, once the awaited future is ready, the task is 
+        resumed, and the code after the await is executed. this happens in the same 
+        thread where the task was originally running unless the runtime decides to move 
+        it to another thread (which usually doesn’t happen unless you use specific APIs).
+
+        NOTE: await keyword pauses the execution before continuing to execute the rest of the code, 
+              it doesn't block the thread it allows other asynchronous tasks to run during this pause. 
+              don't await for spawned tasks to finish, cause they're running in the background, waiting
+              for them pauses the execution in here.
+
+        NOTE: tokio light threads used for executing io tasks in a none blocking manner
+              os threads used for executing cpu bound tasks in a blocking manner.
+
+        NOTE: await pauses the function execution in there and suspend the code 
+              but don't block the thread it allows runtime to tell the eventloop
+              that the task is not ready yet so pop out another one from the queue
+              and execute in the same thread until i notify the caller that the
+              has completed.
+        
+        NOTE: don't use os threads in an async context, they blocks the 
+              caller or main threads and don't allow the tokio runtime 
+              to execute tasks asyncly and concurrently!
+
+        NOTE: we can await on the spawned tokio ligh threads, doing so 
+              pauses the execution in there but don't block the caller 
+              thread and allows other async tasks continue executing during 
+              the pause, we can also let the tokio spawn task execute in the
+              background by not waiting for them. 
+
+        use os threads for cryptography and graph tasks
+        use tokio threads for async future io tasks 
+        both os and light threads can be solved in the background
+        join on os thread blocks and await on tokio thread pauses the execution
+        both join and await will wait for the task to complete but in tokio is a none blocking manner
+        await on tokio threads don't block the caller thread instead it continues executing other async tasks
+        tokio threads execute their tasks by poping them out from their queue in a none blocking way 
+        os threads execute their tasks by poping them out from their queue in a blocking way 
+        join (await) on tokio light threads: 
+             the runtime scheduler uses an eventloop which
+             pauses the execution of async object in that thread 
+             until the future it is waiting on is ready to produce a value, it allows the runtime 
+             to continue executing other tasks on the same thread (or on other threads in a 
+             multi-threaded runtime) while the current task is waiting.
+        join (wait) on os threads: 
+             wait for the thread to finish by blocking the caller thread.
+    */ 
+
+    // all async tasks which are spawned inside the tokio spawn thread
+    // are scheduled by the tokio runtime and run concurrently.
+    // spawn an sleep inside the background thread, it executes
+    // it in the background ligh thread meanwhile allows other
+    // tasks continue with executing 
+    tokio::spawn(async move{
+        println!("waiting asyncly for 2 seconds");
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        println!("finish 2 seconds");
+    });
+
+    // don't use std thread sleep cause it blocks the entire thread including
+    // the tokio runtime and won't let async tasks get executed concurrently!
+    // none blocking delays
+    tokio::spawn(async move{
+        println!("sleeping 10 seconds...");
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        println!("wake up after 10 secs...");
+    });
+
+    // all async tasks which are spawned inside the tokio spawn thread
+    // are scheduled by the tokio runtime and run concurrently.
+    // spawn an sleep inside the background thread, it executes
+    // it in the background ligh thread meanwhile allows other
+    // tasks continue with executing
+    tokio::spawn(async move{
+        println!("waiting asyncly for 3 seconds");
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+        println!("finish 3 seconds");
+    });    
+
+    // wait for all tasks to complete
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+    // -- don't use select! cause it will wake up whichever future completes first, 
+    // but it doesn’t block the other futures from running.
+    // -- don't use os threads cause they block the main thread and wait for the task to complete
 
 }

@@ -473,7 +473,7 @@ pub async fn ExecutorEventLoop(){
     // concurrency      : (&mut <-> Mutex RwLock)
     // threadpool       : light or os threads, eventloop (threadpool channel queue to handle events in a loop see actor.rs with threadpool)
     // atomic syncing   : channels mutex rwlock arc select
-    // future objects   : async io task, thread joining on main thread
+    // future objects   : async io task, thread joining on main (caller) thread
     // purchase locking : lock the object when someone is minting it using select mutex spawn
     
     /*
@@ -578,11 +578,11 @@ pub fn StockPriceEvent(){
         process is happening inside each thread. 
         then in the function we're calling the wait for release which lock the 
         stock again and checks its price against a limit causes to block the 
-        main thread until the price of the stock is smaller than the limit, it 
+        main (caller) thread until the price of the stock is smaller than the limit, it 
         depends on the update price every time the update price function update 
         the price of the stock a notif gets triggered which will be checked 
         by the wait for release method to check the price agains the limit this 
-        process continues constantly the main thread is blocked until the price 
+        process continues constantly the main (caller) thread is blocked until the price 
         reaches a higher amount than the limit.
     */
 
@@ -665,7 +665,7 @@ pub fn StockPriceEvent(){
             blocked. once the prices reaches the limit, the wait() method will return. the method will 
             exit the loop and continue executing.
             using a Condvar in this way, we can effectively manage access to the Stock. By using the 
-            wait_for_release() method, the main thread waits for the price of the Stock to reach a certain 
+            wait_for_release() method, the main (caller) thread waits for the price of the Stock to reach a certain 
             limit before proceeding. this is useful in scenarios where the order of operations matters, 
             for example when one operation depends on the result of another. example scenarios would be 
             things like managing stocks, purchasing a product, or a warehouse ledger system.
@@ -685,16 +685,16 @@ pub fn StockPriceEvent(){
     /* 
         testing:
         basically in here we're updating the price 
-        in 10 threads and block the main thread if 
+        in 10 threads and block the main (caller) thread if 
         the price is smaller than the limit until 
         we notify the blocked thread by the condvar 
         that the price value is changed, then there 
         would be no need to wait for the notif until
         another thread tries to update the price.
         we spawn the update_price() method inside 10
-        threads then block the main thread if the price
+        threads then block the main (caller) thread if the price
         is not met the limit finally we iterate through 
-        all the threads to join them on the main thread
+        all the threads to join them on the main (caller) thread
         and wait for them to finish.
         waiting in os threads means blocking the thread 
         until we get the result.
@@ -717,10 +717,10 @@ pub fn StockPriceEvent(){
     // thread until the notifier notify the condvar in another 
     // thread with a new value of the price, then we'll wait and 
     // block the thread until the price reaches higher than the limit again.
-    // ------- this blocks the main thread -------
+    // ------- this blocks the main (caller) thread -------
     monitor.wait_for_release(); 
 
-    // join on all threads in main thread to execute the stock price task
+    // join on all threads in main (caller) thread to execute the stock price task
     for thread in threads{
         thread.join().unwrap();
     }
@@ -730,7 +730,7 @@ pub fn StockPriceEvent(){
     println!("final value of the stock is {:?}", final_value);
 
 
-    // wait_for_release() method blocks the main thread until we reach
+    // wait_for_release() method blocks the main (caller) thread until we reach
     // the limit, or receives a notification from the condvar which might
     // happens in another thread by updating the price of the stock.  
 
@@ -1094,8 +1094,11 @@ pub fn MutexCondvarPlayground(){
 
 }
 
-pub fn jobQChannelFromScratch(){
-    
+pub async fn jobQChannelFromScratch(){
+
+    // use trait to pass different types to a function through a single interface
+    // use Any to try to cast any type that impls Any trait into an specific type
+    // pass different functions to a method using Fn closure
     // dependency injection for observer field inside the Mutex (it can be other smart pointers like Arc and Box also)
 
     trait GetVal{
@@ -1120,6 +1123,18 @@ pub fn jobQChannelFromScratch(){
 
         // hanlding dynamic dispatch, supports any type through a single interface
         pub fn set_info(&mut self, val: V){
+
+            // cast the value into the Any trait, we could use Box also 
+            let any_val = &val as &dyn Any;
+            match any_val.downcast_ref::<String>(){
+                Some(string) => {
+                    // ...
+                },
+                None => {
+                    println!("can't downcast it to string");
+                }
+            };
+
             self.info = val.getVal();
             self.publish(val); // name has changed
         }
@@ -1178,7 +1193,7 @@ pub fn jobQChannelFromScratch(){
             // the subscription logic goes here
             // for now we're just logging things!
             println!("[subthread subscriber]");
-            println!("subscribing inside a thread > value is : {}", info);
+            println!("subscribing > value is : {}", info);
         });
 
         // updating the info field, will notify all subscribers 
@@ -1187,22 +1202,26 @@ pub fn jobQChannelFromScratch(){
     });
 
     // -------------------------------------------------------------
-    // working with person object completely inside the main thread.
+    // working with person object completely inside the main (caller) thread.
     // -------------------------------------------------------------
-    // block the main thread for subscription
+    // block the main (caller) thread for subscription
+    // subscribe() method push a new subscriber to the vector only
     person.lock().unwrap().subscribe(move |info|{
-        println!("[main thread subscriber]");
-        println!("subscribing inside the main thread > value is : {}", info)
+        println!("[main (caller) thread subscriber]");
+        println!("subscribing > value is : {}", info)
     });
-    // block the main thread for changing the ingo
+
+    // set_info() change the info field as well as notify subscribers 
+    // with the updated value
+    // block the main (caller) thread for changing the ingo
     person.lock().unwrap().set_info(String::from("28"));
 
-    // block the main thread to wait for the thread to complete the task
+    // block the main (caller) thread to wait for the thread to complete the task
+    // wait for the thread to finish, this method returns immediately if the 
+    // thread has already finished, so joining on the thread can be important 
+    // if we need a result coming from the thread otherwise the thread will
+    // be solved in the background like tokio spawn threads. 
     thread1.join().unwrap();
 
-
-    // use trait to pass different types to a function through a single interface
-    // use Any to try to cast any type that impls Any trait into an specific type
-    // pass different functions to a method using Fn closure
 
 }
