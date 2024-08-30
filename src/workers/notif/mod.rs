@@ -1,40 +1,86 @@
 
 
-
 /* ========================================================================================
-            a sexy actor to produce/consume messages to/from RMQ broker exchange
-            use rmq to fetch a massive data from the exchange in realtime manner
+       REALTIME NOTIF EVENT STREAMING DESIGN PATTERN (README files inside tests folder)
+ 
+    local & remote RPC channels : Kafka, RMQ, Redis pubsub, jobq mpsc, pg db 
+    thread safe eventloop queue : the receiver of each broker or the mpsc channel like Arc<Mutex<Recevier<Data>>>
+    queue                       : buffer of thread safe event objects like Buffer<Event>{data:Arc<Mutex<Vec<Event>>>}
+    syntax                      : while let Some(notif_data) = mpscReceiverEventloopOrRmqOrKafkaOrRedisSubscriber.recv().await{}
+    CronScheduler               : an actor background worker to call io periodically using ctx.run_interval(), loop{} and tokio time and spawn or redis key space notifications pubsub
+    storing and caching         : store and cache received notif data in pg db and on redis
+    node talking                : local talking with mailbox & remote talking with (JSON/G/Capnp)RPC
+    websocket config            : send received notif data through the ws mpsc sender / receive notif data in ws server scope 
+    notify notif owner          : through http short polling api or websocket streaming
+    async io runTime Executor   : using tokio spawn to spawn light io thread per each async io task  
+    NotifBrokerActor use cases  :
+        → wallet service prodcons actor with different payment portal => receive command object
+        → transactionpool service prodcons actor                      => receive transaction object
+        → product service prodcons actor                              => receive order object to purchase atomically
+    concurrency tools & notes   : 
+        → tokio::select, tokio::spawn, tokio::sync::{Mutex, mpsc, RwLock}, std::sync::{Condvar, Arc, Mutex}
+        → cpu tasks are graph and geo calculations as well as cryptography algorithms which are resource intensive
+        → async io tasks are io and networking calls which must be handled simultaneously in order to scale resources
+        → async io task execution inside light threadpool: wait on the task but don't block the thread, continue with executing other tasks
+        → cpu task execution inside os threadpool: suspend the thread of execution by blocking it, avoid executing other tasks 
+        → use await on the async io task to not to block the thread and let the thread execute other tasks meanwhile the task is waiting to be solved
+        → await pauses and suspends the function execution not the thread and tells the eventloop to pop out another task while the function is awaited
+        → use join on the cpu task to block the thread to suspend the thread execution with all tasks and wait for the result of the thread
+        → use Condvar to wait and block the thread until some data changes then notify the blocked thread
+        → don't use os threadpool in the context of light threadpool, they block the execution thread as well as the entire async runtime
+        → std mutex block the caller thread if the lock is busy it stops the thread from executing all tasks until it acquires the lock
+        → tokio mutex suspend the async task if the lock is busy it suspend the io task instead of blocking the executor thread
+        → std stuffs block and suspend the thread and stop it from executing other tasks while it doing some heavy operations inside the thread like mutex logics
+        → tokio stuffs suspend the async io task process instead of blocking the thread and allows the thread executing other tasks simultaneously
+        → use channels for atomic syncing between threads instead of using mutex in both async and none async context
+        → as soon as the future or async io task is ready to yeild a value the runtime meanwhile of handling other tasks would notify the caller about the result
+        → as soon as the the result of the task is ready to be returned from the os thread the os thread will be stopped blocking and continue with executing other tasks
+        → actors have their own os or ligh thread of execution which uses to spawn tasks they've received via message passing channels or mailbox
+        → to share a data between threads it must be Send Sync and live valid
+        → initialize storage and actors data structures once and pack them in AppContext struct then share this between threads
 
-    -ˋˏ✄┈┈┈┈
-    >_ the consuming task has been started by sending the ConsumeNotif message 
-    to this actor which will execute the streaming loop over the queue in 
-    either the notif consumer actor context itself or the tokio spawn thread:
+    ========================================================================================
+            a sexy actor to produce/consume messages from different type of brokers
+            it uses RMQ, Redis and Kafka to produce and consume massive messages in 
+            realtime, kindly it supports data AES256 encryption through producing 
+            messages to the broker.
 
-        notif consumer -----Q(Consume Payload)-----> Exchange -----notif CQRS writer-----> cache/store on Redis & db
 
-    -ˋˏ✄┈┈┈┈
-    >_ the producing task has been started by sending the ProduceNotif message 
-    to this actor which will execute the publishing process to the exchange 
-    in either the notif producer actor context itself or the tokio spawn thread:
+    BROKER TYPES: 
+        ---> KAFKA
+        ---> REDIS PUBSUB
+        ---> RMQ 
+            -ˋˏ✄┈┈┈┈
+            >_ the consuming task has been started by sending the ConsumeNotif message 
+            to this actor which will execute the streaming loop over the queue in 
+            either the notif consumer actor context itself or the tokio spawn thread:
 
-        notif producer -----payload-----> Exchange
-    
-    -ˋˏ✄┈┈┈┈
-    >_ client can use a short polling technique to fetch notifications for an 
-    specific owner from redis or db, this is the best solution to implement a
-    realtiming strategy on the client side to fetch what's happening on the 
-    server side in realtime. there is another expensive alternaitive to this
-    which is startiung a websocket server in backend side and send all notifications
-    to the client through the ws channels in realtime.
+                notif consumer -----Q(Consume Payload)-----> Exchange -----notif CQRS writer-----> cache/store on Redis & db
 
-     _________                                      _________
-    | server1 | <------- RMQ notif broker -------> | server2 |
-     ---------                                      ---------
-        | ws                                          | ws
-         ------------------- client ------------------
+            -ˋˏ✄┈┈┈┈
+            >_ the producing task has been started by sending the ProduceNotif message 
+            to this actor which will execute the publishing process to the exchange 
+            in either the notif producer actor context itself or the tokio spawn thread:
+
+                notif producer -----payload-----> Exchange
+            
+            -ˋˏ✄┈┈┈┈
+            >_ client can use a short polling technique to fetch notifications for an 
+            specific owner from redis or db, this is the best solution to implement a
+            realtiming strategy on the client side to fetch what's happening on the 
+            server side in realtime. there is another expensive alternaitive to this
+            which is startiung a websocket server in backend side and send all notifications
+            to the client through the ws channels in realtime.
+
+             _________                                       _________
+            | server1 | <------- RMQ notif broker -------> | server2 |
+             ---------                                       ---------
+                | ws                                          | ws
+                 ------------------- client ------------------
     ======================================================================================== */
 
 use crate::*;
+use deadpool_lapin::lapin::protocol::channel;
 use deadpool_redis::redis::AsyncCommands;
 use base58::FromBase58;
 use constants::CRYPTER_THEMIS_ERROR_CODE;
@@ -799,7 +845,7 @@ impl NotifBrokerActor{
                                 let payload = data.as_bytes();
                                 match chan
                                     .basic_publish(
-                                        &exchange, // the way of sending messages
+                                        &exchange, // messages go in there
                                         &routing_key, // the way that message gets routed to the queue based on a unique routing key
                                         BasicPublishOptions::default(),
                                         payload, // this is the ProduceNotif data,

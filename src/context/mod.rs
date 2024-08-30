@@ -23,7 +23,7 @@ use crate::workers::notif::{NotifBrokerActor};
 use crate::config::{Env as ConfigEnv, Context};
 use crate::config::EnvExt;
 use crate::storage::engine::Storage;
-use crate::workers::scheduler::Scheduler;
+use crate::workers::scheduler::CronScheduler;
 use actix::{Actor, Addr};
 use indexmap::IndexMap;
 use serde::{Serialize, Deserialize};
@@ -61,7 +61,7 @@ pub struct CqrsActors{
 pub struct ActorInstaces{
     pub broker_actors: BrokerActor,
     pub cqrs_actors: CqrsActors,
-    pub scheduler_actor: Addr<Scheduler>,
+    pub scheduler_actor: Addr<CronScheduler>,
 }
 
 
@@ -73,7 +73,7 @@ pub struct NotifMpscChannel{
     pub sender: tokio::sync::mpsc::Sender<String>,
     // thread safe receiver since receiver must be mutable by default thus having 
     // it in another thread requires to wrapp it around Arc and Mutex
-    pub receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>> 
+    pub eventloop: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>> 
 }
 
 #[derive(Clone)]
@@ -82,8 +82,8 @@ pub struct AppContext{ // we'll extract this instance from the depot in each api
     pub app_storage: Option<std::sync::Arc<Storage>>,
     pub actors: Option<ActorInstaces>,
     pub channels: std::sync::Arc<Channels>,
-    pub kvan: KVan
-
+    pub kvan: KVan,
+    pub signal: std::sync::Arc<std::sync::Condvar>, // we'll use this to block the thread until some data gets changed when the condvar is notifying the thread
 }
 
 impl AppContext{
@@ -99,7 +99,7 @@ impl AppContext{
                     notif_broker: NotifMpscChannel{
                         sender: notif_broker_tx.clone(),
                         // making the receiver safe to be shared multiple times and mutated
-                        receiver: std::sync::Arc::new(
+                        eventloop: std::sync::Arc::new(
                             tokio::sync::Mutex::new(
                                 notif_broker_rx
                             )
@@ -114,8 +114,13 @@ impl AppContext{
         let notif_accessor_actor = NotifAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
         let notif_actor = NotifBrokerActor::new(app_storage.clone(), notif_mutator_actor.clone(), zerlog_producer_actor.clone(), notif_broker_tx.clone()).start();
         let hoop_mutator_actor = HoopMutatorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
+        let mutator_actors = MutatorActors{
+            notif_mutator_actor: notif_mutator_actor.clone(),
+            hoop_mutator_actor: hoop_mutator_actor.clone()
+        };
         let hoop_accessor_actor = HoopAccessorActor::new(app_storage.clone(), zerlog_producer_actor.clone()).start();
-        let scheduler_actor = Scheduler::new(notif_actor.clone(), app_storage.clone(), notif_broker_tx.clone(), zerlog_producer_actor.clone()).start();
+        
+        let scheduler_actor = CronScheduler::new(notif_actor.clone(), app_storage.clone(), mutator_actors.clone(), notif_broker_tx.clone(), zerlog_producer_actor.clone()).start();
         
         let actor_instances = ActorInstaces{
             broker_actors: BrokerActor{
@@ -123,10 +128,7 @@ impl AppContext{
                 zerlog_actor: zerlog_producer_actor,
             },
             cqrs_actors: CqrsActors{
-                mutators: MutatorActors{
-                    notif_mutator_actor: notif_mutator_actor.clone(),
-                    hoop_mutator_actor: hoop_mutator_actor.clone()
-                },
+                mutators: mutator_actors,
                 accessors: AccessorActors{
                     notif_accessor_actor: notif_accessor_actor.clone(),
                     hoop_accessor_actor: hoop_accessor_actor.clone()
@@ -151,7 +153,8 @@ impl AppContext{
                 tokio::sync::Mutex::new(
                     BTreeMap::new()
                 )
-            )
+            ),
+            signal: std::sync::Arc::new(std::sync::Condvar::new())
         }
 
     }

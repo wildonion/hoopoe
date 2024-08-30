@@ -1,6 +1,8 @@
 
 use chrono::{DateTime, FixedOffset, Local};
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, EntityTrait, Statement, TryIntoModel, Value};
+use sea_orm::Set;
+use salvo::rate_limiter::QuotaGetter;
+use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TryIntoModel, Value};
 use serde::{Serialize, Deserialize};
 use actix::prelude::*;
 use tonic::IntoRequest;
@@ -10,6 +12,7 @@ use actix::{Actor, AsyncContext, Context};
 use crate::workers::zerlog::ZerLogProducerActor;
 use crate::entities::{self, hoops, users_hoops};
 use crate::models::event::{DbHoopData, HoopEventFormForDb};
+use crate::entities::hoops::{Column, Model as HoopModel, Entity as HoopEntity, ActiveModel as HoopActiveModel};
 use crate::storage::engine::Storage;
 use crate::constants::{self, PING_INTERVAL};
 use serde_json::json;
@@ -20,6 +23,15 @@ pub struct StoreHoopEvent{
     pub hoop: HoopEventFormForDb,
     pub local_spawn: bool
 }
+
+#[derive(Message, Clone, Serialize, Deserialize)]
+#[rtype(result = "ResponseHoopData")]
+pub struct UpdateIsFinished{
+    pub hoop_title: String,
+}
+
+#[derive(MessageResponse)]
+pub struct ResponseHoopData(pub std::pin::Pin<Box<dyn std::future::Future<Output = Option<Option<DbHoopData>>> + Send + Sync + 'static>>);
 
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -64,6 +76,125 @@ impl HoopMutatorActor{
         Self { app_storage, zerlog_producer_actor }
     }
 
+    // this would return the updated hoop field
+    pub async fn RawFinishHoop(&mut self, hoop_title: String) -> Option<DbHoopData>{
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let zerlog_producer_actor = self.clone().zerlog_producer_actor;
+
+        let db_backend = db.get_database_backend();
+        let stmt = Statement::from_sql_and_values(
+            db_backend.clone(), 
+            constants::queries::UPDATE_IS_FINISHED, 
+            [
+                hoop_title.clone().into()
+            ]
+        );
+
+        // update query 
+        match db.execute(stmt).await{
+            Ok(query_res) => {
+
+                let stmt = Statement::from_sql_and_values(
+                    db_backend, 
+                    constants::queries::SELECT_HOOP_BY_TITLE, 
+                    [
+                        hoop_title.clone().into()
+                    ]
+                );
+
+                // fetch query
+                match db.query_one(stmt).await{ // fetch the updated row
+                    Ok(exec_res) => {
+                        
+                        let res = exec_res.unwrap(); // get the query result to extract the rows
+                        Some(
+                            DbHoopData{
+                                id: res.try_get("", "id").unwrap(),
+                                etype: res.try_get("", "etype").unwrap(),
+                                manager: res.try_get("", "manager").unwrap(),
+                                entrance_fee: res.try_get("", "entrance_fee").unwrap(),
+                                cover: res.try_get("", "cover").unwrap(),
+                                started_at: res.try_get("", "started_at").unwrap(),
+                                end_at: res.try_get("", "end_at").unwrap(),
+                                title: res.try_get("", "title").unwrap(),
+                                description: res.try_get("", "description").unwrap(),
+                                capacity: res.try_get("", "capacity").unwrap(),
+                                duration: res.try_get("", "duration").unwrap(),
+                                created_at: res.try_get("", "created_at").unwrap(),
+                                updated_at: res.try_get("", "updated_at").unwrap(),
+                            }
+                        )
+                    },
+                    Err(e) => {
+                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                        let error_content = &e.to_string();
+                        let error_content = error_content.as_bytes().to_vec();
+                        let mut error_instance = HoopoeErrorResponse::new(
+                            *constants::STORAGE_IO_ERROR_CODE, // error code
+                            error_content, // error content
+                            ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
+                            "HoopMutatorActor.FinishHoop.db.query_one", // method
+                            Some(&zerlog_producer_actor)
+                        ).await;
+                        return None; // terminate the caller
+                    }
+                }
+            },
+            Err(e) => {
+                use crate::error::{ErrorKind, HoopoeErrorResponse};
+                let error_content = &e.to_string();
+                let error_content = error_content.as_bytes().to_vec();
+                let mut error_instance = HoopoeErrorResponse::new(
+                    *constants::STORAGE_IO_ERROR_CODE, // error code
+                    error_content, // error content
+                    ErrorKind::Storage(crate::error::StorageError::SeaOrm(e)), // error kind
+                    "HoopMutatorActor.FinishHoop.db.execute", // method
+                    Some(&zerlog_producer_actor)
+                ).await;
+                return None; // terminate the caller
+            }
+        }
+    }
+
+    // this would return the updated hoop field
+    pub async fn FinishHoop(&mut self, hoop_title: String) -> Option<DbHoopData>{
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let zerlog_producer_actor = self.clone().zerlog_producer_actor;
+
+        let hoop: Option<HoopModel> = HoopEntity::find()
+            .filter(Column::Title.contains(&hoop_title))
+            .one(db)
+            .await
+            .unwrap();
+
+        let mut hoop_active_model: HoopActiveModel = hoop.unwrap().into();
+        hoop_active_model.is_finished = Set(Some(true));
+        let hoop: HoopModel = hoop_active_model.clone().update(db).await.unwrap();
+
+        Some(
+            DbHoopData{
+                id: hoop_active_model.id.take().unwrap(),
+                etype: hoop_active_model.etype.take().unwrap(),
+                manager: hoop_active_model.manager.take().unwrap(),
+                entrance_fee: hoop_active_model.entrance_fee.take().unwrap(),
+                title: hoop_active_model.title.take().unwrap(),
+                description: hoop_active_model.description.take().unwrap(),
+                started_at: hoop_active_model.started_at.take().unwrap().timestamp(),
+                end_at: hoop_active_model.end_at.take().unwrap().timestamp(),
+                duration: hoop_active_model.duration.take().unwrap(),
+                capacity: hoop_active_model.capacity.take().unwrap(),
+                cover: hoop_active_model.cover.take().unwrap(),
+                created_at: hoop_active_model.created_at.take().unwrap(),
+                updated_at: hoop_active_model.updated_at.take().unwrap(),
+            }
+        )
+
+    }
+
     pub async fn raw_store(&mut self, hoop: HoopEventFormForDb) -> Option<DbHoopData>{
 
         let storage = self.app_storage.as_ref().clone().unwrap();
@@ -78,12 +209,13 @@ impl HoopMutatorActor{
                 hoop.etype.into(),
                 hoop.manager.into(),
                 hoop.entrance_fee.into(),
-                hoop.duration.into(),
-                hoop.started_at.into(),
-                hoop.cover.into(),
                 hoop.title.into(),
                 hoop.description.into(),
+                hoop.duration.into(),
                 hoop.capacity.into(),
+                hoop.cover.into(),
+                hoop.started_at.into(),
+                hoop.end_at.into(),
             ]
         );
 
@@ -111,6 +243,7 @@ impl HoopMutatorActor{
                                 entrance_fee: res.try_get("", "entrance_fee").unwrap(),
                                 cover: res.try_get("", "cover").unwrap(),
                                 started_at: res.try_get("", "started_at").unwrap(),
+                                end_at: res.try_get("", "end_at").unwrap(),
                                 title: res.try_get("", "title").unwrap(),
                                 description: res.try_get("", "description").unwrap(),
                                 capacity: res.try_get("", "capacity").unwrap(),
@@ -171,6 +304,7 @@ impl HoopMutatorActor{
                 "capacity": hoop.capacity,
                 "duration": hoop.duration,
                 "started_at": hoop.started_at,
+                "end_at": hoop.end_at,
                 "cover": hoop.cover,
             })
         ){
@@ -328,3 +462,42 @@ impl Handler<RawStoreHoopEvent> for HoopMutatorActor{
 
     }
 }
+
+impl Handler<UpdateIsFinished> for HoopMutatorActor{
+    
+    type Result = ResponseHoopData;
+    fn handle(&mut self, msg: UpdateIsFinished, ctx: &mut Self::Context) -> Self::Result {
+        
+        let UpdateIsFinished{hoop_title} = msg;
+        let mut this = self.clone();
+        
+        // since we need to use async channels to get the resp of this.get() method
+        // we need to be inside an async context, that's why we're returning an async
+        // object from the method. async objects are future objects they're self-ref types 
+        // they need to be pinned into the ram to break the cycle in them and returning
+        // future objects must be in form of Box::pin(async move{});
+        ResponseHoopData(
+            Box::pin( // future objects as separate type needs to get pinned
+                // don't use blocking channles in async context, we've used
+                // async version of mpsc which requires an async context
+                async move{
+                    let (tx, mut rx) 
+                        = tokio::sync::mpsc::channel::<Option<DbHoopData>>(1024);
+                    // since we're executing the updating task inside 
+                    // in the background light io threads we need to use
+                    // channels to receive the data outside of the thread
+                    // to return it as the return data of the async block 
+                    tokio::spawn(async move{
+                        let updated_hoop = this.FinishHoop(hoop_title).await;
+                        tx.send(updated_hoop).await;
+                    });
+                    while let Some(updated_hoop) = rx.recv().await{
+                        return Some(updated_hoop);
+                    }
+                    return None;
+                }
+            )
+        )
+
+    }
+} 

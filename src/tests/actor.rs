@@ -888,7 +888,7 @@ pub fn MutexCondvarPlayground(){
         pub fn acquire(&self) -> Option<PooledObject<ExpensiveCar>>{
             let mut get_cars = self.queue.data.lock().unwrap();
             let pool_of_expensive_cars = (*get_cars).pop()
-                .map(|car| PooledObject{
+                .map(|car| PooledObject{ // mapping the poped out element into a PooledObject
                     item: car,
                     pool: self.queue.data.clone(),
                 });

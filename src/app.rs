@@ -153,7 +153,7 @@ mod routers;
   that all actors need to get started inside the actix runtime!
 */
 // #[tokio::main]
-#[actix_web::main] // use this since we're using actor
+#[actix_web::main] //since we're using actor we need to use the actix runtime
 async fn main(){
 
     /* ------------- 

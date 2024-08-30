@@ -13,7 +13,7 @@ members = [
 migration = { path = "migration", name = "migration" }
 crypter = { path = "crypter", name = "crypter" }
 capnp-rpc = "0.19.2"
-salvo = { version = "0.68.5", features = ["full"] }
+salvo = { version = "0.71.1", features = ["full"] }
 actix = "0.13.5"
 actix-web = "4"
 tokio = { version = "1", features = ["full"] }
@@ -32,7 +32,7 @@ rslock = "0.4.0"
 tonic = "0.12"
 futures = "0.3"
 deadpool-lapin = { version = "0.12.1", features = ["serde", "rt_tokio_1"] }
-deadpool-redis = "0.15.1"
+deadpool-redis = "0.16.0"
 futures-util = "0.3"
 once_cell = "1"
 uuid = { version = "1", features = ["serde", "v4"] }
@@ -49,7 +49,7 @@ hex = "0.4"
 clap = { version = "4.5.11", features = ["derive"] }
 thiserror = "1.0"
 percentage = "0.1.0"
-sea-orm = { version = "1.0.0", features = [ 
+sea-orm = { version = "1.0.1", features = [ 
   "sqlx-postgres", 
   "runtime-tokio-rustls", 
   "macros", 
@@ -65,13 +65,16 @@ themis = "0.14.0"
 base58 = "0.2.0"
 rand_chacha = "0.3"
 chacha20 = "0.9"
-indexmap = "2.2.6"
+indexmap = "2.4"
 
 
 [[bin]]
 name = "hooper"
 path = "hooper/app.rs"
 
+[[bin]]
+name = "playground"
+path = "playground/main.rs"
 
 [[bin]]
 path = "src/app.rs"

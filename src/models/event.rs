@@ -98,6 +98,7 @@ pub struct HoopEventFormForDb{
     pub title: String,
     pub description: String,
     pub started_at: i64,
+    pub end_at: i64,
     pub duration: i64,
     pub capacity: i64,
     pub cover: String
@@ -145,6 +146,7 @@ pub struct DbHoopData{
     pub title: String,
     pub description: String,
     pub started_at: i64,
+    pub end_at: i64,
     pub duration: i64,
     pub capacity: i64,
     pub cover: String,

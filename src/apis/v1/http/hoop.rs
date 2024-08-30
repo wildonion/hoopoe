@@ -55,13 +55,13 @@ pub async fn add_hoop(
     let actors = app_ctx.clone().unwrap().actors.unwrap();
     let hoop_mutator_actor_controller = actors.clone().cqrs_actors.mutators.hoop_mutator_actor;
     let mut redis_conn = redis_pool.get().await.unwrap();
+    let scheduler_actor = actors.clone().scheduler_actor;
 
 
     let cover = req.file("cover").await.unwrap();
     let inv_info = serde_json::from_str::
         <Vec<std::collections::HashMap<String, i64>>>
         (&hoop_info.invitations.clone()).unwrap();
-
 
     // setting up the exp time of the event inside the redis as an expirable key
     // later on the scheduler actor can subscribe to redis expire channel 
@@ -86,13 +86,11 @@ pub async fn add_hoop(
         ));
     }
 
-    // set an exp key to check the end time of the event every 
-    // 10 mins without sending io calls to db
-    let now = chrono::Local::now();
-    let ten_mins_later = chrono::Local::now() + chrono::Duration::minutes(10);
-    let duration_in_seconds = ten_mins_later.timestamp() - now.timestamp();
+    let end_date_time = chrono::DateTime::from_timestamp(hoop_end_time, 0).unwrap().date_naive();
+    let now = chrono::Local::now().date_naive();
+    let duration_in_seconds = (end_date_time - now).num_seconds() as u64;
     let key = format!("hoop_{}_at_{}", hoop_info.title, hoop_info.started_at);
-    let _: () = redis_conn.set_ex(key, &user_data.username, duration_in_seconds as u64).await.unwrap();
+    let _: () = redis_conn.set_ex(key, "", duration_in_seconds).await.unwrap();
 
     let etype = match hoop_info.etype.as_str(){
         "social" => EventType::SocialGathering,
@@ -103,8 +101,7 @@ pub async fn add_hoop(
 
     // store cover on vps then on s3 or digispaces
     // store hoop info in db by sending the message to the hoop_mutator_actor_controller
-    
-    res.render("developing...")    
+ 
 
 }
 

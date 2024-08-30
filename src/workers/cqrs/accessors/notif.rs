@@ -349,7 +349,7 @@ impl Handler<RequestAllNotifData> for NotifAccessorActor{
         // they need to be pinned into the ram to break the cycle in them and returning
         // future objects must be in form of Box::pin(async move{});
         ResponseAllNotifData(
-            Box::pin(
+            Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
                 async move{
@@ -389,7 +389,7 @@ impl Handler<RequestNotifData> for NotifAccessorActor{
         // they need to be pinned into the ram to break the cycle in them and returning
         // future objects must be in form of Box::pin(async move{});
         ResponseNotifData(
-            Box::pin(
+            Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
                 async move{
@@ -428,7 +428,7 @@ impl Handler<RequestNotifDataByNotifId> for NotifAccessorActor{
         // they need to be pinned into the ram to break the cycle in them and returning
         // future objects must be in form of Box::pin(async move{});
         ResponseNotifDataByNotifId(
-            Box::pin(
+            Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
                 async move{

@@ -491,14 +491,18 @@ pub async fn solidDesignPattern(){
         
         pass different types to method through a single interface using trait 
         handling dep injection using Box<dyn and Mutex<dyn
+        trait for stat dyn disptach and dep injection and polymorphism (pass multiple type to a method)
     */
 
-    // use Box<dyn AnyType> for dynamic typing and dispatch
-    // use impl AnyType for static typing and dispatch 
-    // use trait for polymorphism like wallet payment portal
-    // pass Box<dyn AnyType in struct for dep injection  
-    // use Box::pin() to pin the future trait objects into the ram
-    // use onion, macrocosm and features to create plugin
+    // traits:
+    //     - use Box<dyn AnyType> for dynamic typing and dispatch
+    //     - use impl AnyType for static typing and dispatch 
+    //     - use trait for polymorphism like wallet payment portal
+    //     - pass Box<dyn AnyType in struct for dep injection and dynamic dispatch
+    //     - use Box::pin() to pin the future trait objects into the ram
+    //     - use onion, macrocosm and features to create plugin
+    //     - dependency injection using Box<dyn AnyType>
+    //     - passing trait to methods or struct using dyn as dynamic dispatch and impl Trait as static dispatch
     trait ServiceExt{
         fn getInstance(&self) -> &Box<dyn ServiceExt>;
     }
@@ -599,5 +603,71 @@ pub async fn solidDesignPattern(){
     let account = Account1{owner: String::from("0x00")};
     let ctx = Context::<Account1>{builder: Box::new(Builder)};
 
+
+    // ********************************
+    // dependency injecton example
+    // ********************************
+    trait AnyTypeCanBe{}
+    trait ObjectSafe{
+        fn getObject(&self);
+    }
+    struct PlayerInfo{}
+    impl AnyTypeCanBe for String{}
+    impl AnyTypeCanBe for PlayerInfo{}
+    impl ObjectSafe for PlayerInfo{
+        fn getObject(&self) {
+            
+        }
+    }
+    fn getInfo(param: impl AnyTypeCanBe) -> Box<dyn ObjectSafe>{
+        // future as separate object their pointer needs to gets pinned into the ram 
+        // cause they will get moved around different parts of the ram and their address
+        // will be changed thus in order to track them later for solvation we need to pin them
+        let fut = Box::pin(async move{});
+        Box::new(PlayerInfo{})
+    }
+    fn getInfoTraitLifetime<'valid>(param: &'valid dyn AnyTypeCanBe){} // dyn keyword on its own requires a valid lifetime to be behind
+    fn getInfoTraitLifetime1<'valid>(param: Box<dyn AnyTypeCanBe>){} // box handles the lifetime and allocation automatically
+    
+    // cast it to trait so we can pass it to the method
+    // the AnyTypeCanBe is implemented for String so 
+    // we can cast the string into that trait
+    let string_type = &String::from("") as &dyn AnyTypeCanBe; 
+    getInfoTraitLifetime(string_type);
+    getInfo(String::from(""));
+    getInfo(PlayerInfo{});
+    // ************************************************************
+
+
+    trait Interface{ type Output; }
+    // dep injection with future object must be a pinned box
+    // future is a trait and trait is not Sized thus needs to behind 
+    // a pointer the best option would be Box due to having handling lifetime and allocation
+    // automatically feature, this would gives a nice dependency injection feature as well
+    // also it needs to gets pinned into the ram, trait objects are heap data 
+    // they get moved by the Rust often around different location of the ram
+    // we need to keep them fixed at an stable location cause we need 
+    // to use them later in different scope to wait on them hence to address this 
+    // issue pinning the pointer (Box) of future object is the best option.
+    type FuturePinned = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>>;
+    
+    // dep injection with other traits than future
+    type AnyThingExceptFutureObject = Box<dyn Interface<Output = ()> + Send + Sync + 'static>;
+    // bound generic to future trait 
+    type GenericType<G> = PlayerInfo1<G>; // bounding won't be checked in here type aliases
+    struct PlayerInfo1<G: std::future::Future<Output = ()> + Send + Sync + 'static>{ data: G }
+
+    trait GetPointee{
+        fn getVal(&self) -> Self;
+    }
+    impl<T: Clone> GetPointee for T{
+        fn getVal(&self) -> Self{ // if the implementor was &T the self would be &T
+            self.clone()
+        }
+    }
+
+    let pointee = String::from("");
+    let pointer = &pointee;
+    let pointee_val = pointer.getVal();
 
 }

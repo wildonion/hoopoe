@@ -13,6 +13,7 @@ use tokio::sync::{mpsc::Receiver, Mutex};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use wallexerr::misc::Wallet;
 use workers::zerlog::ZerLogProducerActor;
+use salvo::affix_state;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use migration::{Migrator, MigratorTrait};
 
@@ -42,8 +43,9 @@ impl HoopoeServer{
             .push(routers::register_app_controllers())
             .hoop(Compression::new().enable_brotli(CompressionLevel::Fastest))
             .hoop(Logger::new()) // register middlewares using hoop() method
-            .hoop(affix::inject(app_ctx))
-            .hoop(cors);
+            .hoop(affix_state::inject(app_ctx))
+            .hoop(cors)
+            .hoop(max_concurrency(10)); // max number of requests being process concurrently
 
         // adding api ui routes
         let doc = OpenApi::new("Hoopoe Api", "0.1.0").merge_router(&router);
@@ -81,8 +83,9 @@ impl HoopoeServer{
             .push(routers::register_app_controllers())
             .hoop(Compression::new().enable_brotli(CompressionLevel::Fastest))
             .hoop(Logger::new()) // register middlewares using hoop() method
-            .hoop(affix::inject(app_ctx))
-            .hoop(cors);
+            .hoop(affix_state::inject(app_ctx))
+            .hoop(cors)
+            .hoop(max_concurrency(10)); // max number of requests being process concurrently
 
         // adding swagger ui route
         let doc = OpenApi::new("Hoopoe Api", "0.1.0").merge_router(&router);
@@ -145,8 +148,8 @@ impl HoopoeServer{
             
             service.run().await;
 
-            // service is an static dispatch which is an instance 
-            // of any type who implements the HoopoeService trait
+            // service will be statically dispatched which is an instance 
+            // of any type who implements the HoopoeService trait at compile time
             // ...
     }
 
@@ -169,7 +172,7 @@ impl HoopoeServer{
             >_ ORM checks on its own that the db is up to create the pool connection
             it won't start the app if the db is off, makes sure you've started
             the pg db server
-        */ 
+        */  
         let args = cli::ServerKind::parse();
         let connection = sea_orm::Database::connect(
             db_url
@@ -178,12 +181,12 @@ impl HoopoeServer{
         // migration process at runtime
         // if fresh{
         //     log::info!("fresh db...");
-        //     Migrator::fresh(&connection).await.unwrap();
-        //     Migrator::refresh(&connection).await.unwrap();
+        //     Migrator::fresh(connection).await.unwrap();
+        //     Migrator::refresh(connection).await.unwrap();
         // } else{ 
-        //     Migrator::up(&connection, None).await.unwrap();
+        //     Migrator::up(connection, None).await.unwrap();
         // }       
-        // Migrator::status(&connection).await.unwrap();
+        // Migrator::status(connection).await.unwrap();
 
     }
 
@@ -232,7 +235,8 @@ impl HoopoeServer{
 
     // surely needs ssl cert files 
     pub async fn runOverHTTP3(self){
-        
+    
+        // loads the certs file 
         let Self { service, addr, app_ctx, ssl_domain } = self;
         let serv = service.unwrap(); // contains apis
 
@@ -250,7 +254,6 @@ impl HoopoeServer{
 
         let server = Server::new(acceptor);
         server.serve(serv).await;
-
     }
 
 }

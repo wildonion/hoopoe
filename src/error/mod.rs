@@ -517,7 +517,10 @@ impl From<(Vec<u8>, u16, ErrorKind, String)> for HoopoeErrorResponse{
 // HoopoeErrorResponse custom error handler
 #[async_trait]
 impl Writer for HoopoeErrorResponse{
-    async fn write(mut self, _req: &mut salvo::Request, _depot: &mut salvo::Depot, res: &mut salvo::Response) {
+    // in salvo the underlying data of mutable pointer to res and req
+    // will be filled and there is no need to return a response from 
+    // the handler, just fill it then it'll be returned to the caller
+    async fn write(mut self, req: &mut salvo::Request, depot: &mut salvo::Depot, res: &mut salvo::Response) {
         use crate::models::server::Response as HoopoeResponse;
         res.status_code(salvo::http::StatusCode::INTERNAL_SERVER_ERROR);
         res.render(

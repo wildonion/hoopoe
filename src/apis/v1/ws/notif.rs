@@ -48,7 +48,7 @@ async fn consume(
     // in tokio thread, locking must be in a none blocking manner hence to get any data
     // from the mutex us we must use a channel to send data to it and receive it in ouside
     // of the thread using the receiver.
-    let notif_broker_receiver = notif_broker_channel.receiver.clone();
+    let notif_broker_receiver = notif_broker_channel.eventloop.clone();
     
     WebSocketUpgrade::new()
         .upgrade(req, res, |ws| async move{

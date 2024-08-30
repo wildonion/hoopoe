@@ -22,7 +22,6 @@ i'm hoopoe, the social event platform allows your hoop get heard!
 - **step4)** client invokes `/notif/get/owner/` api to get its notification during the app execution in a short polling manner.
 
 ```
-
    ------------------ server1/node1 actor -----------------                                         ___________
   |                                                        |                   ____________________|           |
   |   ___________                            ___________   |                  |                    |           |
@@ -35,9 +34,9 @@ i'm hoopoe, the social event platform allows your hoop get heard!
   |   -----------                            -----------   |             |
    --------------------------------------------------------              |
   |  |                                                                   |
-  |  |    synchronisation with                                           |
-  |  |_____ rmq notif prodcons __                                        |
-  |    data format:  NotifData   |    ----------------- server2/node2 actor ------------------
+  |  |    synchronisation with rmq notif broker                          |
+  |  |_____ actor prodcons, data format: NotifData                       |
+  |                              |    ----------------- server2/node2 actor ------------------
   |                              |   |                                                        |
   |                              |   |                                                        |
   |                              |   |   ___________                            ___________   |
@@ -46,7 +45,7 @@ i'm hoopoe, the social event platform allows your hoop get heard!
   |        _________                 |  |  Actor1   |-----message handlers-----|  Actor2   |  |
   |       |         |                |  |  tokio    |     |___ jobq ___|       |  tokio    |  |
    -------|   PG    |                |  | threadpool|--rmq prodcons channels---| threadpool|  |
-          |         |____mutators____|  |           |                          |           |  |
+          |  redis  |____mutators____|  |           |                          |           |  |
           |         |____readers ____|   -----------                            -----------   |
           |         |                |                                                        |
            ---------                  --------------------------------------------------------
@@ -250,7 +249,7 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
 ```bash
 # -----------------------
 # ---- read/write access
-sudo chown -R root:root . && sudo chmod -R 777 . 
+sudo chmod -R 777 . 
 ```
 
 #### step0) install necessary packages on Linux:

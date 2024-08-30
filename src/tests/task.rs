@@ -27,8 +27,13 @@ use types::Job;
     background worker of the instance thread to tell obj caller that the worker is busy rn. 
 */
 
-// future or task, sender, background worker and lock 
-#[derive(Debug)]
+// future object
+// job tree to push the job into the current tree
+// sender to broadcast or publish some data to a channel
+// an eventloop to receive a data from the channel or the queue to execute it in the background worker thread
+// background worker to run the job
+// locker to lock the task instance when a task is being executed 
+// #[derive(Debug)] // don't implement this cause Pin doesn't implement Debug
 pub struct Task<J: std::future::Future<Output = O>, S, O> where // J is a Future object and must be executed with Box::pin(job);
     J: std::future::Future + Send + Sync + 'static + Clone,
     O: Send + Sync + 'static,
@@ -37,27 +42,45 @@ pub struct Task<J: std::future::Future<Output = O>, S, O> where // J is a Future
     pub status: TaskStatus,
     pub id: String,
     pub name: String, // like send_mail task 
-    pub job: J, // use Box::pin(job) to pin it into the ram and call it; the function that needs to get executed 
+    /* 
+        Pin is a wrapper around some kind of pointer Ptr which makes 
+        that pointer "pin" its pointee value in place, thus preventing 
+        the value referenced by that pointer from being moved or otherwise 
+        invalidated at that place in memory unless it implements Unpin
+        which means tha type type doesn't require to be pinned into 
+        the ram, self ref types must implement !Unpin or must be pinned
+    */
+    pub dep_injection_fut_obj: std::pin::Pin<Box<dyn std::future::Future<Output = O> + Send + Sync + 'static>>, // a future as separate type to move between scopes
+    pub job: J, 
     pub job_tree: Vec<Task<J, S, O>>,
     pub sender: tokio::sync::mpsc::Sender<S>, // use this to send the result of the task into the channel to share between other lightweight thread workers
+    pub eventloop: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<S>>>, // use this as eventloop to execute tasks as they're coming from the channel in the background worker thread
     pub worker: std::sync::Mutex<tokio::task::JoinHandle<O>>, // execute the task inside the background worker, this is a thread which is safe to be mutated in other threads 
     pub lock: std::sync::Mutex<()>, // the task itself is locked and can't be used by other threads
 }
 
 impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S: Sync + Send + 'static> 
     Task<J, S, O> 
-    where O: Send + Sync + 'static{
+    where O: std::any::Any + Send + Sync + 'static{
 
-    pub async fn new(job: J, sender: tokio::sync::mpsc::Sender<S>) -> Self{
+    pub async fn new(job: J, 
+        sender: tokio::sync::mpsc::Sender<S>, 
+        eventloop: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<S>>>, 
+        fut_output: O) -> Self{
+
+        // sender and receiver
+
         let task = Self{
             status: TaskStatus::Initializing,
             id: Uuid::new_v4().to_string(),
             name: String::from("KJHS923"),
             job: job.clone(),
+            dep_injection_fut_obj: Box::pin(async move{ fut_output }), // pinning the future into the ram with the output of type O
             sender,
+            eventloop,
             job_tree: vec![],
             worker: { // this is the worker that can execute the task inside of itself, it's basically a lightweight thread
-                std::sync::Mutex::new(
+                std::sync::Mutex::new( // lock the worker
                     tokio::spawn(job)
                 )
             },

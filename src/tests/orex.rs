@@ -602,8 +602,11 @@ pub async fn test_code_order_exec(){
 // we can use ? operator to catch the file error at runtime since 
 // HoopoeErrorResponse implements the Error and From traits that
 // allow us to build an error instance of type HoopoeErrorResponse.
-pub async fn openFile(path: &str) -> Result<String, HoopoeErrorResponse>{
+#[handler]
+pub async fn openFile(res: &mut Response, req: &mut Request, depot: &mut Depot) -> Result<String, HoopoeErrorResponse>{
     
+
+    let path = "";
 
     let mut wallet = wallexerr::misc::Wallet::new_ed25519();
     let prvkey = wallet.clone().ed25519_secret_key.unwrap(); 
@@ -618,6 +621,9 @@ pub async fn openFile(path: &str) -> Result<String, HoopoeErrorResponse>{
     let encrypted_data = wallet.self_secure_cell_encrypt(secure_cell_config).unwrap();
     // let encrypted_data = secure_cell_config.data;
  
+    // From<std::io::Error> trait is implemented for HoopoeErrorResponse
+    // the salve Writer trait is also implemented for the HoopoeErrorResponse struct
+    // we can return an instance of it as the respone of this api handler
     let mut file = tokio::fs::File::open(path).await?;
     let mut buffer = vec![];
     file.read_to_end(&mut buffer).await?;
@@ -666,6 +672,15 @@ pub async fn openFile1(path: &str) -> Result<String, Box<dyn std::error::Error +
 
 // none blocking execution of all io tasks in lightweight threads 
 pub async fn runAsynclyAndConcurrently(){
+
+    // std mutex block the thread and prevent the thread from executing 
+    // other task in there by suspending the thread, tokio mutex block 
+    // the async io task instead of the thread, it allows the thread to 
+    // execute other tasks while the task is waiting for the lock.
+    // std mutex blocks the caller thread if the lock is busy and suspend 
+    // the thread from executing other tasks and using cpu resources until
+    // the thread becomes active by the os but in tokio mutex the async 
+    // task will be suspended instead of blocking the caller thread of mutex.
 
     /* 
         in the context of os threads the runtime and the whole thread gets blocked 
