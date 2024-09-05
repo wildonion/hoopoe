@@ -8,6 +8,16 @@
     https://medium.com/@maturationofthe/leveraging-rusts-tokio-library-for-asynchronous-actor-model-cf6d477afb19
     https://www.reddit.com/r/rust/comments/xec77k/rayon_or_tokio_for_heavy_filesystem_io_workloads/
 
+    
+    What is an Actor? 
+    Actor is a threadpool or a single threaded structure which has its own mailbox and cron scheduler 
+    to receive and execute tasks inside its thread of execution it can use tokio or os threads to execute 
+    async io or cpu tasks, they talk through message sending patterns like mpsc in local and grpc remotely
+    the message or task execution can be happened by receiving the task from the actor eventloop which is 
+    the receiver of the mailbox jobq mpsc channel in local or the grpc remotely then execute in a free 
+    thread if it has threadpool or its own single thread of execution, the thread can be either a light
+    or os thread for executing async io or intensive cpu tasks.
+
     runtime takes the async task and put it inside the thread queue 
     then at an appropriate time the scheduler pop the task out of the
     thread queue to execute it and if a thread is free it tries to steal

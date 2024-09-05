@@ -56,10 +56,26 @@ impl CronScheduler{
             }
     }
 
-    // task is an io future job of one of the following types:
-    // std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>
-    // Arc<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
-    // F: std::future::Future<Output = ()> + Send + Sync + 'static
+    /* -------------------------------------------------------------
+        since futures are object safe trait hence they have all traits 
+        features we can pass them to the functions in an static or dynamic 
+        dispatch way using Arc or Box or impl Future or event as the return 
+        type of a closure trait method:
+            std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>
+            Arc<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
+            Box<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
+            Arc<Mutex<dyn Fn() -> R + Send + Sync + 'static>> where R: std::future::Future<Output = ()> + Send + Sync + 'static
+            F: std::future::Future<Output = ()> + Send + Sync + 'static
+            param: impl std::future::Future<Output = ()> + Send + Sync + 'static
+
+        NOTE: mutex requires the type to be Sized and since traits are 
+        not sized at compile time we should annotate them with dyn keyword
+        and put them behind a pointer with valid lifetime or Box and Arc smart pointers
+        so for the mutexed_job we must wrap the whole mutex inside an Arc or annotate it
+        with something like &'valid tokio::sync::Mutex<dyn Fn() -> R + Send + Sync + 'static>
+        the reason is that Mutex is a guard and not an smart pointer which can hanlde 
+        an automatic pointer with lifetime 
+    */
     pub async fn startCronScheduler<F, R>(seconds: u64, 
         // make the future cloneable in each iteration and tokio scope 
         // as well as safe to be shared between threads

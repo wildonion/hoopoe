@@ -7,7 +7,7 @@
     thread safe eventloop queue : the receiver of each broker or the mpsc channel like Arc<Mutex<Recevier<Data>>>
     queue                       : buffer of thread safe event objects like Buffer<Event>{data:Arc<Mutex<Vec<Event>>>}
     syntax                      : while let Some(notif_data) = mpscReceiverEventloopOrRmqOrKafkaOrRedisSubscriber.recv().await{}
-    CronScheduler               : an actor background worker to call io periodically using ctx.run_interval(), loop{} and tokio time and spawn or redis key space notifications pubsub
+    CronSchedulerActor          : an actor background worker to call io periodically using ctx.run_interval(), loop{} and tokio time and spawn or redis key space notifications pubsub
     storing and caching         : store and cache received notif data in pg db and on redis
     node talking                : local talking with mailbox & remote talking with (JSON/G/Capnp)RPC
     websocket config            : send received notif data through the ws mpsc sender / receive notif data in ws server scope 
@@ -18,6 +18,7 @@
         → transactionpool service prodcons actor                      => receive transaction object
         → product service prodcons actor                              => receive order object to purchase atomically
     concurrency tools & notes   : 
+        → an eventloop is a thread safe receiver queue of the mpsc channel which receives tasks and execute them in free background thread
         → tokio::select, tokio::spawn, tokio::sync::{Mutex, mpsc, RwLock}, std::sync::{Condvar, Arc, Mutex}
         → cpu tasks are graph and geo calculations as well as cryptography algorithms which are resource intensive
         → async io tasks are io and networking calls which must be handled simultaneously in order to scale resources
@@ -33,6 +34,7 @@
         → std stuffs block and suspend the thread and stop it from executing other tasks while it doing some heavy operations inside the thread like mutex logics
         → tokio stuffs suspend the async io task process instead of blocking the thread and allows the thread executing other tasks simultaneously
         → use channels for atomic syncing between threads instead of using mutex in both async and none async context
+        → if we want some result of an either async io or cpu task we have the options of either using of mutex, channels or joining on the thread (would block cpu threads) 
         → as soon as the future or async io task is ready to yeild a value the runtime meanwhile of handling other tasks would notify the caller about the result
         → as soon as the the result of the task is ready to be returned from the os thread the os thread will be stopped blocking and continue with executing other tasks
         → actors have their own os or ligh thread of execution which uses to spawn tasks they've received via message passing channels or mailbox
@@ -40,10 +42,21 @@
         → initialize storage and actors data structures once and pack them in AppContext struct then share this between threads
 
     ========================================================================================
-            a sexy actor to produce/consume messages from different type of brokers
-            it uses RMQ, Redis and Kafka to produce and consume massive messages in 
-            realtime, kindly it supports data AES256 encryption through producing 
-            messages to the broker.
+        a sexy actor to produce/consume messages from different type of brokers
+        it uses RMQ, Redis and Kafka to produce and consume massive messages in 
+        realtime, kindly it supports data AES256 encryption through producing 
+        messages to the broker.
+
+        brokering is all about queueing, sending and receiving messages way more faster, 
+        safer and reliable than a simple eventloop or a tcp based channel. 
+        In rmq producer sends message to exchange the a consumer can bind its queue to 
+        the exchange to receive the messages, routing key determines the pattern of receive 
+        messages inside the bounded queue from the exchange 
+        In kafka producer sends messages to topic the consumer can receives data from 
+        the topic, Rmq adds an extra layer on top of msg handling logic which is creating 
+        queue per each consumer.
+        Offset in kafka is an strategy which determines the way of tracking the sequential 
+        order of receiving messages by kafka topics it’s like routing key in rmq 
 
 
     BROKER TYPES: 
