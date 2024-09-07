@@ -175,8 +175,10 @@ impl NotifAccessorActor{
             return None;
         }
 
+        // fetch unseen notifs for owner
         let mut notifs = NotifEntity::find()
             .filter(NotifColumn::ReceiverInfo.contains(&owner))
+            .filter(NotifColumn::IsSeen.eq(false))
             .order_by_desc(NotifColumn::FiredAt)
             .limit((to - from) + 1)
             .offset(from)

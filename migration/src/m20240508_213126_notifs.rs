@@ -44,7 +44,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(Notifs::ActionData)
-                            .json()
+                            .json() // jsonb column store any json string or json value inside this column
                             .not_null()
                     )
                     .col(

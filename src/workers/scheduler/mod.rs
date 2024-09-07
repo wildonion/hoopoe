@@ -21,6 +21,36 @@ use crate::*;
 use actix::prelude::Handler as ActixMessageHandler;
 
 
+pub async fn runInterval1<M, R, O>(task: std::sync::Arc<dyn Fn() -> R + Send + Sync + 'static>, int: usize)
+    where R: std::future::Future<Output = O> + Send + Sync + 'static,
+{
+    tokio::spawn(async move{
+        let mut int = tokio::time::interval(tokio::time::Duration::from_secs(int as u64));
+        int.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        
+        loop{
+            int.tick().await;
+            task().await;
+        }
+    });
+}
+
+pub async fn runInterval<M, R, O>(method: M, int: u64)
+    where M: Fn() -> R + Send + Sync + 'static,
+            R: std::future::Future<Output = O> + Send + Sync + 'static,
+{
+    tokio::spawn(async move{
+        let mut int = tokio::time::interval(tokio::time::Duration::from_secs(int));
+        int.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        
+        loop{
+            int.tick().await;
+            method().await;
+        }
+    });
+}
+
+
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default)]
 #[rtype(result = "()")]
 pub struct UpdateState{
@@ -81,6 +111,7 @@ impl CronScheduler{
         // as well as safe to be shared between threads
         task: std::sync::Arc<dyn Fn() -> R + Send + Sync + 'static>) where // make the closure trait shareable and cloneable
             R: std::future::Future<Output = ()> + Send + Sync + 'static{
+        
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(seconds));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // execute the checking io task in the background worker thread  
@@ -94,6 +125,25 @@ impl CronScheduler{
                 tokio::spawn(cloned_task()); // the closure however returns a future 
             }
         });
+
+        /* --------------------------
+            execution thread process for solving future:
+            await on async task suspend it to get the result but won't block thread 
+            means the light thread can continue executing other tasks
+            future objects are being done in the background awaiting on or polling  
+            them tells runtime that we need the result if the future was ready he sends the 
+            result to the caller otherwise it forces the thread to get another task 
+            from the eventloop to execute it meanwhile the future is being solved, 
+            this allows to execute tasks in a none blocking manner 
+        */
+        tokio::spawn(async move{
+            runInterval(|| async move{
+                println!("i'm executing intervally in the background thread ...");
+            }, seconds)
+            .await;
+        });
+
+
     }
 
     pub async fn subscribeToRedisExpChannel(&self){

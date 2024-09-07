@@ -326,7 +326,7 @@ pub async fn get_notif(
                 } else{
     
                     // there is no data on redis so send message to the accessor actor
-                    // to fetch the latest data from the db
+                    // to fetch the latest data from the db and cache it on redis
                     match notif_accessor_actor.send(
                         RequestNotifData{
                             owner: notif_query.owner,

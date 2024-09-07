@@ -69,6 +69,8 @@ pub struct Transaction{
     from: String, 
     to: String, 
     tax: f64,
+    action: TxAction,
+    memo: String, // this field is required when the exchange is using a single address to deposit tokens instead of a new one per each user 
     data: Vec<u8>, // every tx object can store data
     tx_type: TxType,
     treasury_type: TreasuryType,
@@ -76,6 +78,14 @@ pub struct Transaction{
     hash: Option<String>, // sha256 ash of the transaction
     tx_sig: Option<String>, // the signature result of signing the tx hash with private key, this will use to verify the tx along with the pubkey of the signer
     signer: String, // the one who has signed the tx
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub enum TxAction{
+    UpdateCode,
+    #[default]
+    CallMethod,
+    UpdateLibs
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -97,7 +107,7 @@ pub enum TreasuryType{
 }
 
 impl Transaction{
-    pub async fn new(last_tx: Self, amount: f64, from: &str, to: &str, tax: f64, data: &[u8]) -> Self{ // a tx object might have some data inside of itself
+    pub async fn new(last_tx: Self, memo: &str, amount: f64, from: &str, to: &str, tax: f64, data: &[u8]) -> Self{ // a tx object might have some data inside of itself
 
         // create a new tx object
         let mut tx_data = Self{
@@ -105,6 +115,8 @@ impl Transaction{
             from: from.to_string(),
             to: to.to_string(),
             tax,
+            action: TxAction::CallMethod,
+            memo: memo.to_string(),
             data: data.to_vec(), 
             status: TxStatus::Started,
             tx_type: TxType::Deposit,

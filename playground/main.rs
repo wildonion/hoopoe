@@ -1,8 +1,11 @@
 
 
-use deadpool_lapin::lapin::types::generation;
-use rand::thread_rng;
+
+use rand::{thread_rng, Rng};
 use rand::seq::SliceRandom;
+use std::error::Error;
+use std::task::Context;
+use std::thread;
 use std::{collections::HashMap, sync::atomic::AtomicUsize};
 use std::net::SocketAddr;
 use deadpool_redis::redis::{AsyncCommands, RedisResult};
@@ -37,6 +40,7 @@ pub static ONLINE_USERS: Lazy<Arc<Mutex<HashMap<String, usize>>>> =
 
 
 
+// Error part is an object safe trait which will be dispatched dynamically
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>{
 
@@ -64,14 +68,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
             
             let online_users = ONLINE_USERS.clone();
             let mut get_online_users = online_users.lock().await;
-            
+
             // try to find an existing user with this address
             // otherwise insert it into the map
             *get_online_users.entry(
                 addr.to_string()
             ).and_modify(|v| { *v; } /* keep the old id */ )
             .or_insert(get_id_tracker);
-        
+            
             let cloned_redis_pool = redis_pool.clone();
             // try to connect the user to a random online one
             tokio::spawn(async move{
@@ -82,110 +86,120 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
                 // and gets done in a separate thread
                 connectMe(stream, addr, cloned_redis_pool).await;
             });
-
         }
-    });
+    }); 
 
+    // since the socket stream needs to be mutable hence moving it 
+    // between threads requires to be Arced and Mutexed to use it 
+    // mutably in a safe manner inside other threads.
     pub async fn connectMe(mut current_user_stream: std::sync::Arc<tokio::sync::Mutex<TcpStream>>, 
-        current_user: SocketAddr, redis_pool: deadpool_redis::Pool){
-        let command = "connectMe";
-        match command{
-            "connectMe" => {
+        current_user: SocketAddr, redis_pool: deadpool_redis::Pool){ 
 
-                let users_streams = USERS_TCP_STREAM.clone();
-                let mut get_users_streams = users_streams.lock().await;
+        let users_streams = USERS_TCP_STREAM.clone();
+        let mut get_users_streams = users_streams.lock().await;
 
-
-                let online_users = ONLINE_USERS.clone();
-                let mut get_online_users = online_users.lock().await;
-                let cloned_current_user_stream = current_user_stream.clone();
+        let online_users = ONLINE_USERS.clone();
+        let mut get_online_users = online_users.lock().await;
+        let cloned_current_user_stream = current_user_stream.clone();
 
 
-                let mut redis_conn = redis_pool.get().await.unwrap();
-                let get_connected_users: String = redis_conn.get("connectedUsers").await.unwrap();
-                let mut decoded_connected_users = serde_json::from_str::<
-                        HashMap<String, usize>
-                    >(&get_connected_users)
-                    .unwrap();
+        let mut redis_conn = redis_pool.get().await.unwrap();
+        let get_connected_users: String = redis_conn.get("connectedUsers").await.unwrap();
+        let mut decoded_connected_users = serde_json::from_str::<
+                HashMap<String, usize>
+            >(&get_connected_users)
+            .unwrap();
 
-                let mut map_keys = get_online_users
-                    .clone()
-                    .into_iter()
-                    .map(|(user, id)| user)
-                    .collect::<Vec<String>>();
+        let mut map_keys = get_online_users
+            .clone()
+            .into_iter()
+            .map(|(user, id)| user)
+            .collect::<Vec<String>>();
 
-                map_keys.shuffle(&mut thread_rng());
-                let mut found_user: String = String::from("");
-                let mut found_id: usize = 0;
+        map_keys.shuffle(&mut thread_rng());
+        let mut found_user: String = String::from("");
+        let mut found_id: usize = 0;
 
-                for user in map_keys.clone(){
+        for user in map_keys.clone(){
 
-                    let id = get_online_users.get(&user).unwrap();
+            let id = get_online_users.get(&user).unwrap();
 
-                    let mut redis_conn = redis_pool.get().await.unwrap();
-                    let get_connected_users: String = redis_conn.get("connectedUsers").await.unwrap();
-                    let mut decoded_connected_users = serde_json::from_str::<
-                            HashMap<String, usize>
-                        >(&get_connected_users)
-                        .unwrap();
+            let mut redis_conn = redis_pool.get().await.unwrap();
+            let get_connected_users: String = redis_conn.get("connectedUsers").await.unwrap();
+            let mut decoded_connected_users = serde_json::from_str::<
+                    HashMap<String, usize>
+                >(&get_connected_users)
+                .unwrap();
 
-                    // the user to connect to must not be the current user as well as
-                    // must not on redis in during the 2 mins period
-                    // a user can't connect to a user which was connected 2 mins ago
-                    if user == current_user.to_string() || decoded_connected_users.contains_key(&user){
-                        continue;
-                    } else{
-                        
-                        // start chatting with the first found user
-                        found_id = *id;
-                        found_user = user;
-                        break;
-                    }
-                }
-
-                // store the user on redis, for 2 mins he won't be able to
-                // connect to the previous user
-                if !found_user.is_empty() && found_id != 0{
-                    decoded_connected_users.insert(found_user, found_id);
-                }
-                let encoded_connected_user = serde_json::to_string(&decoded_connected_users).unwrap();
-                let _: () = redis_conn.set_ex("connectedUsers", &encoded_connected_user, 120).await.unwrap();
+            // the user to connect to must not be the current user as well as
+            // must not on redis in during the 2 mins period
+            // a user can't connect to a user which was connected 2 mins ago
+            if user == current_user.to_string() || decoded_connected_users.contains_key(&user){
+                continue;
+            } else{
                 
-                // receive msg bytes from the user tcp stream channel
-                let getUserSender = get_users_streams.get(&found_id).unwrap().1.clone();
-                let getUserReceiver = get_users_streams.get(&found_id).unwrap().0.clone();
-                let cloned_current_user_stream = cloned_current_user_stream.clone();
-                
-                tokio::spawn(async move{
-                    
-                    let mut buff = vec![];
-                    let mut getStream = cloned_current_user_stream.lock().await;
+                // start chatting with the first found user
+                found_id = *id;
+                found_user = user;
+                break;
+            }
+        }        
 
-                    while let Ok(rcvd_bytes) = getStream.read(&mut buff).await{
-                        if rcvd_bytes == 0{
-                            getStream.shutdown().await; // shutdown the stream, disconnect the connection
-                        }
-                        let current_user_msg = std::str::from_utf8(&buff[..rcvd_bytes]).unwrap();
-                        // send the msg bytes of the current user to the connected user channel
-                        // connected user will use his receiver to receive the msg 
-                        getUserSender.send(current_user_msg.to_string()).await;
-
-                        let cloned_getUserReceiver = getUserReceiver.clone();
-                        let mut getReceiver = cloned_getUserReceiver.lock().await;
-                        // receive the connected user msg in here and send it through the 
-                        // current user tcp stream channel to the current user 
-                        while let Some(connected_user_msg) = getReceiver.recv().await{
-                            getStream.write_all(connected_user_msg.as_bytes()).await;
-                        }
-                    }
-                });
-
-
-            },
-            _ => {}
+        // store the user on redis, for 2 mins he won't be able to
+        // connect to the previous user
+        if !found_user.is_empty() && found_id != 0{
+            decoded_connected_users.insert(found_user, found_id);
         }
+        let encoded_connected_user = serde_json::to_string(&decoded_connected_users).unwrap();
+        let _: () = redis_conn.set_ex("connectedUsers", &encoded_connected_user, 120).await.unwrap();
+        
+        // receive msg bytes from the user tcp stream channel
+        let getUserSender = get_users_streams.get(&found_id).unwrap().1.clone();
+        let getUserReceiver = get_users_streams.get(&found_id).unwrap().0.clone();
+        let cloned_current_user_stream = cloned_current_user_stream.clone();
+
+        tokio::spawn(async move{
+            
+            let mut buff = vec![];
+            let mut getStream = cloned_current_user_stream.lock().await;
+
+            while let Ok(rcvd_bytes) = getStream.read(&mut buff).await{
+                if rcvd_bytes == 0{
+                    getStream.shutdown().await; // shutdown the stream, disconnect the connection
+                }
+                let current_user_msg = std::str::from_utf8(&buff[..rcvd_bytes]).unwrap();
+                // send the msg bytes of the current user to the connected user channel
+                // connected user will use his receiver to receive the msg 
+                getUserSender.send(current_user_msg.to_string()).await;
+
+                let cloned_getUserReceiver = getUserReceiver.clone();
+                let mut getReceiver = cloned_getUserReceiver.lock().await;
+                // receive the connected user msg in here and send it through the 
+                // current user tcp stream channel to the current user 
+                while let Some(connected_user_msg) = getReceiver.recv().await{
+                    getStream.write_all(connected_user_msg.as_bytes()).await;
+                }
+            }
+        });
+
     }
 
+    pub async fn disconnectMe(mut current_user_stream: std::sync::Arc<tokio::sync::Mutex<TcpStream>>, 
+        user_id: usize, current_user: SocketAddr, redis_pool: deadpool_redis::Pool){
+        
+        let cloned_current_user_stream = current_user_stream.clone();
+        tokio::spawn(async move{
+            let mut getStream = cloned_current_user_stream.lock().await;
+            getStream.shutdown().await; // close the current user tcp streaming channel
+
+            // try to remove it from online users
+            let online_users = ONLINE_USERS.clone();
+            let mut get_online_users = online_users.lock().await;
+            (*get_online_users).remove(&current_user.to_string()).unwrap();
+
+        });
+
+    }
     
     // ---====---====---====---====---====---====---====---====---====---====---====---====
     
@@ -200,11 +214,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
             where F: Fn(T) -> R + Send + Sync,
             R: std::future::Future<Output = ()> + Send + Sync
             {
-            println!("triggering event {:?}", event_name);
-            let mut get_queue = self.queue.lock().await;
-            while let Some(event) = get_queue.recv().await{
-                triggerer(event);
-            }
+                println!("[*] triggering {:?} event", event_name);
+                let mut get_queue = self.queue.lock().await;
+                while let Some(event) = get_queue.recv().await{
+                    triggerer(event);
+                }
         }
     }
 
@@ -212,37 +226,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     struct BufferEvent{
         pub data: std::sync::Arc<tokio::sync::Mutex<Vec<u8>>>
     }
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Serialize, Deserialize, Clone, Debug)]
     struct EventData{
         pub owner: String,
+        pub data: String,
         pub recv_time: i64
     }
 
-
-    // threadpool, spawning 10 threads it can be more structural 
-    // like it has a task field and eventloop receiver to recevie 
-    // tasks and execute them inside spawned thread also a field to 
-    // store all threads for joining them later which each of which 
-    // blocking the caller thread
     let (tx, mut rx) = tokio::sync::mpsc::channel::<BufferEvent>(100);
     let mut eventloop = EventLoop::<BufferEvent>{
         queue: std::sync::Arc::new(tokio::sync::Mutex::new(rx))
     };
 
-    for _ in 0..10{
-        let mut eventloop = eventloop.clone();
-        tokio::spawn(async move{
-            eventloop.on("receive", |e| async move{
-                // WRONG CODE: don't use std mutex in tokio spawn
-                let get_event_data = e.data.lock().await;
-                let string = serde_json::
-                    from_slice::<EventData>(&get_event_data)
-                    .unwrap();
-        
-            }).await;
-        });
-    }
-    
+    /* -------------------------------------
+        .await; suspend the task and tell runtime i need the result, if the
+        result wasn't ready runtime continue executing other task by poping 
+        them out from the eventloop and suspend the awaited task in there until 
+        the future completes and result becomes ready, not awaiting means we 
+        don't care about the result, runtime executes task in the background 
+        light io thread without having any suspention hence we could continue 
+        with the rest of the code, thus if you need the result of async task
+        like sending it to channel, await on it, HOWEVER this won't block the 
+        light thread.
+        also we could use tokio::select to control the execution flow of 
+        the app in async context and get the result of whatever the async
+        task has solved sooner than the other. 
+        tokio::spawn() is a place where async task can be executed by the runtime
+        scheduler, it's a lightweight thread of execution where async tasks 
+        will be awaited in there without blocking the thread.
+    */
+    tokio::spawn(
+        {
+            let mut eventloop = eventloop.clone();
+            async move{
+                eventloop.on("receive", |e| async move{
+                    let get_event_data = e.data.lock().await;
+                    let event_data = serde_json::
+                        from_slice::<EventData>(&get_event_data)
+                        .unwrap();
+                    println!("[*] received event: {:?}", event_data);
+            
+                }).await;
+            }
+        }
+    );
+
     Ok(())
 
 }
