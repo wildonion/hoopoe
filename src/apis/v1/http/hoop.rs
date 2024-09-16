@@ -95,7 +95,7 @@ pub async fn add_hoop(
     let etype = match hoop_info.etype.as_str(){
         "social" => EventType::SocialGathering,
         "proposal" => EventType::Proposal,
-        "streaming" => EventType::Streaming, // use hooper streamer handlers
+        "streaming" => EventType::Streaming,
         _ => EventType::None
     };
 

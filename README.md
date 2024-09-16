@@ -235,9 +235,9 @@ tokio::spawn( // running the consuming notif job in the background in a free thr
 
 [Rust Ownership and Borrowing Rules](https://github.com/wildonion/gvm/wiki/Ownership-and-Borrowing-Rules)
 
-[ERD Schema](https://github.com/wildonion/hooper/blob/main/infra/hoopoe.png)
+[ERD Schema](https://github.com/wildonion/hoopoe/blob/main/infra/hoopoe.png)
 
-[HTTP Postman Collection](https://github.com/wildonion/hooper/blob/main/infra/api.http.json)
+[HTTP Postman Collection](https://github.com/wildonion/hoopoe/blob/main/infra/api.http.json)
 
 ## How 2 setup, develop, and deploy?
 
@@ -314,17 +314,6 @@ sea-orm-cli generate entity -u postgres://postgres:geDteDd0Ltg2135FJYQ6rjNYHYkGQ
 cargo run --bin hoopoe -- --server http --fresh # default is http and fresh migrations
 # or see help
 cargo run --bin hoopoe -- --help
-# ------------------------------
-# ------ hooper servers --------
-# ------------------------------
-# launch as grpc with freshing db
-cargo run --bin hooper -- --server grpc --fresh # default is grpc and fresh migrations
-# launch as tcp with freshing db
-cargo run --bin hooper -- --server tcp --fresh
-# launch as p2p with freshing db
-cargo run --bin hooper -- --server p2p --fresh
-# or see help
-cargo run --bin hooper -- --help
 ```
 
 ### 🚀 Prod env (the CI/CD approach):

@@ -2,6 +2,7 @@
 
 use deadpool_redis::redis::AsyncCommands;
 use std::error::Error;
+use std::f32::consts::E;
 use std::net;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,6 +12,8 @@ use constants::STORAGE_IO_ERROR_CODE;
 use deadpool_redis::{Connection, Manager, Pool};
 use sea_orm::{ConnectionTrait, QueryResult, Statement, Value};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
+use crate::entities::notifs::{Column, Model as NotifModel, Entity as NotifEntity, ActiveModel as NotifActiveModel};
+use sea_orm::ActiveModelTrait;
 use crate::models::event::DbNotifData;
 use crate::workers::zerlog::ZerLogProducerActor;
 use crate::{models::event::NotifData};
@@ -20,12 +23,14 @@ use crate::constants::PING_INTERVAL;
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::{constants, entities};
-use crate::entities::notifs::{
-    self, Model as NotifModel, Column as NotifColumn,
-    ActiveModel as NotifActiveModel, 
-    Entity as NotifEntity
-}; // import notif itself, column, entity and the model
+use sea_orm::ActiveValue::Set;
 
+
+#[derive(Message, Clone, Serialize, Deserialize)]
+#[rtype(result = "ResponseNotifDataByNotifId")]
+pub struct SeenNotif{
+    pub notif_id: i32
+}
 
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "ResponseAllNotifData")]
@@ -52,7 +57,7 @@ pub struct RequestNotifDataByNotifId{
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct NotifDataResponse{
-    pub notifs: Vec<notifs::Model>,
+    pub notifs: Vec<NotifModel>,
     pub items: u64,
     pub pages: u64, 
     pub current_page: u64
@@ -106,6 +111,35 @@ impl NotifAccessorActor{
 
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, zerlog_producer_actor: Addr<ZerLogProducerActor>) -> Self{
         Self { app_storage, zerlog_producer_actor }
+    }
+
+    pub async fn setSeenNotif(&self, notif_id: i32) -> Option<DbNotifData>{
+
+        let storage = self.app_storage.as_ref().clone().unwrap();
+        let db = storage.get_seaorm_pool().await.unwrap();
+        let redis_pool = storage.get_redis_pool().await.unwrap();
+        let zerlog_producer_actor = self.clone().zerlog_producer_actor;
+        
+
+        let notif: Option<NotifModel> = NotifEntity::find_by_id(notif_id).one(db).await.unwrap();
+        let mut notifActiveModel: NotifActiveModel = notif.unwrap().into();
+        notifActiveModel.is_seen = Set(true);
+        let notif: NotifModel = notifActiveModel.clone().update(db).await.unwrap();
+        
+        Some(
+            // building and returning struct in-place, this gets allocated in the caller space on the stack 
+            DbNotifData { 
+                id: notif.id, 
+                nid: notif.nid, 
+                receiver_info: notif.receiver_info, 
+                action_data: notif.action_data, 
+                actioner_info: notif.actioner_info,
+                action_type: notif.action_type, 
+                fired_at: notif.fired_at, 
+                is_seen: notif.is_seen 
+            }
+        )
+        
     }
 
     pub async fn get_by_notif_id(&self, notif_id: i32) -> Option<DbNotifData>{
@@ -177,9 +211,9 @@ impl NotifAccessorActor{
 
         // fetch unseen notifs for owner
         let mut notifs = NotifEntity::find()
-            .filter(NotifColumn::ReceiverInfo.contains(&owner))
-            .filter(NotifColumn::IsSeen.eq(false))
-            .order_by_desc(NotifColumn::FiredAt)
+            .filter(Column::ReceiverInfo.contains(&owner))
+            .filter(Column::IsSeen.eq(false))
+            .order_by_desc(Column::FiredAt)
             .limit((to - from) + 1)
             .offset(from)
             .paginate(db, page_size);
@@ -262,7 +296,7 @@ impl NotifAccessorActor{
         }
 
         let mut notifs = NotifEntity::find()
-            .order_by_desc(NotifColumn::FiredAt)
+            .order_by_desc(Column::FiredAt)
             .limit((to - from) + 1)
             .offset(from)
             .paginate(db, page_size);
@@ -354,6 +388,22 @@ impl Handler<RequestAllNotifData> for NotifAccessorActor{
             Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
+                /*
+                    pinning a boxed future would be a great option if we need to 
+                    execute async tasks like receiving from a an async channel inside 
+                    a none async scope like actor message handler functions, we can 
+                    wrap the async job around an async move{} and then pin the async 
+                    move{} scope to return it from the function, later when we invoke 
+                    the actual function we can catch the result which contains the 
+                    async future object and get the result of the future object by 
+                    awaiting on it which tells runtime to suspend the function execution 
+                    in there but don’t block the thread, continuing executing other 
+                    tasks in the current thread either in background (don’t await) or 
+                    by suspending (await) the task. 
+                    in the caller scope we should await on the pinned boxed future
+                    to get the result by suspending (not blocking) its execution 
+                    in the thread.
+                */
                 async move{
                     let (tx, mut rx) 
                         = tokio::sync::mpsc::channel::<Option<NotifDataResponse>>(1024);
@@ -394,6 +444,22 @@ impl Handler<RequestNotifData> for NotifAccessorActor{
             Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
+                /*
+                    pinning a boxed future would be a great option if we need to 
+                    execute async tasks like receiving from a an async channel inside 
+                    a none async scope like actor message handler functions, we can 
+                    wrap the async job around an async move{} and then pin the async 
+                    move{} scope to return it from the function, later when we invoke 
+                    the actual function we can catch the result which contains the 
+                    async future object and get the result of the future object by 
+                    awaiting on it which tells runtime to suspend the function execution 
+                    in there but don’t block the thread, continuing executing other 
+                    tasks in the current thread either in background (don’t await) or 
+                    by suspending (await) the task. 
+                    in the caller scope we should await on the pinned boxed future
+                    to get the result by suspending (not blocking) its execution 
+                    in the thread.
+                */
                 async move{
                     let (tx, mut rx) 
                         = tokio::sync::mpsc::channel::<Option<NotifDataResponse>>(1024);
@@ -433,6 +499,22 @@ impl Handler<RequestNotifDataByNotifId> for NotifAccessorActor{
             Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
+                /*
+                    pinning a boxed future would be a great option if we need to 
+                    execute async tasks like receiving from a an async channel inside 
+                    a none async scope like actor message handler functions, we can 
+                    wrap the async job around an async move{} and then pin the async 
+                    move{} scope to return it from the function, later when we invoke 
+                    the actual function we can catch the result which contains the 
+                    async future object and get the result of the future object by 
+                    awaiting on it which tells runtime to suspend the function execution 
+                    in there but don’t block the thread, continuing executing other 
+                    tasks in the current thread either in background (don’t await) or 
+                    by suspending (await) the task. 
+                    in the caller scope we should await on the pinned boxed future
+                    to get the result by suspending (not blocking) its execution 
+                    in the thread.
+                */
                 async move{
                     let (tx, mut rx) 
                         = tokio::sync::mpsc::channel::<Option<DbNotifData>>(1024);
@@ -447,6 +529,54 @@ impl Handler<RequestNotifDataByNotifId> for NotifAccessorActor{
                 }
             )
         )
+    }
+
+}
+
+
+impl Handler<SeenNotif> for NotifAccessorActor{
+    type Result = ResponseNotifDataByNotifId;
+
+    fn handle(&mut self, msg: SeenNotif, ctx: &mut Self::Context) -> Self::Result {
+
+        let SeenNotif { notif_id } = msg.clone();
+        let this = self.clone();
+
+        // execute the updating seen field task in the background thread
+        // since we need to return the updated field from the async contex
+        // we should to this in the background means the caller of this 
+        // handler must await on the result receiving from the function.
+        // but the whole logic inside the async context has already been 
+        // executed, we just need to await on it to suspend its execution
+        // to receive the result.
+        ResponseNotifDataByNotifId(
+            /* 
+                since we care about the result of the tokio spawn task hence 
+                forces us to use channels, also we can't use none async channels
+                in async context therefore the whole logic of executing the update
+                seen task and returning the updated field would be inside an async
+                context which forces us to return the async context from the 
+                handler method.
+            */
+            Box::pin(async move{ // returning future as separate object requires to pin them into the ram
+                let (tx, mut rx) = 
+                    tokio::sync::mpsc::channel::<Option<DbNotifData>>(1024);
+
+                tokio::spawn(async move{
+                    let updated_notif = this.setSeenNotif(notif_id).await;
+                    // need to get the updated notif from inside of the tokio spawn threadpool
+                    // somehow so sending it through a channe would be a best option
+                    tx.send(updated_notif).await;
+                });
+
+                while let Some(updated_notif) = rx.recv().await{
+                    // return it once we receive it 
+                    return Some(updated_notif);
+                }
+                return None;
+            })
+        )
+
     }
 
 }

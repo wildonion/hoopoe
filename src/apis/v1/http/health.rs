@@ -177,7 +177,7 @@ pub async fn mint(
     */
 
     let mut prod = req.extract::<Product>().await.unwrap();
-    let (is_being_minted, mut product_receiver) = prod.atomic_purchase_status().await;
+    let (is_being_minted, mut updatedProductReceiver) = prod.atomic_purchase_status().await;
 
     match is_being_minted{
         true => {
@@ -200,8 +200,7 @@ pub async fn mint(
         false => {
             // if you want to use while let Some the prod must be cloned in every iteration
             // hence using if let Some is the best option in here to avoid using clone.
-            if let Some(product) = product_receiver.recv().await{
-                
+            if let Some(product) = updatedProductReceiver.recv().await{
                 let server_time = format!("{}", chrono::Local::now().to_string());
                 res.status_code = Some(StatusCode::OK);
                 res.render(Json(

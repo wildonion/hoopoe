@@ -15,7 +15,6 @@ use serde_json::json;
 use crate::entities::*;
 
 
-
 #[derive(Message, Clone, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct StoreNotifEvent{
@@ -218,6 +217,7 @@ impl Handler<StoreNotifEvent> for NotifMutatorActor{
         }
         
         return;
+
     }
 
 }

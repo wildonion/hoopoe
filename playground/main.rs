@@ -174,8 +174,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
                 let cloned_getUserReceiver = getUserReceiver.clone();
                 let mut getReceiver = cloned_getUserReceiver.lock().await;
-                // receive the connected user msg in here and send it through the 
-                // current user tcp stream channel to the current user 
+                // receive the connected user (user2) msg in here and send it through the 
+                // current user (user1) tcp stream channel to the current user 
                 while let Some(connected_user_msg) = getReceiver.recv().await{
                     getStream.write_all(connected_user_msg.as_bytes()).await;
                 }
@@ -188,11 +188,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         user_id: usize, current_user: SocketAddr, redis_pool: deadpool_redis::Pool){
         
         let cloned_current_user_stream = current_user_stream.clone();
+        // lockcing as an async task inside a light io thread
         tokio::spawn(async move{
             let mut getStream = cloned_current_user_stream.lock().await;
             getStream.shutdown().await; // close the current user tcp streaming channel
 
-            // try to remove it from online users
+            // try to remove the user from online users
             let online_users = ONLINE_USERS.clone();
             let mut get_online_users = online_users.lock().await;
             (*get_online_users).remove(&current_user.to_string()).unwrap();
@@ -219,7 +220,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
                 while let Some(event) = get_queue.recv().await{
                     triggerer(event);
                 }
-        }
+            }
+        
+        pub async fn cronScheduling<F, R>(&mut self, func: F, period: u64) 
+            where F: Fn() -> R + Send + Sync + 'static + Clone,
+                R: std::future::Future<Output = ()> + Send + Sync + 'static
+            {
+
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                
+                // defining an async context or future object
+                let fut = async move{
+                    let cloned_task = func.clone();
+                    loop{
+                        interval.tick().await;
+                        // since the closure returns a future we can run it 
+                        // in the background tokio thread
+                        tokio::spawn(func()); // the closure however returns a future 
+                    }
+                };
+
+                // execute the future object in the background thread worker 
+                // without waiting for the result
+                tokio::spawn(fut);
+
+            }
+        
     }
 
     #[derive(Clone)]
@@ -259,6 +286,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         {
             let mut eventloop = eventloop.clone();
             async move{
+                // once we receive a buffer event we'll be decoding it 
+                // into EventData structure
                 eventloop.on("receive", |e| async move{
                     let get_event_data = e.data.lock().await;
                     let event_data = serde_json::

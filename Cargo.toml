@@ -69,10 +69,6 @@ indexmap = "2.4"
 
 
 [[bin]]
-name = "hooper"
-path = "hooper/app.rs"
-
-[[bin]]
 name = "playground"
 path = "playground/main.rs"
 

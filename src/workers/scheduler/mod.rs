@@ -91,6 +91,9 @@ impl CronScheduler{
         features we can pass them to the functions in an static or dynamic 
         dispatch way using Arc or Box or impl Future or event as the return 
         type of a closure trait method:
+            returning reference or box to dyn trait by casting the type who impls the trait into the trait 
+            dep injection object safe trait using & and smart pointers dyn
+            future as generic in return type of closure or function or pinning its box
             std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>
             Arc<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
             Box<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
@@ -106,13 +109,13 @@ impl CronScheduler{
         the reason is that Mutex is a guard and not an smart pointer which can hanlde 
         an automatic pointer with lifetime 
     */
-    pub async fn startCronScheduler<F, R>(seconds: u64, 
+    pub async fn startCronScheduler<F, R>(period: u64, 
         // make the future cloneable in each iteration and tokio scope 
         // as well as safe to be shared between threads
         task: std::sync::Arc<dyn Fn() -> R + Send + Sync + 'static>) where // make the closure trait shareable and cloneable
             R: std::future::Future<Output = ()> + Send + Sync + 'static{
         
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(seconds));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // execute the checking io task in the background worker thread  
         // in a none blocking manner, runtime suspend or pause the execution
@@ -139,7 +142,7 @@ impl CronScheduler{
         tokio::spawn(async move{
             runInterval(|| async move{
                 println!("i'm executing intervally in the background thread ...");
-            }, seconds)
+            }, period)
             .await;
         });
 

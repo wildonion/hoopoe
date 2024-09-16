@@ -3,12 +3,57 @@
 
 use constants::PRODUC_IDS;
 use error::HoopoeErrorResponse;
-use interfaces::product::ProductExt;
 use wallexerr::misc::SecureCellConfig;
 use core::fmt;
-use std::{os::unix::process, sync::{Arc, Condvar, Mutex}, thread};
+use std::{fmt::Display, os::unix::process, sync::{Arc, Condvar, Mutex}, thread};
 use tokio::sync::mpsc;
 use crate::*;
+
+
+
+
+#[derive(Debug)]
+struct CustomeErrMe{}
+#[derive(Debug)]
+pub struct CustomeErrMe1{}
+impl std::error::Error for CustomeErrMe{
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        let s = self.source();
+        s
+    }
+}
+
+impl Display for CustomeErrMe{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error{}", self);
+        Ok(())
+    }
+}
+
+impl std::error::Error for CustomeErrMe1{
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        let s = self.source();
+        s
+    }
+}
+
+impl Display for CustomeErrMe1{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error{}", self);
+        Ok(())
+    }
+}
+
+// From trait helps us to use ? operator on the type which is a Result type
+// and has Error trait as its error part, calling ? on the Result type upcast
+// the type into the error part which can be either Box<dyn Error> or CustomeErrMe1 
+// instance, in the first option this would gets called dynamically at runtime. 
+impl From<std::io::Error> for CustomeErrMe1{ 
+    fn from(value: std::io::Error) -> Self {
+        Self {  }        
+    }   
+}
+
 
 /* ------------------------------------------- */
 // NODEJS LIKE ASYNC METHOD ORDER OF EXECUTION
@@ -18,6 +63,27 @@ use crate::*;
     
     - none async rust: none io tasks like crypter using os threadpool
     - async rust     : async future io tasks like db and file operations using tokio light io threads in a none blocking way
+    - await          : await suspend the task execution allows runtime to notify the caller once the task is solved but meanwhile executing other tasks (none blocking)
+    - !await         : not awaiting executes the task in the background thread enforces us to use channel to send result to other threads instead of awaiting on the tokio spawn
+
+
+    tokio::spawn() receives an async context which can execute it in the background 
+    until there is no await on the tokio::spawn() as soon as we await on the tokio::spawn()
+    the runtime understand this that it should suspend the function from execution 
+    to get the result of the async task and if the result is not ready at that moment 
+    it won't block the thread meanwhile of suspending it continue executing other tasks 
+    until the future is solved which notify the runtime about the result hence runtime
+    notifies the caller about the result which has been polled.
+    the tokio::spawn() is a lightweight threadpool of execution which takes the future object 
+    and execute it in the background thread, the future object however has its own 
+    functions and other async tasks. if a thread is highly busy it moves the task into 
+    another thread, if we need the result of the future object we can use channels or 
+    mutex to mutate the data without awaiting on the tokio::spawn() this allows to sync
+    with other threads without suspending and waiting for the result.
+    an example of that would be minting a product in the background thread and respond
+    the caller at the time of minting to save times as soon as the mint process finishes
+    we'll store or cache it somewhere so client can use short polling api to receive it.
+
 
     ----------------------------------------------------------------------
               Golang and Rust (goroutines and futures)!
@@ -635,11 +701,60 @@ pub async fn openFile(res: &mut Response, req: &mut Request, depot: &mut Depot) 
 
 }
 
-// error handling using dynamic dispatch approach, the exact type of 
-// error will be specified at runtime, but we must sure that the type
-// implements the Error trait which almost every type does this.
-pub async fn openFile1(path: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync + 'static>>{
+/*
+error handling using dynamic dispatch approach, the exact type of 
+error will be specified at runtime, but we must sure that the type
+implements the Error trait which almost every type does this.
+
+custom error handler:
+    Box<dyn Error> is a boxed object safe trait that can be used to return 
+    an error type which implements the Error trait, it can be a file process
+    or a custom error, calling ? operator on the error type automatically 
+    upcast the type into Box<dyn Error> at runtime, to use ? on custom error 
+    type, the type should impl the From trait
+    if the custom type implements the Error trait we can return Err(Box::new(CustomErr))
+    instead of using ? operator and the return type be: Result<(), Box<dyn Error>> 
+
+    1. **Dynamic Dispatch with `Box<dyn Error>`**:
+    - `Box<dyn Error>` is a boxed object safe trait, meaning you can return different error types that implement `Error`. For example, `std::io::Error`, `std::fmt::Error`, or even a custom error type can be boxed and returned.
+
+    2. **Error Propagation with `?`**:
+    - The `?` operator is used to **propagate errors**. In the example, if `File::open` fails, it returns an `std::io::Error`, which is automatically converted into a `Box<dyn Error>` through **trait object upcasting** and returned from `main`.
+
+    3. **Boxing the Error**:
+    - When `File::open` returns an `std::io::Error`, the `?` operator automatically **boxes** it into `Box<dyn Error>` because the `Error` trait is implemented for `std::io::Error`. This works thanks to Rust’s **trait object upcasting**, which allows any type implementing `Error` to be placed inside a `Box<dyn Error>`.
+
+    If you want to return a custom error using `Box<dyn Error>`, you can do so by defining your own error type that implements the `Error` trait.
+
+    4. **Custom Error**:
+    - `CustomErrMe` implements both `fmt::Display` and `std::error::Error`, making it a valid error type.
     
+    5. **Boxing Custom Error**:
+    - `Box::new(CustomErrMe)` creates a boxed trait object of `CustomErrMe`, which implements the `Error` trait, so it can be returned as `Box<dyn Error>`.
+
+    6. **Returning the Error**:
+    - You return the error using `Err(Box::new(CustomErrMe))`, which wraps the custom error in a `Box` and upcasts it to the `Error` trait.
+
+    ### Static vs. Dynamic Dispatch in Error Handling
+
+    - **Static Dispatch** (e.g., `impl Trait`, `T: Trait`) is useful when you know the exact type of error at compile time and don't need the flexibility of multiple possible error types. It often leads to **better performance** because the compiler can generate more optimized code without the indirection of dynamic dispatch.
+    
+    - **Dynamic Dispatch** with `Box<dyn Error>` is useful when you need to handle multiple possible error types and want to return them as a single trait object type. It introduces a small performance cost due to the indirection involved with the trait object but provides greater **flexibility**.
+
+    ### When to Use `Box<dyn Error>`:
+    - When your function can return **multiple types of errors**, and you don’t want to define an enum to capture all of them.
+    - When the error types involved are not known at compile time (e.g., in libraries that might need to return different errors based on the context).
+    - When simplicity and flexibility matter more than the minor overhead of dynamic dispatch.
+    - Dynamic dispatch (`Box<dyn Error>`) enables flexibility by deferring the decision about which error type is returned until runtime.
+    - The `?` operator allows easy propagation of errors, and it automatically upcasts errors that implement the `Error` trait into a `Box<dyn Error>`.
+    - You can return both standard library errors and custom errors using this approach, and it simplifies handling multiple error types in a single function.
+*/
+pub async fn openFile1(path: &str) 
+    // the return type for the error part could be:
+    // 1 - calling ? operator on the type which implements Error trait like file io causes the io error (From must be implemented as well to use ?)
+    // 2 - Err(Box::new(CustomErrorHanlder{})) in which CustomErrorHanlder implements Error and Display trait to satisfy the dynamic dispatch logic
+    -> Result<String, Box<dyn std::error::Error + Send + Sync + 'static>>{
+
 
     let mut wallet = wallexerr::misc::Wallet::new_ed25519();
     let prvkey = wallet.clone().ed25519_secret_key.unwrap(); 
@@ -653,15 +768,131 @@ pub async fn openFile1(path: &str) -> Result<String, Box<dyn std::error::Error +
     };
     let encrypted_data = wallet.self_secure_cell_encrypt(secure_cell_config).unwrap();
     // let encrypted_data = secure_cell_config.data;
- 
     
-    // we can use ? operator to catch the file error at runtime since 
-    // HoopoeErrorResponse implements the Error and From traits that
-    // allow us to build an error instance of type HoopoeErrorResponse.
+    let encrypted_hex = hex::encode(encrypted_data);
+    let signature = wallet.self_ed25519_sign(&encrypted_hex, &prvkey).unwrap();
 
-    let mut file = tokio::fs::File::open(path).await?;
+    // ---------------- HANDLING ERROR ----------------
+    // ========================================================
+    // ========================================================
+    // --------------------------------- SOLUTION 1
+    // ? operator upcast into Box<dyn Error> (requires From trait to be implemented for the type)
+    // dynamic dispatch allows accessing multiple types through a single interface, ensuring 
+    // flexibility and simplicity but has an small cost of overhead at runtime.
+    // Result<(), Box<dyn Error>>: the return type of error part must be dynamically dispatched
+    // means we can return any type that implements the Error trait and causes the 
+    // error at runtime as the error part but in a boxed state.
+    // we can use ? to upcast the error type into Box<dyn Error> but the type must implement
+    // From trait (even the custom error handler!)
+    // instead of using ? to satisfy the return type of the error part we can put the custom 
+    // error handler or the type that causes the error inside a box and return that.
+    // NOTE: that the return type can't be boxing the error trait itself it should be boxing 
+    // an instance that satisfies the Error trait.
+    let mut file = tokio::fs::File::open(path).await?; // use ? for upcasting to Box<dyn Error>
+    
+    // ERROR: since the open() method returns an Error trait as its error part
+    //        thus: the return type can't be boxing the Error trait itself
+    //        it must be an instance who implements the Error trait
+    //        for dynamic dispatching the trait must be implemented for 
+    //        those types that will be specified at runtime. 
+    // let Ok(file) = file else{
+    //     let err = file.unwrap_err();
+    //     return Err(Box::new(file)); 
+    // };
+
     let mut buffer = vec![];
-    file.read_to_end(&mut buffer).await?;
+    file.read_to_end(&mut buffer).await.unwrap(); // try to unwrap the ok part
+
+    // --------------------------------- SOLUTION 2
+    // custom error handler dispatch dynamically (requires the type to implement the Error trait)
+    // simply we can handle multiple error types through a the Error trait interface by boxing them
+    // at runtime, it's called dynamic dispatch and will be used where we don't know the exact type
+    // of the error at runtime and we would likely to box it an return it as an object safe trait 
+    // which is kina a dependency injection.
+    let condition = true;
+    // we can also return a boxed of CustomeErrMe or CustomeErrMe1 instance
+    // inside the Err variant of Result option
+    if condition{
+        return Err(Box::new(CustomeErrMe{}));
+    }
+    // using another custom error handler, what matters here is 
+    // that the type must implementes Error trait
+    if !condition{
+        return Err(Box::new(CustomeErrMe1{}));
+    }
+
+    // --------------------------------- SOLUTION 3
+    // since the return type of the error part would be dynamically dispatched
+    // thus any type that impl the Error and From trait can be used in here to
+    // be returned, i've used ? operator to upcast the CustomeErrMe1 into a 
+    // Box<dyn Error> at runtime.
+    let res = openFile2("path").await?;
+    let res1 = openFile2("path").await;
+    
+    // --------------------------------- SOLUTION 4
+    // we can also unwrap the error part and return it as a boxed instance of CustomeErrMe1
+    // inside the Err variant, we can actually do this since the CustomeErrMe1 impls Error and From
+    let Ok(file) = res1 else{
+        let err = res1.unwrap_err();
+        return Err(Box::new(err));
+    };
+    // ========================================================
+    // ========================================================
+    
+    let content = std::str::from_utf8(&buffer).unwrap();
+    let signature = wallet.self_ed25519_sign(&content, &prvkey).unwrap();
+
+    Ok(signature)
+
+}
+
+pub async fn openFile2(path: &str) 
+    // the return type for the error part could be:
+    // 1 - calling ? operator on the type which implements Error trait like file io causes the io error (From must be implemented as well to use ?)
+    // 2 - Err(CustomErrorHanlder{}) 
+    -> Result<String, CustomeErrMe1>{
+
+
+    let mut wallet = wallexerr::misc::Wallet::new_ed25519();
+    let prvkey = wallet.clone().ed25519_secret_key.unwrap(); 
+    let pubkey = wallet.clone().ed25519_public_key.unwrap(); 
+    let data = String::from("hash of some data");
+
+    let secure_cell_config = &mut SecureCellConfig{ 
+        secret_key: String::from("an strong fucking secret"), 
+        passphrase: String::from("an strong pass"), 
+        data: data.as_bytes().to_vec(),
+    };
+    let encrypted_data = wallet.self_secure_cell_encrypt(secure_cell_config).unwrap();
+    // let encrypted_data = secure_cell_config.data;
+    
+    let encrypted_hex = hex::encode(encrypted_data);
+    let signature = wallet.self_ed25519_sign(&encrypted_hex, &prvkey).unwrap();
+
+    // ---------------- HANDLING ERROR ----------------
+    // ========================================================
+    // ========================================================
+    // --------------------------------- SOLUTION 1
+    // ? operator upcast into CustomeErrMe1 (requires From trait to be implemented for the CustomeErrMe1)
+    // the return type of error part is not a dynamic dipatch rather it's an instance of CustomeErrMe1
+    // keep in mind that the error type must be implemented for CustomeErrMe1 using From trait which allows
+    // us to call ? operator on the type that causes the error, since the error part is of type CustomErrMe1
+    // Rust automatically convert the type causes the error into the error part which is CustomErrMe1.
+    let mut file = tokio::fs::File::open(path).await?; // use ? for upcasting to CustomeErrMe1
+
+    // --------------------------------- SOLUTION 2
+    // since the return type of error part is an instance of CustomeErrMe1 struct
+    // we can put it in Err variant directly without boxing it cause we're not going
+    // to return a dynamic dispatching error in this case. 
+    let condition = true;
+    if condition{
+        return Err(CustomeErrMe1 {  });
+    }
+    // ========================================================
+    // ========================================================
+
+    let mut buffer = vec![];
+    file.read_to_end(&mut buffer).await.unwrap(); // try to unwrap the ok part
     
     let content = std::str::from_utf8(&buffer).unwrap();
     let signature = wallet.self_ed25519_sign(&content, &prvkey).unwrap();
@@ -673,16 +904,22 @@ pub async fn openFile1(path: &str) -> Result<String, Box<dyn std::error::Error +
 // none blocking execution of all io tasks in lightweight threads 
 pub async fn runAsynclyAndConcurrently(){
 
-    // std mutex block the thread and prevent the thread from executing 
-    // other task in there by suspending the thread, tokio mutex block 
-    // the async io task instead of the thread, it allows the thread to 
-    // execute other tasks while the task is waiting for the lock.
-    // std mutex blocks the caller thread if the lock is busy and suspend 
-    // the thread from executing other tasks and using cpu resources until
-    // the thread becomes active by the os but in tokio mutex the async 
-    // task will be suspended instead of blocking the caller thread of mutex.
-
     /* 
+        we can use channels instead of awaiting on a tokio spawn joinhandle 
+        this allows the async task contains the async logics gets executed in the 
+        background in a none blocking manner while othet tasks continue executing 
+        in the same thread once, if we need result from the inside of the thread 
+        we can use mutex or channels to get that result without awating on the 
+        tokio spawn joinhandle.
+        std mutex block the thread and prevent the thread from executing 
+        other task in there by suspending the thread, tokio mutex block 
+        the async io task instead of the thread, it allows the thread to 
+        execute other tasks while the task is waiting for the lock.
+        std mutex blocks the caller thread if the lock is busy and suspend 
+        the thread from executing other tasks and using cpu resources until
+        the thread becomes active by the os but in tokio mutex the async 
+        task will be suspended instead of blocking the caller thread of mutex.
+
         in the context of os threads the runtime and the whole thread gets blocked 
         by waiting or joining on the thread hence the thread won't be able to execute
         other taks until the awaited one has finished running on the other hand 

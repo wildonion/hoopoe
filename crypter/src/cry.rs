@@ -402,6 +402,8 @@ pub mod eddsa_with_keccak256_signing{
 
 pub mod zkp{
 
+    // https://docs.circom.io/
+    // https://docs.ton.org/develop/dapps/tutorials/simple-zk-on-ton
     // https://noir-lang.org/index.html
     // https://github.com/rust-cc/awesome-cryptography-rust#zero-knowledge-proofs
     // https://github.com/cossacklabs/themis/blob/master/docs/examples/rust/secure_compare.rs => themis zkp

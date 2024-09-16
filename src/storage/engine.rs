@@ -2,7 +2,6 @@
 
 
 // engine supports ram and hard based storages like redis and postgres
-// it stores coming events into db
 
 
 use crate::*;

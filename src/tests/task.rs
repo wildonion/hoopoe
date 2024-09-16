@@ -177,6 +177,9 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S: S
         features we can pass them to the functions in an static or dynamic 
         dispatch way using Arc or Box or impl Future or event as the return 
         type of a closure trait method:
+            returning reference or box to dyn trait by casting the type who impls the trait into the trait 
+            dep injection object safe trait using & and smart pointers dyn
+            future as generic in return type of closure or function or pinning its box
             std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>
             Arc<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
             Box<dyn Fn() -> R + Send + Sync + 'static> where R: std::future::Future<Output = ()> + Send + Sync + 'static
@@ -254,7 +257,7 @@ impl<J: std::future::Future<Output = O> + Send + Sync + 'static + Clone,
 impl<O: Send + Sync + 'static, J: std::future::Future<Output = O> + 
      Send + Sync + 'static + Clone, S> TaskExt<String> for Task<J, S, O>
     where 
-        J::Output: Send + Sync + 'static, 
+        J::Output: Send + Sync + 'static,
         <J as std::future::Future>::Output: Send + Sync + 'static{
     
     type State = String;
@@ -263,7 +266,7 @@ impl<O: Send + Sync + 'static, J: std::future::Future<Output = O> +
     async fn execute_this(&self, t: String) {
          
         let this = self.clone();
-        let job = this.clone().job.clone();
+        let job = this.job.clone();
         tokio::spawn(job); // job is of type future, we're executing it inside another free thread
 
     }
@@ -329,6 +332,12 @@ impl<J: std::future::Future<Output = O> + Send + Sync + 'static + Clone + std::f
     pub fn push_task(&mut self, child: std::sync::Arc<TaskTree<J, S, O>>){
         let mut get_children = self.children.try_lock().unwrap();
         (*get_children).push(child);
+    }
+
+    pub fn pop_task(&mut self) -> Option<std::sync::Arc<TaskTree<J, S, O>>>{
+        let mut get_children = self.children.try_lock().unwrap();
+        let poped_task = (*get_children).pop();
+        poped_task
     }
 
 }

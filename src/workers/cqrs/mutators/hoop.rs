@@ -480,6 +480,19 @@ impl Handler<UpdateIsFinished> for HoopMutatorActor{
             Box::pin( // future objects as separate type needs to get pinned
                 // don't use blocking channles in async context, we've used
                 // async version of mpsc which requires an async context
+                /*
+                    pinning a boxed future would be a great option if we need to 
+                    execute async tasks like receiving from a an async channel inside 
+                    a none async scope like actor message handler functions, we can 
+                    wrap the async job around an async move{} and then pin the async 
+                    move{} scope to return it from the function, later when we invoke 
+                    the actual function we can catch the result which contains the 
+                    async future object and get the result of the future object by 
+                    awaiting on it which tells runtime to suspend the function execution 
+                    in there but don’t block the thread, continuing executing other 
+                    tasks in the current thread either in background (don’t await) or 
+                    by suspending (await) the task. 
+                */
                 async move{
                     let (tx, mut rx) 
                         = tokio::sync::mpsc::channel::<Option<DbHoopData>>(1024);

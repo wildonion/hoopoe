@@ -11,7 +11,7 @@ the thread waits for the io to gets completed while the scheduler is scheudling 
 a different OS thread to execute them concurrently without blocking program.
 **Tokio**: none blokcing async io in a lightweigh thread of execution using an event loop.
 **Golang**: blocking io in a lightweight thread without blocking the entire app using netpoller.
-**blocking use case for both**: locking mutex in a thread to avoid data being mutated by other threads at the same time.
+**blocking use case for both**: locking mutex in a thread to avoid data being mutated by other threads at the same time; if the lock is busy the caller thread gets blocked.
 waiting means please block the thread so i can get the result but executing the task in the background light io thread means don't wait and just pause the execution in there and go execute other tasks, waiting in golang requires the thread to gets blocked but in tokio will be done a none blocking way:
 
 ### Goroutines in Go:

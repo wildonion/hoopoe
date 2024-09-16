@@ -315,7 +315,7 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         tokio::sync::mpsc::channel::<Product>(1024);
 
     // second spawn, minting process and releasing the pid lock
-    let mint_task = tokio::spawn(
+    let mintTask = tokio::spawn(
         {
             let psender = psender.clone();
             let lock_ids = lock_ids.clone();
@@ -372,6 +372,10 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
 
         get a task that is solved sooner than the other async jobs or tasks 
         since we have only two different async tasks: minting and checking 
+
+        each tokio::spawn() contains an async io task which will be executed in 
+        the background by awaiting on them we'll tell the runtime to suspend the
+        function execution but don't block the thread during executing other tasks
     */
     tokio::select! {
         // if this branch is selected means the product minting
@@ -385,9 +389,9 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         // if this branch is selected means the product is inside 
         // the minting process and we should release the lock after
         // it completes and notify the client later, note that the 
-        // whole logic of the minting process is inside the mint_task
+        // whole logic of the minting process is inside the mintTask
         // spawned task
-        _ = mint_task => { // if mint_task was solved then we simply return false and the receiver
+        _ = mintTask => { // if mintTask was solved then we simply return false and the receiver
             return (false, preceiver); // during the minting process, if we're here means the minting is done
         },
     }

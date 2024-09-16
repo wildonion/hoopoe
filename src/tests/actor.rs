@@ -54,6 +54,7 @@
         > control over the execution flow: use tokio select to only join that thread which is completed sooner than others
         > distributed clustering talking: use rpc for sending message and calling each other methdos
     conclusion:
+        A threadpool has its own internal eventloop queue for popping out tasks.
         actor is a simple structure that can be used to execute async tasks and jobs in the whole 
         actor system threadpool they can also communicate and send message to each other by using 
         their mailbox, mailbox gives each actor a unique address to send message togehter using 
