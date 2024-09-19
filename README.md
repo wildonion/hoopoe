@@ -4,7 +4,7 @@
 
 ## ᝰ.ᐟ What am i?
 
-i'm hoopoe, the social event platform allows your hoop get heard!
+i'm hoopoe, a realtime social event platform allows your hoop get heard!
 
 ## Execution flow & system design?
 
@@ -19,7 +19,7 @@ i'm hoopoe, the social event platform allows your hoop get heard!
 
 - **step3)** instance of `NotifData` is cached on redis and stored in db.
 
-- **step4)** client invokes `/notif/get/owner/` api to get its notification during the app execution in a short polling manner.
+- **step4)** client invokes `/notif/get/owner/` api to get its notification during the app execution in a short polling manner or through ws streaming.
 
 ```
    ------------------ server1/node1 actor -----------------                                         ___________

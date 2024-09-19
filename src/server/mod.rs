@@ -177,8 +177,9 @@ impl HoopoeServer{
         let connection = sea_orm::Database::connect(
             db_url
         ).await.unwrap();
-        let fresh = args.fresh;
+
         // migration process at runtime
+        let fresh = args.fresh;
         // if fresh{
         //     log::info!("fresh db...");
         //     Migrator::fresh(connection).await.unwrap();

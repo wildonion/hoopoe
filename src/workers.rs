@@ -17,3 +17,4 @@ pub mod cqrs; // cqrs actor components
 pub mod notif; // broker actor component
 pub mod zerlog; // zerlog actor component
 pub mod scheduler; // hoop scheduler actor component
+pub mod actor;

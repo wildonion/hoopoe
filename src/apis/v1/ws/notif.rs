@@ -21,7 +21,9 @@ use crate::*;
     the notif broker however stores data on redis and db allows 
     the client to fetch notifs for an owner in a short polling manner
     this way is used to fetch all notifs for an owern in realtime as
-    they're receiving by the RMQ consumer.
+    they're receiving by the RMQ consumer, there is a jobq mpsc channel
+    being used to send the received notif through RMQ to this channel
+    likely we're receiving it in here using the rx of the mpsc channel. 
     addr: localhost:2344/v1/stream/notif/consume/?owner=100&room=notif_room
     owner is the notification owner which must be equal to the `receiver_info`
     field inside the notif_data instance received by the consumer. 
