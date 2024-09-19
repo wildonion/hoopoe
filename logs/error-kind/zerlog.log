@@ -58,3 +58,5 @@ code: 65535 | message: Message production error: UnknownPartition (Local: Unknow
  | time: 1726767152352 | method name: NotifBrokerActor.publishToKafka.deliveryStatus
 code: 65531 | message: invalid number at line 1 column 2 | due to: Serde Error
  | time: 1726771961937 | method name: NotifBrokerActor.consumeFromKafka.decode_serde
+code: 65531 | message: invalid number at line 1 column 2 | due to: Serde Error
+ | time: 1726773899166 | method name: NotifBrokerActor.consumeFromRedis.decode_serde
