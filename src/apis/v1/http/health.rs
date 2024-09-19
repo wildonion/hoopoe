@@ -7,7 +7,7 @@ use constants::STORAGE_IO_ERROR_CODE;
 use context::AppContext;
 use interfaces::crypter::Crypter; // use it here so we can call the encrypt and decrypt methods on the &[u8]
 use interfaces::product::ProductExt;
-use lockers::llm::Product;
+use lockers::llm::{Product, PurchasingStatus};
 use models::event::UserSecureCellConfig;
 use serde::{Deserialize, Serialize};
 use crate::*;
@@ -162,7 +162,8 @@ pub async fn mint(
     depot: &mut Depot,
     ctrl: &mut FlowCtrl, // with this we can control the flow of each route like executing the next handler
     // https://salvo.rs/book/features/openapi.html#extractors (QueryParam, HeaderParam, CookieParam, PathParam, FormBody, JsonBody)
-    prod: JsonBody<Product>, // used to extract the request body as well as showcasing in swagger ui
+    // prod: JsonBody<Product>, // used to extract the request body as well as showcasing in swagger ui
+    // NOTE: don't use JsonBody if you're using #[salvo(extract(default_source(from="body")))]
 ){
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context
@@ -177,16 +178,16 @@ pub async fn mint(
     */
 
     let mut prod = req.extract::<Product>().await.unwrap();
-    let (is_being_minted, mut updatedProductReceiver) = prod.atomic_purchase_status().await;
+    let (productStatus, mut updatedProductReceiver) = prod.atomic_purchase_status().await;
 
-    match is_being_minted{
-        true => {
+    match productStatus{
+        PurchasingStatus::Minting => { // someone is minting
             let server_time = format!("{}", chrono::Local::now().to_string());
             res.status_code = Some(StatusCode::LOCKED);
             res.render(Json(
                 HoopoeResponse{ 
                     data: prod.clone(), 
-                    message: "pid is locked", 
+                    message: "someone is minting the pid cuz it's locked", 
                     is_err: true, 
                     status: StatusCode::LOCKED.as_u16(),
                     meta: Some(
@@ -197,7 +198,7 @@ pub async fn mint(
                 }
             )); // reject the request
         },
-        false => {
+        _ => { // product is locked for minting
             // if you want to use while let Some the prod must be cloned in every iteration
             // hence using if let Some is the best option in here to avoid using clone.
             if let Some(product) = updatedProductReceiver.recv().await{
@@ -206,13 +207,13 @@ pub async fn mint(
                 res.render(Json(
                     HoopoeResponse{ 
                         data: prod.clone(), 
-                        message: "notify you once the minting gets done", 
+                        message: "product got locked for minting, notify you once the minting gets done", 
                         is_err: false, 
                         status: StatusCode::OK.as_u16(),
                         meta: Some(
                             serde_json::json!({
                                 "server_time": server_time,
-                                "minted_product": product
+                                "product_for_minting": product
                             })
                         )
                     }

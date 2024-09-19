@@ -50,3 +50,11 @@ code: 65451 | message: invalid parameter | due to: Themis Error
  | time: 1721815033092 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
 code: 65451 | message: invalid parameter | due to: Themis Error
  | time: 1721817375695 | method name: CrypterInterface.encrypt.Wallet::secure_cell_decrypt
+code: 65535 | message: Message production error: UnknownPartition (Local: Unknown partition) | due to: Redis, RMQ or Seaorm Error
+ | time: 1726766912112 | method name: NotifBrokerActor.publishToKafka.deliveryStatus
+code: 65535 | message: Message production error: UnknownPartition (Local: Unknown partition) | due to: Redis, RMQ or Seaorm Error
+ | time: 1726767026858 | method name: NotifBrokerActor.publishToKafka.deliveryStatus
+code: 65535 | message: Message production error: UnknownPartition (Local: Unknown partition) | due to: Redis, RMQ or Seaorm Error
+ | time: 1726767152352 | method name: NotifBrokerActor.publishToKafka.deliveryStatus
+code: 65531 | message: invalid number at line 1 column 2 | due to: Serde Error
+ | time: 1726771961937 | method name: NotifBrokerActor.consumeFromKafka.decode_serde

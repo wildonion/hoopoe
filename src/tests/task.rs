@@ -69,6 +69,7 @@ pub struct Task<J: std::future::Future<Output = O>, S, O> where // J is a Future
     pub pool: Vec<tokio::task::JoinHandle<O>>,
     pub worker: std::sync::Mutex<tokio::task::JoinHandle<O>>, // execute the task inside the background worker, this is a thread which is safe to be mutated in other threads 
     pub lock: std::sync::Mutex<()>, // the task itself is locked and can't be used by other threads
+    pub state: std::sync::Arc<tokio::sync::Mutex<Vec<u8>>> // the state of the worker must be safe to be shared between threads
 }
 
 // thread safe eventloop and queue: arc mutex vec T vs arc mutex receiver T
@@ -108,6 +109,7 @@ impl<O, J: std::future::Future<Output = O> + Send + Sync + 'static + Clone, S: S
                     tokio::spawn(job)
                 )
             },
+            state: std::sync::Arc::new(tokio::sync::Mutex::new(vec![])),
             lock: Default::default(),
         };
 

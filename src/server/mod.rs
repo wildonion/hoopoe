@@ -12,7 +12,7 @@ use context::AppContext;
 use tokio::sync::{mpsc::Receiver, Mutex};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use wallexerr::misc::Wallet;
-use workers::zerlog::ZerLogProducerActor;
+use workers::{scheduler, zerlog::ZerLogProducerActor};
 use salvo::affix_state;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use migration::{Migrator, MigratorTrait};
@@ -292,16 +292,6 @@ impl Actor for HoopoeWsServerActor{
 
 impl HoopoeWsServerActor{
 
-    async fn check_health(user_id: usize){
-        let mut interval = tokio::time::interval(constants::PING_INTERVAL);
-        tokio::spawn(async move{
-            loop{ 
-                interval.tick().await; // tick every 5 second in a loop
-                log::info!("websocket session for user#{} is alive", user_id);
-            }
-        });
-    }
-
     pub async fn send_message_to_ws_users_in_room(my_id: usize, msg: Message, this_room: &str) {
         let this_cloned_msg = msg.clone();
         let msg = if let Ok(s) = this_cloned_msg.to_str() {
@@ -351,7 +341,13 @@ impl HoopoeWsServerActor{
                 return;
             }
 
-            Self::check_health(user_id).await;
+            // check the heartbeat of the connected client in the background every 10 seconds
+            // runInterval() is a method that takes a closure which returns a future object 
+            // and a period param to execute the closure periodically in the background light
+            // thread of tokio runtime.
+            scheduler::runInterval(move || async move{
+                log::info!("websocket session for user#{} is alive", user_id);
+            }, 10).await;
 
             /* -------------------------
                 can't move pointers which is not live long enough into 

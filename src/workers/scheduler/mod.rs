@@ -35,17 +35,18 @@ pub async fn runInterval1<M, R, O>(task: std::sync::Arc<dyn Fn() -> R + Send + S
     });
 }
 
-pub async fn runInterval<M, R, O>(method: M, int: u64)
+// task is a closure that returns a future object 
+pub async fn runInterval<M, R, O>(task: M, period: u64)
     where M: Fn() -> R + Send + Sync + 'static,
             R: std::future::Future<Output = O> + Send + Sync + 'static,
 {
     tokio::spawn(async move{
-        let mut int = tokio::time::interval(tokio::time::Duration::from_secs(int));
+        let mut int = tokio::time::interval(tokio::time::Duration::from_secs(period));
         int.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         
         loop{
             int.tick().await;
-            method().await;
+            task().await;
         }
     });
 }

@@ -34,7 +34,7 @@
 										{
 											"key": "cover",
 											"type": "file",
-											"src": "/Users/wildonion/Desktop/onion.png"
+											"src": "/Users/wildonion/Desktop/DALL·E 2024-08-20 13.18.23 - A conceptual book cover design featuring a man without a suit walking in the middle. The ground beneath him subtly incorporates a heart with a brain e.webp"
 										},
 										{
 											"key": "etype",
@@ -63,7 +63,7 @@
 										},
 										{
 											"key": "started_at",
-											"value": "17578657778",
+											"value": "1724869829",
 											"type": "text"
 										},
 										{
@@ -85,6 +85,11 @@
 											"key": "invitations",
 											"value": "[{\"entrance_fee\": 10, \"friend_id\": 8}]",
 											"type": "text"
+										},
+										{
+											"key": "end_at",
+											"value": "1724869980",
+											"type": "text"
 										}
 									]
 								},
@@ -103,7 +108,7 @@
 					"name": "Notif",
 					"item": [
 						{
-							"name": "Register Notif (Produce)",
+							"name": "Publish To RMQ",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -114,7 +119,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"info\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    },\n    \"consumer_info\": null\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"Rmq\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -136,7 +141,73 @@
 							"response": []
 						},
 						{
-							"name": "Register Notif (Consume)",
+							"name": "Publish To Kafka",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"Kafka\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"headers\": [{\n                \"key\": \"wildonionKey\", \n                \"val\": \"wildonionValue\"\n            }],\n            \"partitions\": 4,\n            \"topic\": \"SavageTopic\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Publish To Redis",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkTRZGDr9L6fszxLz6xKvXrqJSJQNo9vAMjYs5tbbiRPskTGUgRegd"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": {\n        \"Redis\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"channel\": \"channel-to-produce-msg-to\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    },\n    \"consumer_info\": null\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Start RMQ Consumer",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -147,7 +218,73 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"info\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_redis_id\": \"notif_unique_redis_id\" // !!!!must be unique for every new notif!!!!\n            }\n        }\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Rmq\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Start Redis Consumer",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkRUAJQtFUBmfjrpL99YjTeaJ1jBEDgt7sCVdKKdvoUi4n6Ennr8e2"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Redis\": {\n            \"channel\": \"channel-to-consume-msg-from\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{events-v1}}/notif/",
+									"host": [
+										"{{events-v1}}"
+									],
+									"path": [
+										"notif",
+										""
+									]
+								},
+								"description": "if you want to produce notif into the RMQ channel put `consumer_info: null` and fill the `producer_info`, to consume notifs just put `producer_info: null` and fill the `consumer_info`"
+							},
+							"response": []
+						},
+						{
+							"name": "Start Kafka Consumer",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "token_time",
+										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Kafka\": {\n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"topics\": [\"SavageTopic\"],\n            \"consumerGroupId\": \"cid\", // this can be UUID\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"

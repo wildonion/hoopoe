@@ -32,7 +32,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          script: | # 1 - pull services from the custom registry (each image in dockercompose file prefixed with registry name) | 2 - up all the services
-            cd /root/hoopoe
+          script: | # cd hoopoe directly cause we're already in root
+            cd hoopoe
             sudo docker compose -f "docker-compose.yml" pull
             sudo docker compose -f "docker-compose.yml" up -d

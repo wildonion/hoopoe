@@ -138,9 +138,16 @@ pub struct Product{
     pub is_minted: bool,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum PurchasingStatus{
+    Minting, // someone is minting
+    Locked, // pid is locked and ready to gets minted, notify client
+    Done
+}
+
 impl ProductExt for Product{
     type Product = Self;
-    async fn atomic_purchase_status(&mut self) -> (bool, tokio::sync::mpsc::Receiver<Product>) {
+    async fn atomic_purchase_status(&mut self) -> (PurchasingStatus, tokio::sync::mpsc::Receiver<Product>) {
         start_minting(self.clone()).await
     }
     async fn mint(&mut self) -> (bool, Product){ 
@@ -254,7 +261,7 @@ impl ProductExt for Product{
     step3) if it's in there then we must reject the request
     step4) otherwise we can proceed to minting process
 */
-pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::Receiver<Product>){
+pub(self) async fn start_minting(product: Product) -> (PurchasingStatus, tokio::sync::mpsc::Receiver<Product>){
 
     /* ___ IMPORTANT
       ╰┈➤ in handling async future io tasks remember to use Mutex in a separate light io threads
@@ -271,7 +278,10 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
     let lock_ids = constants::PURCHASE_DEMO_LOCK_MUTEX.clone();
     
     let (tx, mut rx) = 
-        tokio::sync::mpsc::channel::<bool>(1024);
+        tokio::sync::mpsc::channel::<PurchasingStatus>(1024);
+
+    let (psender, preceiver) = 
+        tokio::sync::mpsc::channel::<Product>(1024);
     
     /* ___ IMPORTANT
       ╰┈➤ each actix worker thread contains the whole application factory instance each of them
@@ -294,26 +304,31 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         can use this data which causes to block the client request and makes him to get halted until
         the lock gets released.
     */
+    // ===================================== locking task
     tokio::spawn(
         { // cloning necessary data before moving into async move{} scope
-            let tx = tx.clone();
+            let clonedTx = tx.clone();
             let lock_ids = lock_ids.clone();
             async move{
                 let mut write_lock = lock_ids.lock().await;
                 if (*write_lock).contains(&pid){
                     log::info!("rejecting client request cause the id is still being minted!");
                     // reject the request since the product is being minted
-                    tx.send(true).await; // sending the true flag as rejecting the request
+                    clonedTx.send(PurchasingStatus::Minting).await; // sending the minting flag as rejecting the request
                 } else{
+                    clonedTx.send(PurchasingStatus::Locked).await; // sending the locked flag as the product is already locked and ready to gets minted
                     (*write_lock).push(pid); // save the id for future minters to reject their request during the first minting process
                 }
             }
         }
     );
 
-    let (psender, preceiver) = 
-        tokio::sync::mpsc::channel::<Product>(1024);
 
+    // ===================================== minting task
+    // we'll await on this task until it gets solved completely 
+    // by the runtime which means the product has been minted 
+    // successfully.
+    let clonedTx1 = tx.clone();
     // second spawn, minting process and releasing the pid lock
     let mintTask = tokio::spawn(
         {
@@ -352,6 +367,7 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
                 */
                 let mut write_lock = lock_ids.lock().await;
                 (*write_lock).retain(|&p_id| p_id != pid); // product got minted, don't keep its id in the locks vector, other clients can demand the minting process easily on the next request
+                clonedTx1.send(PurchasingStatus::Done).await; // sending done flag as product is not locked any more and the minting is done
             }
         }
     );
@@ -383,16 +399,16 @@ pub(self) async fn start_minting(product: Product) -> (bool, tokio::sync::mpsc::
         // if we receive something from the channel we know 100 percent 
         // it's a true flag or a rejecting flag cause we're only sending 
         // true flag to the channel.
-        _ = rx.recv() => {
-            return (true, preceiver); // product is being minted
+        status = rx.recv() => {
+            return (status.unwrap(), preceiver);
         },
         // if this branch is selected means the product is inside 
         // the minting process and we should release the lock after
         // it completes and notify the client later, note that the 
         // whole logic of the minting process is inside the mintTask
-        // spawned task
+        // spawned task, mintTask does return nothing!
         _ = mintTask => { // if mintTask was solved then we simply return false and the receiver
-            return (false, preceiver); // during the minting process, if we're here means the minting is done
+            return (PurchasingStatus::Done, preceiver); // during the minting process, if we're here means the minting is done
         },
     }
 

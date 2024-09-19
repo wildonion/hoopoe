@@ -4,7 +4,7 @@
 use chrono::{DateTime, NaiveDateTime};
 use sea_orm::prelude::DateTimeWithTimeZone;
 use serde::{Serialize, Deserialize};
-use workers::notif::{ConsumeNotif, ProduceNotif};
+use workers::notif::{ProducerInfo, ConsumerInfo};
 use crate::*;
 
 
@@ -50,21 +50,11 @@ pub enum TokenTimeScope{
 }
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
-pub struct ProduceNotifInfo{
-    pub info: ProduceNotif,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
-pub struct ConsumeNotifInfo{
-    pub info: ConsumeNotif,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default, Debug, ToSchema)]
 #[derive(Extractible)]
 #[salvo(extract(default_source(from="body")))]
 pub struct RegisterNotif{
-    pub producer_info: Option<ProduceNotifInfo>,
-    pub consumer_info: Option<ConsumeNotifInfo>,
+    pub producer_info: Option<ProducerInfo>,
+    pub consumer_info: Option<ConsumerInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]

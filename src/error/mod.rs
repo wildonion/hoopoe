@@ -190,7 +190,7 @@ pub enum ErrorKind{
     Crypter(CrypterError),
     #[error("Actix HTTP or WS Server Error")]
     Server(ServerError), // actix server io 
-    #[error("Redis, RMQ or Seaorm Error")]
+    #[error("Redis, Kafka, RMQ or Seaorm Error")]
     Storage(StorageError), // seaorm, redis, rmq
     #[error("Chrono, Parse Error")]
     Time(TimeError),
@@ -249,6 +249,8 @@ pub enum StorageError{
     Rmq(#[from] deadpool_lapin::lapin::Error), 
     #[error("[RMQ] - failed to get lapin pool")]
     RmqPool(#[from] deadpool_lapin::PoolError), 
+    #[error("[KAFKA] - failed to connect to kafka")]
+    Kafka(#[from] rdkafka::error::KafkaError), 
     #[error("[SEAORM] - faild to do db operation")]
     SeaOrm(#[from] sea_orm::DbErr)
 }

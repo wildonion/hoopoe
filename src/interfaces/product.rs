@@ -1,7 +1,7 @@
 
 
 
-use crate::lockers::llm::Product;
+use crate::lockers::llm::{Product, PurchasingStatus};
 
 
 /* -----------------
@@ -30,6 +30,6 @@ use crate::lockers::llm::Product;
 */
 pub trait ProductExt{
     type Product;
-    async fn atomic_purchase_status(&mut self) -> (bool, tokio::sync::mpsc::Receiver<Self::Product>);
+    async fn atomic_purchase_status(&mut self) -> (PurchasingStatus, tokio::sync::mpsc::Receiver<Self::Product>);
     async fn mint(&mut self) -> (bool, Product); // the actual logic to purchase a product and send it to the mint service
 }

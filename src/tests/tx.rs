@@ -3,7 +3,7 @@
 use std::sync::atomic::AtomicU8;
 use interfaces::payment::PaymentProcess;
 use models::event::ActionType;
-use notif::ProduceNotif;
+use notif::PublishNotifToRmq;
 use rand_chacha::ChaCha12Core;
 use salvo::rate_limiter::QuotaGetter;
 use wallexerr::misc::Wallet;
@@ -305,7 +305,7 @@ impl ActixMessageHandler<Send2Pool> for StatelessTransactionPool{
         }
 
         let prod_notif = 
-            ProduceNotif{
+            PublishNotifToRmq{
                 local_spawn: true,
                 notif_data: NotifData{ 
                     id: Uuid::new_v4().to_string(), 

@@ -65,46 +65,139 @@ pub async fn register_notif(
     let get_producer_info = register_notif_req.clone().producer_info;
     let get_consumer_info = register_notif_req.clone().consumer_info;
 
-    // there is a producer info in body
+    /* ************************************************************* */
+    /* *************** HE TRIES TO PRODUCE SOMETHING *************** */
+    /* ************************************************************* */
     if get_producer_info.is_some(){
+        
         let producer_info = get_producer_info.unwrap();
-        let mut notif = producer_info.info;
-        notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
+        if producer_info.Rmq.is_some(){
 
-        /* -ˋˏ✄┈┈┈┈
-            >_ sending notif to RMQ in the background
-                you may want to produce data in a loop{} constantly 
-                like sending gps data contains lat and long into the
-                exchange so other consumers be able to consume constantly
-                as the data coming at a same time, kindly put the sending
-                message logic to actor inside a loop{}.
-        */
-        tokio::spawn( // running the producing notif job in the background in a separate thread
-            {
-                let cloned_app_ctx = app_ctx.clone();
-                let cloned_notif = notif.clone();
-                async move{
-                    // producing nofit by sending the ProduceNotif message to
-                    // the producer actor,
-                    match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
-                            .broker_actors.notif_actor.send(cloned_notif).await
-                        {
-                            Ok(_) => { () },
-                            Err(e) => {
-                                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                let err_instance = crate::error::HoopoeErrorResponse::new(
-                                    *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
-                                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                    crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                    &String::from("register_notif.producer_actor.notif_actor.send"), // current method name
-                                    Some(&zerlog_producer_actor)
-                                ).await;
-                                return;
+            // since the actor supports the PublishNotifToRmq message so 
+            // use the unwrapped data to send the rmq producing message to the actor
+            let mut notif = producer_info.clone().Rmq.unwrap();
+            notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
+
+            /* -ˋˏ✄┈┈┈┈
+                >_ sending notif to RMQ in the background
+                    you may want to produce data in a loop{} constantly 
+                    like sending gps data contains lat and long into the
+                    exchange so other consumers be able to consume in realtime
+                    as the data coming at a same time to achieve this 
+                    kindly put the sending message logic to actor 
+                    inside a loop{}.
+            */
+            tokio::spawn( // running the producing notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // producing nofit by sending the ProduceNotif message to
+                        // the producer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { () },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.producer_actor.rmq.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
                             }
                         }
-                    }
-            }
-        );
+                }
+            );
+
+        } else if producer_info.Kafka.is_some(){
+            
+            // since the actor supports the PublishNotifToKafka message so 
+            // use the unwrapped data to send the kafka producing message to the actor
+            let mut notif = producer_info.clone().Kafka.unwrap();
+            
+            /* -ˋˏ✄┈┈┈┈
+                >_ sending notif to Kafka in the background
+                    you may want to produce data in a loop{} constantly 
+                    like sending gps data contains lat and long into the
+                    exchange so other consumers be able to consume in realtime
+                    as the data coming at a same time to achieve this 
+                    kindly put the sending message logic to actor 
+                    inside a loop{}.
+            */
+            tokio::spawn( // running the producing notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // producing nofit by sending the ProduceNotif message to
+                        // the producer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { () },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.producer_actor.kafka.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
+                            }
+                        }
+                }
+            );
+
+        } else{
+            
+            // since the actor supports the PublishNotifToRedis message so 
+            // use the unwrapped data to send the redis producing message to the actor
+            let mut notif = producer_info.clone().Redis.unwrap();
+
+            /* -ˋˏ✄┈┈┈┈
+                >_ sending notif to Redis in the background
+                    you may want to produce data in a loop{} constantly 
+                    like sending gps data contains lat and long into the
+                    exchange so other consumers be able to consume in realtime
+                    as the data coming at a same time to achieve this 
+                    kindly put the sending message logic to actor 
+                    inside a loop{}.
+            */
+            tokio::spawn( // running the producing notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // producing nofit by sending the ProduceNotif message to
+                        // the producer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { () },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.producer_actor.redis.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
+                            }
+                        }
+                }
+            );
+        }
 
         // in here the background task might have halted, executed or even 
         // crashed but the response is sent already to the caller regardless
@@ -119,69 +212,176 @@ pub async fn register_notif(
                 is_err: false, 
                 status: StatusCode::OK.as_u16(),
                 meta: Some(
-                    serde_json::to_value(&notif).unwrap()
+                    serde_json::to_value(&producer_info).unwrap()
                 )
             }
         ));
 
+    /* ************************************************************* */
+    /* *************** HE TRIES TO CONSUME SOMETHING *************** */
+    /* ************************************************************* */ 
     } else if get_consumer_info.is_some(){ // there is a consumer info in body
+        
         let consumer_info = get_consumer_info.unwrap();
-        let mut notif = consumer_info.info;
-        notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
-        notif.queue = format!("{}.{}:{}", APP_NAME, notif.tag, notif.queue);
+        if consumer_info.Rmq.is_some(){
 
-        /* -ˋˏ✄┈┈┈┈
-            >_ start consuming in the background
-                if you know the RMQ info you may want to start consuming in the 
-                background exactly when the server is being started otherwise 
-                you would have to send message to its actor to start it as an 
-                async task in the background.
-        */
-        tokio::spawn( // running the consuming notif job in the background in a separate thread
-            {
-                let cloned_app_ctx = app_ctx.clone();
-                let cloned_notif = notif.clone();
-                async move{
-                    // consuming notif by sending the ConsumeNotif message to 
-                    // the consumer actor,
-                    match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
-                            .broker_actors.notif_actor.send(cloned_notif).await
-                        {
-                            Ok(_) => { 
-                                
-                                // in here you could access the notif for an owner using 
-                                // a redis key like: notif_owner:3 which retrieve all data
-                                // on the redis for the receiver with id 3   
-                                () 
+            // since the actor supports the ConsumehNotifFromRmq message so 
+            // use the unwrapped data to send the rmq consuming message to the actor
+            let mut notif = consumer_info.clone().Rmq.unwrap();
+        
+            notif.exchange_name = format!("{}.notif:{}", APP_NAME, notif.exchange_name);
+            notif.queue = format!("{}.{}:{}", APP_NAME, notif.tag, notif.queue);
 
-                            },
-                            Err(e) => {
-                                let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                let err_instance = crate::error::HoopoeErrorResponse::new(
-                                    *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
-                                    source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                    crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                    &String::from("register_notif.consumer_actor.notif_actor.send"), // current method name
-                                    Some(&zerlog_producer_actor)
-                                ).await;
-                                return;
+            /* -ˋˏ✄┈┈┈┈
+                >_ start consuming in the background
+                    if you know the RMQ info you may want to start consuming in the 
+                    background exactly WHERE the server is being started otherwise 
+                    you would have to send message to its actor to start it as an 
+                    async task in the background.
+            */
+            tokio::spawn( // running the consuming notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // consuming notif by sending the ConsumeNotif message to 
+                        // the consumer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { 
+                                    
+                                    // in here you could access the notif for an owner using 
+                                    // a redis key like: notif_owner:3 which retrieve all data
+                                    // on the redis for the receiver with id 3   
+                                    () 
+
+                                },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.consumer_actor.rmq.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
                             }
-                        }
-    
+        
+                    }
                 }
-            }
-        );
+            );
+
+        } else if consumer_info.Kafka.is_some(){
+
+            // since the actor supports the ConsumehNotifFromKafka message so 
+            // use the unwrapped data to send the kafka consuming message to the actor
+            let mut notif = consumer_info.clone().Kafka.unwrap();
+            
+            /* -ˋˏ✄┈┈┈┈
+                >_ start consuming in the background
+                    if you know the Kafka info you may want to start consuming in the 
+                    background exactly WHERE the server is being started otherwise 
+                    you would have to send message to its actor to start it as an 
+                    async task in the background.
+            */
+            tokio::spawn( // running the consuming notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // consuming notif by sending the ConsumeNotif message to 
+                        // the consumer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { 
+                                    
+                                    // in here you could access the notif for an owner using 
+                                    // a redis key like: notif_owner:3 which retrieve all data
+                                    // on the redis for the receiver with id 3   
+                                    () 
+
+                                },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.consumer_actor.kafka.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
+                            }
+        
+                    }
+                }
+            );
+
+        } else{
+            
+            // since the actor supports the ConsumehNotifFromRedis message so 
+            // use the unwrapped data to send the redis consuming message to the actor
+            let mut notif = consumer_info.clone().Redis.unwrap();
+
+            /* -ˋˏ✄┈┈┈┈
+                >_ start consuming in the background
+                    if you know the Redis info you may want to start consuming in the 
+                    background exactly WHERE the server is being started otherwise 
+                    you would have to send message to its actor to start it as an 
+                    async task in the background.
+            */
+            tokio::spawn( // running the consuming notif job in the background in a separate thread
+                {
+                    let cloned_app_ctx = app_ctx.clone();
+                    let cloned_notif = notif.clone();
+                    async move{
+                        // consuming notif by sending the ConsumeNotif message to 
+                        // the consumer actor,
+                        match cloned_app_ctx.clone().unwrap().actors.as_ref().unwrap()
+                                .broker_actors.notif_actor.send(cloned_notif).await
+                            {
+                                Ok(_) => { 
+                                    
+                                    // in here you could access the notif for an owner using 
+                                    // a redis key like: notif_owner:3 which retrieve all data
+                                    // on the redis for the receiver with id 3   
+                                    () 
+
+                                },
+                                Err(e) => {
+                                    let source = &e.source().unwrap().to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                    let err_instance = crate::error::HoopoeErrorResponse::new(
+                                        *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                        crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                        &String::from("register_notif.consumer_actor.redis.notif_actor.send"), // current method name
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return;
+                                }
+                            }
+        
+                    }
+                }
+            );
+
+        }
 
         // fill the response object, salvo returns it by itself to the caller
         res.status_code = Some(StatusCode::OK);
         res.render(Json(
             HoopoeResponse::<&[u8]>{ 
                 data: &[], 
-                message: "SUCCESS: notification registered succesfully, consumer has started consuming", 
+                message: "SUCCESS: consumer has started consuming", 
                 is_err: false, 
                 status: StatusCode::OK.as_u16(),
                 meta: Some(
-                    serde_json::to_value(&notif).unwrap()
+                    serde_json::to_value(&consumer_info).unwrap()
                 )
             }
         ));
@@ -211,7 +411,9 @@ pub async fn register_notif(
 /* -ˋˏ✄┈┈┈┈
     >_  this route is used mainly to retrieve notifications in a short polling 
         manner, client must call this api in an interval to fetch notifs for an
-        owner or whole data like every 5 seconds to simulate realtiming in client.
+        owner or whole data like every 5 seconds to simulate realtiming in client
+        fetching notifs for an specific owner requires ownerId which is exactly
+        like a jobId in short polling process.
 */
 #[endpoint]
 pub async fn get_notif(
