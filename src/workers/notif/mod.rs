@@ -20,7 +20,6 @@
     it's notable that for realtime push notif streaming we MUST start consuming from
     the specified broker passed in to the message structure when talking with actor, in
     a place where the application logic which is likely a server is being started.
-               
     ************************************************************************************
     
     ========================================================================================
@@ -211,7 +210,7 @@ pub struct PublishNotifToRmq{
     pub exchange_name: String,
     pub exchange_type: String,
     pub routing_key: String,
-    pub encryption_config: Option<CryptoConfig>,
+    pub encryptionConfig: Option<CryptoConfig>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
@@ -287,7 +286,7 @@ pub struct ConsumeNotifFromRmq{ // we'll create a channel then start consuming b
     pub redis_cache_exp: u64,
     pub local_spawn: bool, // either spawn in actor context or tokio threadpool
     pub store_in_db: bool,
-    pub decryption_config: Option<CryptoConfig>
+    pub decryptionConfig: Option<CryptoConfig>
 }
 
 
@@ -417,7 +416,7 @@ impl NotifBrokerActor{
         match redis_pool.get().await{
             Ok(mut redis_conn) => {
 
-                // try to find the secure cell config on the redis and 
+                // try to create the secure cell config and 
                 // do passphrase and secret key validation logic before
                 // consuming messages
                 let mut secure_cell_config = if let Some(mut config) = decryption_config.clone(){
@@ -461,197 +460,208 @@ impl NotifBrokerActor{
                         let resp_val = message.unwrap();
                         let mut channelData = String::from_resp(resp_val).unwrap(); // this is the expired key
                         
-                        log::info!("Message has been Received from Redis PubSub Channel: {}", channelData);
+                        let mut secure_cell_config = secure_cell_config.clone();
+                        let cloned_notif_data_sender_channel = cloned_notif_data_sender_channel.clone();
+                        let zerlog_producer_actor = zerlog_producer_actor.clone();
+                        let notif_mutator_actor = notif_mutator_actor.clone();
+                        let redis_pool = redis_pool.clone();
 
-                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                        // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
-                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                        // if we have a config means the data has been encrypted
-                        let finalData = if 
-                            !secure_cell_config.clone().secret_key.is_empty() && 
-                            !secure_cell_config.clone().passphrase.is_empty(){
-                                
-                            // after calling decrypt method has changed and now contains raw string
-                            channelData.decrypt(&mut secure_cell_config);
-    
-                            // channelData is now raw string which can be decoded into the NotifData structure
-                            channelData
-    
-                        } else{
-                            // no decryption config is needed, just return the raw data
-                            // there would be no isse with decoding this into NotifData
-                            log::error!("secure_cell_config is empty, data is not encrypted");
-                            channelData
-                        };
-                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                        // potentially we're handling each message in light thread in the 
+                        // background asyncly to have concurrency
+                        tokio::spawn(async move{
 
-                        // either decrypted or the raw data as string
-                        log::info!("[*] received data: {}", finalData);
-                                                        
-                        // decoding the string data into the NotifData structure (convention)
-                        let get_notif_event = serde_json::from_str::<NotifData>(&finalData);
-                        match get_notif_event{
-                            Ok(notif_event) => {
+                            log::info!("Message has been Received from Redis PubSub Channel: {}", channelData);
+                            // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                            // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
+                            // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                            // if we have a config means the data has been encrypted
+                            let finalData = if 
+                                !secure_cell_config.clone().secret_key.is_empty() && 
+                                !secure_cell_config.clone().passphrase.is_empty(){
+                                    
+                                // after calling decrypt method has changed and now contains raw string
+                                channelData.decrypt(&mut secure_cell_config);
+        
+                                // channelData is now raw string which can be decoded into the NotifData structure
+                                channelData
+        
+                            } else{
+                                // no decryption config is needed, just return the raw data
+                                // there would be no isse with decoding this into NotifData
+                                log::error!("secure_cell_config is empty, data is not encrypted");
+                                channelData
+                            };
+                            // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                            // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                            // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
 
-                                log::info!("[*] deserialized data: {:?}", notif_event);
+                            // either decrypted or the raw data as string
+                            log::info!("[*] received data: {}", finalData);
+                                                            
+                            // decoding the string data into the NotifData structure (convention)
+                            let get_notif_event = serde_json::from_str::<NotifData>(&finalData);
+                            match get_notif_event{
+                                Ok(notif_event) => {
 
-                                // =================================================================
-                                /* -------------------------- send to mpsc channel for ws streaming
-                                // =================================================================
-                                    this is the most important part in here, we're slightly sending the data
-                                    to downside of a jobq mpsc channel, the receiver eventloop however will 
-                                    receive data in websocket handler which enables us to send realtime data 
-                                    received from RMQ to the browser through websocket server: RMQ over websocket
-                                    once we receive the data from the mpsc channel in websocket handler we'll 
-                                    send it to the browser through websocket channel.
-                                */
-                                if let Err(e) = cloned_notif_data_sender_channel.send(finalData).await{
-                                    log::error!("can't send notif data to websocket channel due to: {}", e.to_string());
-                                }
+                                    log::info!("[*] deserialized data: {:?}", notif_event);
 
-                                // =============================================================================
-                                // ------------- if the cache on redis flag was activated we then store on redis
-                                // =============================================================================
-                                if redis_cache_exp != 0{
-                                    match redis_pool.get().await{
-                                        Ok(mut redis_conn) => {
+                                    // =================================================================
+                                    /* -------------------------- send to mpsc channel for ws streaming
+                                    // =================================================================
+                                        this is the most important part in here, we're slightly sending the data
+                                        to downside of a jobq mpsc channel, the receiver eventloop however will 
+                                        receive data in websocket handler which enables us to send realtime data 
+                                        received from RMQ to the browser through websocket server: RMQ over websocket
+                                        once we receive the data from the mpsc channel in websocket handler we'll 
+                                        send it to the browser through websocket channel.
+                                    */
+                                    if let Err(e) = cloned_notif_data_sender_channel.send(finalData).await{
+                                        log::error!("can't send notif data to websocket channel due to: {}", e.to_string());
+                                    }
 
-                                            // key: String::from(notif_receiver.id) | value: Vec<NotifData>
-                                            let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
-                                            
-                                            // -ˋˏ✄┈┈┈┈ extend notifs
-                                            let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
-                                            let events = match get_events{
-                                                Ok(events_string) => {
-                                                    let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
-                                                    match get_messages{
-                                                        Ok(mut messages) => {
-                                                            messages.push(notif_event.clone());
-                                                            messages
-                                                        },
+                                    // =============================================================================
+                                    // ------------- if the cache on redis flag was activated we then store on redis
+                                    // =============================================================================
+                                    if redis_cache_exp != 0{
+                                        match redis_pool.get().await{
+                                            Ok(mut redis_conn) => {
+
+                                                // key: String::from(notif_receiver.id) | value: Vec<NotifData>
+                                                let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
+                                                
+                                                // -ˋˏ✄┈┈┈┈ extend notifs
+                                                let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
+                                                let events = match get_events{
+                                                    Ok(events_string) => {
+                                                        let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
+                                                        match get_messages{
+                                                            Ok(mut messages) => {
+                                                                messages.push(notif_event.clone());
+                                                                messages
+                                                            },
+                                                            Err(e) => {
+                                                                use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                                let error_content = &e.to_string();
+                                                                let error_content_ = error_content.as_bytes().to_vec();
+                                                                let mut error_instance = HoopoeErrorResponse::new(
+                                                                    *constants::CODEC_ERROR_CODE, // error code
+                                                                    error_content_, // error content
+                                                                    ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
+                                                                    "NotifBrokerActor.consumeFromRedis.decode_serde_redis", // method
+                                                                    Some(&zerlog_producer_actor)
+                                                                ).await;
+                                                                return; // terminate the caller
+                                                            }
+                                                        }
+                                        
+                                                    },
+                                                    Err(e) => {
+                                                        // we can't get the key means this is the first time we're creating the key
+                                                        // or the key is expired already, we'll create a new key either way and put
+                                                        // the init message in there.
+                                                        let init_message = vec![
+                                                            notif_event.clone()
+                                                        ];
+
+                                                        init_message
+
+                                                    }
+                                                };
+
+                                                // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
+                                                // chaching in redis is an async task which will be executed 
+                                                // in the background with an expirable key
+                                                tokio::spawn(async move{
+                                                    let events_string = serde_json::to_string(&events).unwrap();
+                                                    let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
+                                                    if is_key_there{ // update only the value
+                                                        let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
+                                                    } else{ // initializing a new expirable key containing the new notif data
+                                                        /*
+                                                            make sure you won't get the following error:
+                                                            called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
+                                                            save RDB snapshots, but it's currently unable to persist to disk. Commands that
+                                                            may modify the data set are disabled, because this instance is configured to 
+                                                            report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
+                                                            Please check the Redis logs for details about the RDB error. 
+                                                            SOLUTION: restart redis :)
+                                                        */
+                                                        let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, redis_cache_exp).await.unwrap();
+                                                    }
+                                                });
+
+                                            },
+                                            Err(e) => {
+                                                use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                let error_content = &e.to_string();
+                                                let error_content_ = error_content.as_bytes().to_vec();
+                                                let mut error_instance = HoopoeErrorResponse::new(
+                                                    *constants::STORAGE_IO_ERROR_CODE, // error code
+                                                    error_content_, // error content
+                                                    ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
+                                                    "NotifBrokerActor.consumeFromRedis.redis_pool", // method
+                                                    Some(&zerlog_producer_actor)
+                                            ).await;
+                                                return; // terminate the caller
+                                            }
+                                        }
+                                    }
+
+                                    // =============================================================================
+                                    // ------------- store in database
+                                    // =============================================================================
+                                    // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
+                                    // sending StoreNotifEvent message to the notif event mutator actor
+                                    // spawning the async task of storing data in db in the background
+                                    // worker of lightweight thread of execution using tokio threadpool
+                                    tokio::spawn(
+                                        {
+                                            let cloned_message = notif_event.clone();
+                                            let cloned_mutator_actor = notif_mutator_actor.clone();
+                                            let zerlog_producer_actor = zerlog_producer_actor.clone();
+                                            async move{
+                                                match cloned_mutator_actor
+                                                    .send(StoreNotifEvent{
+                                                        message: cloned_message,
+                                                        local_spawn: true
+                                                    })
+                                                    .await
+                                                    {
+                                                        Ok(_) => { () },
                                                         Err(e) => {
-                                                            use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                            let error_content = &e.to_string();
-                                                            let error_content_ = error_content.as_bytes().to_vec();
-                                                            let mut error_instance = HoopoeErrorResponse::new(
-                                                                *constants::CODEC_ERROR_CODE, // error code
-                                                                error_content_, // error content
-                                                                ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                                                "NotifBrokerActor.consumeFromRedis.decode_serde_redis", // method
+                                                            let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                            let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                                                &String::from("NotifBrokerActor.consumeFromRedis.notif_mutator_actor.send"), // current method name
                                                                 Some(&zerlog_producer_actor)
                                                             ).await;
-                                                            return; // terminate the caller
+                                                            return;
                                                         }
                                                     }
-                                    
-                                                },
-                                                Err(e) => {
-                                                    // we can't get the key means this is the first time we're creating the key
-                                                    // or the key is expired already, we'll create a new key either way and put
-                                                    // the init message in there.
-                                                    let init_message = vec![
-                                                        notif_event.clone()
-                                                    ];
-
-                                                    init_message
-
-                                                }
-                                            };
-
-                                            // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
-                                            // chaching in redis is an async task which will be executed 
-                                            // in the background with an expirable key
-                                            tokio::spawn(async move{
-                                                let events_string = serde_json::to_string(&events).unwrap();
-                                                let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
-                                                if is_key_there{ // update only the value
-                                                    let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
-                                                } else{ // initializing a new expirable key containing the new notif data
-                                                    /*
-                                                        make sure you won't get the following error:
-                                                        called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
-                                                        save RDB snapshots, but it's currently unable to persist to disk. Commands that
-                                                        may modify the data set are disabled, because this instance is configured to 
-                                                        report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
-                                                        Please check the Redis logs for details about the RDB error. 
-                                                        SOLUTION: restart redis :)
-                                                    */
-                                                    let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, redis_cache_exp).await.unwrap();
-                                                }
-                                            });
-
-                                        },
-                                        Err(e) => {
-                                            use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                            let error_content = &e.to_string();
-                                            let error_content_ = error_content.as_bytes().to_vec();
-                                            let mut error_instance = HoopoeErrorResponse::new(
-                                                *constants::STORAGE_IO_ERROR_CODE, // error code
-                                                error_content_, // error content
-                                                ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
-                                                "NotifBrokerActor.consumeFromRedis.redis_pool", // method
-                                                Some(&zerlog_producer_actor)
-                                        ).await;
-                                            return; // terminate the caller
+                                            }
                                         }
-                                    }
+                                    );
+
+                                },
+                                Err(e) => {
+                                    log::error!("[!] can't deserialized into NotifData struct");
+                                    use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                    let error_content = &e.to_string();
+                                    let error_content_ = error_content.as_bytes().to_vec();
+                                    let mut error_instance = HoopoeErrorResponse::new(
+                                        *constants::CODEC_ERROR_CODE, // error code
+                                        error_content_, // error content
+                                        ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
+                                        "NotifBrokerActor.consumeFromRedis.decode_serde", // method
+                                        Some(&zerlog_producer_actor)
+                                    ).await;
+                                    return; // terminate the caller
                                 }
-
-                                // =============================================================================
-                                // ------------- store in database
-                                // =============================================================================
-                                // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
-                                // sending StoreNotifEvent message to the notif event mutator actor
-                                // spawning the async task of storing data in db in the background
-                                // worker of lightweight thread of execution using tokio threadpool
-                                tokio::spawn(
-                                    {
-                                        let cloned_message = notif_event.clone();
-                                        let cloned_mutator_actor = notif_mutator_actor.clone();
-                                        let zerlog_producer_actor = zerlog_producer_actor.clone();
-                                        async move{
-                                            match cloned_mutator_actor
-                                                .send(StoreNotifEvent{
-                                                    message: cloned_message,
-                                                    local_spawn: true
-                                                })
-                                                .await
-                                                {
-                                                    Ok(_) => { () },
-                                                    Err(e) => {
-                                                        let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                        let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                            *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
-                                                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                            crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                                            &String::from("NotifBrokerActor.consumeFromRedis.notif_mutator_actor.send"), // current method name
-                                                            Some(&zerlog_producer_actor)
-                                                        ).await;
-                                                        return;
-                                                    }
-                                                }
-                                        }
-                                    }
-                                );
-
-                            },
-                            Err(e) => {
-                                log::error!("[!] can't deserialized into NotifData struct");
-                                use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                let error_content = &e.to_string();
-                                let error_content_ = error_content.as_bytes().to_vec();
-                                let mut error_instance = HoopoeErrorResponse::new(
-                                    *constants::CODEC_ERROR_CODE, // error code
-                                    error_content_, // error content
-                                    ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                    "NotifBrokerActor.consumeFromRedis.decode_serde", // method
-                                    Some(&zerlog_producer_actor)
-                                ).await;
-                                return; // terminate the caller
                             }
-                        }
+                        });
+                        
                         
                     }
                 });
@@ -952,8 +962,6 @@ impl NotifBrokerActor{
                                     }
                                 }
                                 
-                                consumer.commit_message(&message, CommitMode::Async).unwrap();
-
                                 // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
                                 // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
                                 // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
@@ -1127,6 +1135,9 @@ impl NotifBrokerActor{
                                                 }
                                             }
                                         );
+
+                                        // commit the message since it has been processed
+                                        consumer.commit_message(&message, CommitMode::Async).unwrap();
         
                                     },
                                     Err(e) => {
@@ -1190,7 +1201,7 @@ impl NotifBrokerActor{
         consumer_tag: &str, queue: &str, 
         binding_key: &str, exchange: &str,
         store_in_db: bool,
-        decryption_config: Option<CryptoConfig>
+        decryptionConfig: Option<CryptoConfig>
     ){
 
         let storage = self.app_storage.clone();
@@ -1279,38 +1290,19 @@ impl NotifBrokerActor{
                         // receiving is considered to be none blocking which won't block the current thread. 
                         tokio::spawn(async move{
 
-                            // try to find the secure cell config on the redis and 
+                            // try to create the secure cell config and 
                             // do passphrase and secret key validation logic before
                             // consuming messages
-                            let mut secure_cell_config = if let Some(mut config) = decryption_config.clone(){
-                                match redis_pool.get().await{
-                                    Ok(mut redis_conn) => {
-    
-                                        config.secret = hex::encode(config.secret);
-                                        config.passphrase = hex::encode(config.passphrase);
+                            let mut secure_cell_config = if let Some(mut config) = decryptionConfig.clone(){
+                        
+                                config.secret = hex::encode(config.secret);
+                                config.passphrase = hex::encode(config.passphrase);
 
-                                        // return the loaded instance from redis
-                                        SecureCellConfig{
-                                            secret_key: config.secret,
-                                            passphrase: config.passphrase,
-                                            data: vec![],
-                                        }
-    
-                                    },
-                                    Err(e) => {
-                                        use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                        let error_content = &e.to_string();
-                                        let error_content_ = error_content.as_bytes().to_vec();
-                                        let mut error_instance = HoopoeErrorResponse::new(
-                                            *constants::STORAGE_IO_ERROR_CODE, // error code
-                                            error_content_, // error content
-                                            ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
-                                            "NotifBrokerActor.produce.redis_pool", // method
-                                            Some(&zerlog_producer_actor)
-                                        ).await;
-    
-                                        SecureCellConfig::default()
-                                    }
+                                // return the loaded instance from redis
+                                SecureCellConfig{
+                                    secret_key: config.secret,
+                                    passphrase: config.passphrase,
+                                    data: vec![],
                                 }
 
                             } else{
@@ -1342,246 +1334,217 @@ impl NotifBrokerActor{
                                             Ok(delv) => {
 
                                                 log::info!("[*] received delivery from queue#<{}>", q.name());
+                                                let consumedBuffer = delv.data.clone();
+                                                let hexed_data = std::str::from_utf8(&consumedBuffer).unwrap();
+                                                let mut payload = hexed_data.to_string();
 
-                                                // if the consumer receives this data from the queue
-                                                match delv.ack(BasicAckOptions::default()).await{
-                                                    Ok(ok) => {
+                                                let mut secure_cell_config = secure_cell_config.clone();
+                                                let cloned_notif_data_sender_channel = cloned_notif_data_sender_channel.clone();
+                                                let redis_pool = redis_pool.clone();
+                                                let notif_mutator_actor = notif_mutator_actor.clone();
+                                                let cloned_zerlog_producer_actor = zerlog_producer_actor.clone();
 
-                                                        let consumed_buffer = delv.data;
-                                                        
-                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                                                        // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
-                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                                                        // if we have a config means the data has been encrypted
-                                                        let data = if !secure_cell_config.clone().data.is_empty(){
+                                                // handle the message in the background light thread asyncly and concurrently
+                                                // by spawning a light thread for the async task
+                                                tokio::spawn(async move{
 
-                                                            // if the decryption config is available then consumed_buffer is the hex of encrypted data
-                                                            let hexed_data = std::str::from_utf8(&consumed_buffer).unwrap();
-                                                            let encrypted_data_buffer = hex::decode(hexed_data).unwrap();
+                                                    // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                    // ===>>>===>>>===>>>===>>>===>>> data decryption logic ===>>>===>>>===>>>===>>>===>>>
+                                                    // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                    // if we have a config means the data has been encrypted
+                                                    let finalData = if 
+                                                        !secure_cell_config.clone().secret_key.is_empty() && 
+                                                        !secure_cell_config.clone().passphrase.is_empty(){
+                                                            
+                                                        // after calling decrypt method has changed and now contains raw string
+                                                        // payload must be mutable since the method mutate the content after decrypting
+                                                        payload.decrypt(&mut secure_cell_config);
 
-                                                            // // make sure that the encrypted data on redis is the same as the one consumed 
-                                                            // // by the consumer, we should first convert the base58 back to the original buffer
-                                                            if secure_cell_config.data.clone() != encrypted_data_buffer || 
-                                                                secure_cell_config.data.len() != encrypted_data_buffer.len(){
+                                                        // payload is now raw string which can be decoded into the NotifData structure
+                                                        payload
 
-                                                                    log::error!("received encrypted data != redis encrypted data, CHANNEL IS NOT SAFE!");
-                                                                    return; // terminate the caller, cancel the rest of computations
-                                                                }
+                                                    } else{
+                                                        // no decryption config is needed, just return the raw data
+                                                        // there would be no isse with decoding this into NotifData
+                                                        log::error!("secure_cell_config is empty, data is not encrypted");
+                                                        payload
+                                                    };
+                                                    // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                    // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                    // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
 
-                                                            /*  ====-----====-----====-----====-----====-----
-                                                                easier way for decryption using Crypter trait
-                                                                ====-----====-----====-----====-----====-----
-                                                            */ 
-                                                            let encrypted_data_buffer = secure_cell_config.data.clone(); // data is the encrypted buffer
-                                                            let mut stringified_encrypted_data_buffer = serde_json::to_string_pretty(&encrypted_data_buffer).unwrap();
-                                                            stringified_encrypted_data_buffer.decrypt(&mut secure_cell_config);
-                                                            // stringified_encrypted_data_buffer now contains the raw string of data
-                                                            // we can use it to decode it into structure
-                                                            // ... 
+                                                    // either decrypted or the raw data as string
+                                                    log::info!("[*] received data: {}", finalData);
+                                                    
+                                                    // decoding the string data into the NotifData structure (convention)
+                                                    let get_notif_event = serde_json::from_str::<NotifData>(&finalData);
+                                                    match get_notif_event{
+                                                        Ok(notif_event) => {
 
-                                                            // pass the secure_cell_config instance to decrypt the data, note 
-                                                            // that the instance must contains the encrypted data in form of utf8 bytes
-                                                            match Wallet::secure_cell_decrypt(&mut secure_cell_config){ // passing the redis secure_cell_config instance
-                                                                Ok(data) => {
-                                                                    // data is the raw utf8 bytes of the actual data
-                                                                    std::str::from_utf8(&data).unwrap().to_string()
-                                                                },
-                                                                Err(e) => {
+                                                            log::info!("[*] deserialized data: {:?}", notif_event);
 
-                                                                    let zerlog_producer_actor = zerlog_producer_actor.clone(); // clone the old one in each iteration
-                                                                    let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                    let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                        *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                                                                        source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                        crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                                                                        &String::from("NotifBrokerActor.consume.Wallet::secure_cell_decrypt"), // current method name
-                                                                        Some(&zerlog_producer_actor)
-                                                                    ).await;
-                                                                      
-                                                                    // can't decrypt return the raw base58 string of encrypted data
-                                                                    // this can't be decoded to NotifData we'll get serde error log!
-                                                                    std::str::from_utf8(&consumed_buffer).unwrap().to_string()
-                                                                }
+                                                            // =================================================================
+                                                            /* -------------------------- send to mpsc channel for ws streaming
+                                                            // =================================================================
+                                                                this is the most important part in here, we're slightly sending the data
+                                                                to downside of a jobq mpsc channel, the receiver eventloop however will 
+                                                                receive data in websocket handler which enables us to send realtime data 
+                                                                received from RMQ to the browser through websocket server: RMQ over websocket
+                                                                once we receive the data from the mpsc channel in websocket handler we'll 
+                                                                send it to the browser through websocket channel.
+                                                            */
+                                                            if let Err(e) = cloned_notif_data_sender_channel.send(finalData).await{
+                                                                log::error!("can't send notif data to websocket channel due to: {}", e.to_string());
                                                             }
 
-                                                        } else{
-                                                            // no decryption config is needed, just return the raw data
-                                                            // there would be no isse with decoding this into NotifData
-                                                            log::error!("encrypted data is empty in secure_cell_config instance");
-                                                            std::str::from_utf8(&consumed_buffer).unwrap().to_string()
-                                                        };
-                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-                                                        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
+                                                            // =============================================================================
+                                                            // ------------- if the cache on redis flag was activated we then store on redis
+                                                            // =============================================================================
+                                                            if exp_seconds != 0{
+                                                                match redis_pool.get().await{
+                                                                    Ok(mut redis_conn) => {
 
-                                                        // either decrypted or the raw data as string
-                                                        log::info!("[*] received data: {}", data);
-                                                        
-                                                        // decoding the string data into the NotifData structure (convention)
-                                                        let get_notif_event = serde_json::from_str::<NotifData>(&data);
-                                                        match get_notif_event{
-                                                            Ok(notif_event) => {
-
-                                                                log::info!("[*] deserialized data: {:?}", notif_event);
-
-                                                                // =================================================================
-                                                                /* -------------------------- send to mpsc channel for ws streaming
-                                                                // =================================================================
-                                                                    this is the most important part in here, we're slightly sending the data
-                                                                    to downside of a jobq mpsc channel, the receiver eventloop however will 
-                                                                    receive data in websocket handler which enables us to send realtime data 
-                                                                    received from RMQ to the browser through websocket server: RMQ over websocket
-                                                                    once we receive the data from the mpsc channel in websocket handler we'll 
-                                                                    send it to the browser through websocket channel.
-                                                                */
-                                                                if let Err(e) = cloned_notif_data_sender_channel.send(data).await{
-                                                                    log::error!("can't send notif data to websocket channel due to: {}", e.to_string());
-                                                                }
-
-                                                                // =============================================================================
-                                                                // ------------- if the cache on redis flag was activated we then store on redis
-                                                                // =============================================================================
-                                                                if exp_seconds != 0{
-                                                                    match redis_pool.get().await{
-                                                                        Ok(mut redis_conn) => {
-
-                                                                            // key: String::from(notif_receiver.id) | value: Vec<NotifData>
-                                                                            let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
-                                                                            
-                                                                            // -ˋˏ✄┈┈┈┈ extend notifs
-                                                                            let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
-                                                                            let events = match get_events{
-                                                                                Ok(events_string) => {
-                                                                                    let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
-                                                                                    match get_messages{
-                                                                                        Ok(mut messages) => {
-                                                                                            messages.push(notif_event.clone());
-                                                                                            messages
-                                                                                        },
-                                                                                        Err(e) => {
-                                                                                            use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                                                            let error_content = &e.to_string();
-                                                                                            let error_content_ = error_content.as_bytes().to_vec();
-                                                                                            let mut error_instance = HoopoeErrorResponse::new(
-                                                                                                *constants::CODEC_ERROR_CODE, // error code
-                                                                                                error_content_, // error content
-                                                                                                ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                                                                                "NotifBrokerActor.decode_serde_redis", // method
-                                                                                                Some(&zerlog_producer_actor)
-                                                                                            ).await;
-                                                                                            return; // terminate the caller
-                                                                                        }
+                                                                        // key: String::from(notif_receiver.id) | value: Vec<NotifData>
+                                                                        let redis_notif_key = format!("notif_owner:{}", &notif_event.receiver_info);
+                                                                        
+                                                                        // -ˋˏ✄┈┈┈┈ extend notifs
+                                                                        let get_events: RedisResult<String> = redis_conn.get(&redis_notif_key).await;
+                                                                        let events = match get_events{
+                                                                            Ok(events_string) => {
+                                                                                let get_messages = serde_json::from_str::<Vec<NotifData>>(&events_string);
+                                                                                match get_messages{
+                                                                                    Ok(mut messages) => {
+                                                                                        messages.push(notif_event.clone());
+                                                                                        messages
+                                                                                    },
+                                                                                    Err(e) => {
+                                                                                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                                                        let error_content = &e.to_string();
+                                                                                        let error_content_ = error_content.as_bytes().to_vec();
+                                                                                        let mut error_instance = HoopoeErrorResponse::new(
+                                                                                            *constants::CODEC_ERROR_CODE, // error code
+                                                                                            error_content_, // error content
+                                                                                            ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
+                                                                                            "NotifBrokerActor.decode_serde_redis", // method
+                                                                                            Some(&cloned_zerlog_producer_actor)
+                                                                                        ).await;
+                                                                                        return; // terminate the caller
                                                                                     }
-                                                                    
-                                                                                },
-                                                                                Err(e) => {
-                                                                                    // we can't get the key means this is the first time we're creating the key
-                                                                                    // or the key is expired already, we'll create a new key either way and put
-                                                                                    // the init message in there.
-                                                                                    let init_message = vec![
-                                                                                        notif_event.clone()
-                                                                                    ];
-
-                                                                                    init_message
-
                                                                                 }
-                                                                            };
+                                                                
+                                                                            },
+                                                                            Err(e) => {
+                                                                                // we can't get the key means this is the first time we're creating the key
+                                                                                // or the key is expired already, we'll create a new key either way and put
+                                                                                // the init message in there.
+                                                                                let init_message = vec![
+                                                                                    notif_event.clone()
+                                                                                ];
 
-                                                                            // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
-                                                                            // chaching in redis is an async task which will be executed 
-                                                                            // in the background with an expirable key
-                                                                            tokio::spawn(async move{
-                                                                                let events_string = serde_json::to_string(&events).unwrap();
-                                                                                let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
-                                                                                if is_key_there{ // update only the value
-                                                                                    let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
-                                                                                } else{ // initializing a new expirable key containing the new notif data
-                                                                                    /*
-                                                                                        make sure you won't get the following error:
-                                                                                        called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
-                                                                                        save RDB snapshots, but it's currently unable to persist to disk. Commands that
-                                                                                        may modify the data set are disabled, because this instance is configured to 
-                                                                                        report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
-                                                                                        Please check the Redis logs for details about the RDB error. 
-                                                                                        SOLUTION: restart redis :)
-                                                                                    */
-                                                                                    let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
-                                                                                }
-                                                                            });
+                                                                                init_message
 
-                                                                        },
-                                                                        Err(e) => {
-                                                                            use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                                            let error_content = &e.to_string();
-                                                                            let error_content_ = error_content.as_bytes().to_vec();
-                                                                            let mut error_instance = HoopoeErrorResponse::new(
-                                                                                *constants::STORAGE_IO_ERROR_CODE, // error code
-                                                                                error_content_, // error content
-                                                                                ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
-                                                                                "NotifBrokerActor.redis_pool", // method
-                                                                                Some(&zerlog_producer_actor)
-                                                                        ).await;
-                                                                            return; // terminate the caller
-                                                                        }
+                                                                            }
+                                                                        };
+
+                                                                        // -ˋˏ✄┈┈┈┈ caching the notif event in redis with expirable key
+                                                                        // chaching in redis is an async task which will be executed 
+                                                                        // in the background with an expirable key
+                                                                        tokio::spawn(async move{
+                                                                            let events_string = serde_json::to_string(&events).unwrap();
+                                                                            let is_key_there: bool = redis_conn.exists(&redis_notif_key.clone()).await.unwrap();
+                                                                            if is_key_there{ // update only the value
+                                                                                let _: () = redis_conn.set(&redis_notif_key.clone(), &events_string).await.unwrap();
+                                                                            } else{ // initializing a new expirable key containing the new notif data
+                                                                                /*
+                                                                                    make sure you won't get the following error:
+                                                                                    called `Result::unwrap()` on an `Err` value: MISCONF: Redis is configured to 
+                                                                                    save RDB snapshots, but it's currently unable to persist to disk. Commands that
+                                                                                    may modify the data set are disabled, because this instance is configured to 
+                                                                                    report errors during writes if RDB snapshotting fails (stop-writes-on-bgsave-error option). 
+                                                                                    Please check the Redis logs for details about the RDB error. 
+                                                                                    SOLUTION: restart redis :)
+                                                                                */
+                                                                                let _: () = redis_conn.set_ex(&redis_notif_key.clone(), &events_string, exp_seconds).await.unwrap();
+                                                                            }
+                                                                        });
+
+                                                                    },
+                                                                    Err(e) => {
+                                                                        use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                                        let error_content = &e.to_string();
+                                                                        let error_content_ = error_content.as_bytes().to_vec();
+                                                                        let mut error_instance = HoopoeErrorResponse::new(
+                                                                            *constants::STORAGE_IO_ERROR_CODE, // error code
+                                                                            error_content_, // error content
+                                                                            ErrorKind::Storage(crate::error::StorageError::RedisPool(e)), // error kind
+                                                                            "NotifBrokerActor.redis_pool", // method
+                                                                            Some(&cloned_zerlog_producer_actor)
+                                                                    ).await;
+                                                                        return; // terminate the caller
                                                                     }
                                                                 }
-
-                                                                // =============================================================================
-                                                                // ------------- if the store in db flag was activated we then store in database
-                                                                // =============================================================================
-                                                                if store_in_db{
-                                                                    // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
-                                                                    // sending StoreNotifEvent message to the notif event mutator actor
-                                                                    // spawning the async task of storing data in db in the background
-                                                                    // worker of lightweight thread of execution using tokio threadpool
-                                                                    tokio::spawn(
-                                                                        {
-                                                                            let cloned_message = notif_event.clone();
-                                                                            let cloned_mutator_actor = notif_mutator_actor.clone();
-                                                                            let zerlog_producer_actor = zerlog_producer_actor.clone();
-                                                                            async move{
-                                                                                match cloned_mutator_actor
-                                                                                    .send(StoreNotifEvent{
-                                                                                        message: cloned_message,
-                                                                                        local_spawn: true
-                                                                                    })
-                                                                                    .await
-                                                                                    {
-                                                                                        Ok(_) => { () },
-                                                                                        Err(e) => {
-                                                                                            let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                                                                                            let err_instance = crate::error::HoopoeErrorResponse::new(
-                                                                                                *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
-                                                                                                source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                                                                                                crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
-                                                                                                &String::from("NotifBrokerActor.notif_mutator_actor.send"), // current method name
-                                                                                                Some(&zerlog_producer_actor)
-                                                                                            ).await;
-                                                                                            return;
-                                                                                        }
-                                                                                    }
-                                                                            }
-                                                                        }
-                                                                    );
-                                                                }
-
-                                                            },
-                                                            Err(e) => {
-                                                                log::error!("[!] can't deserialized into NotifData struct");
-                                                                use crate::error::{ErrorKind, HoopoeErrorResponse};
-                                                                let error_content = &e.to_string();
-                                                                let error_content_ = error_content.as_bytes().to_vec();
-                                                                let mut error_instance = HoopoeErrorResponse::new(
-                                                                    *constants::CODEC_ERROR_CODE, // error code
-                                                                    error_content_, // error content
-                                                                    ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
-                                                                    "NotifBrokerActor.decode_serde", // method
-                                                                    Some(&zerlog_producer_actor)
-                                                                ).await;
-                                                                return; // terminate the caller
                                                             }
+
+                                                            // =============================================================================
+                                                            // ------------- if the store in db flag was activated we then store in database
+                                                            // =============================================================================
+                                                            if store_in_db{
+                                                                // -ˋˏ✄┈┈┈┈ store notif in db by sending message to the notif mutator actor worker
+                                                                // sending StoreNotifEvent message to the notif event mutator actor
+                                                                // spawning the async task of storing data in db in the background
+                                                                // worker of lightweight thread of execution using tokio threadpool
+                                                                tokio::spawn(
+                                                                    {
+                                                                        let cloned_message = notif_event.clone();
+                                                                        let cloned_mutator_actor = notif_mutator_actor.clone();
+                                                                        let zerlog_producer_actor = cloned_zerlog_producer_actor.clone();
+                                                                        async move{
+                                                                            match cloned_mutator_actor
+                                                                                .send(StoreNotifEvent{
+                                                                                    message: cloned_message,
+                                                                                    local_spawn: true
+                                                                                })
+                                                                                .await
+                                                                                {
+                                                                                    Ok(_) => { () },
+                                                                                    Err(e) => {
+                                                                                        let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
+                                                                                        let err_instance = crate::error::HoopoeErrorResponse::new(
+                                                                                            *MAILBOX_CHANNEL_ERROR_CODE, // error hex (u16) code
+                                                                                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
+                                                                                            crate::error::ErrorKind::Actor(crate::error::ActixMailBoxError::Mailbox(e)), // the actual source of the error caused at runtime
+                                                                                            &String::from("NotifBrokerActor.notif_mutator_actor.send"), // current method name
+                                                                                            Some(&zerlog_producer_actor)
+                                                                                        ).await;
+                                                                                        return;
+                                                                                    }
+                                                                                }
+                                                                        }
+                                                                    }
+                                                                );
+                                                            }
+
+                                                        },
+                                                        Err(e) => {
+                                                            log::error!("[!] can't deserialized into NotifData struct");
+                                                            use crate::error::{ErrorKind, HoopoeErrorResponse};
+                                                            let error_content = &e.to_string();
+                                                            let error_content_ = error_content.as_bytes().to_vec();
+                                                            let mut error_instance = HoopoeErrorResponse::new(
+                                                                *constants::CODEC_ERROR_CODE, // error code
+                                                                error_content_, // error content
+                                                                ErrorKind::Codec(crate::error::CodecError::Serde(e)), // error kind
+                                                                "NotifBrokerActor.decode_serde", // method
+                                                                Some(&cloned_zerlog_producer_actor)
+                                                            ).await;
+                                                            return; // terminate the caller
                                                         }
-                                                    },
+                                                    }
+                                                });
+
+                                                // acking here means we have processed payload successfully
+                                                match delv.ack(BasicAckOptions::default()).await{
+                                                    Ok(ok) => { /* acked */ },
                                                     Err(e) => {
                                                         use crate::error::{ErrorKind, HoopoeErrorResponse};
                                                         let error_content = &e.to_string();
@@ -1668,7 +1631,7 @@ impl NotifBrokerActor{
     /* ********************************************************************* */
     /* ***************************** PRODUCING ***************************** */
     /* ********************************************************************* */
-    pub async fn publishToRmq(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str, secure_cell_config: &mut SecureCellConfig){
+    pub async fn publishToRmq(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str){
 
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         let this = self.clone();
@@ -1681,7 +1644,6 @@ impl NotifBrokerActor{
         let routing_key = routing_key.to_string();
         let exchange_type = exchange_type.to_string();
         let data = data.to_string();
-        let cloned_secure_cell_config = secure_cell_config.clone();
 
         tokio::spawn(async move{
 
@@ -1859,99 +1821,44 @@ impl ActixMessageHandler<PublishNotifToRmq> for NotifBrokerActor{
                 routing_key,
                 local_spawn,
                 notif_data,
-                encryption_config,
+                encryptionConfig,
 
             } = msg.clone();
         
-        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-        // ===>>>===>>>===>>>===>>>===>>> data encryption logic ===>>>===>>>===>>>===>>>===>>>
-        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-        let stringified_config_data = if let Some(config) = encryption_config{
-
-            // hex encoding the secret and passphrase
+        let this = self.clone();
+        
+        let mut stringData = serde_json::to_string(&notif_data).unwrap();
+        let finalData = if encryptionConfig.is_some(){
+                        
+            let CryptoConfig{ secret, passphrase } = encryptionConfig.clone().unwrap();
             let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
-                secret_key: hex::encode(config.secret),
-                passphrase: hex::encode(config.passphrase),
-                data: serde_json::to_vec(&notif_data).unwrap(),
+                secret_key: hex::encode(secret),
+                passphrase: hex::encode(passphrase),
+                data: vec![],
             };
 
-            /*  ====-----====-----====-----====-----====-----
-                easier way for encryption using Crypter trait
-                ====-----====-----====-----====-----====-----
-            */
-            let mut notif_data_str = serde_json::to_string_pretty(&notif_data).unwrap();
-            notif_data_str.encrypt(secure_cell_config);
-            // notif_data_str now is the hex encrypted of the raw data
-            // ...
+            // after calling encrypt method stringData has changed and contains the hex encrypted data
+            stringData.encrypt(secure_cell_config);
             
-
-            let str_data = match Wallet::secure_cell_encrypt(secure_cell_config){
-                Ok(data) => {
-                    use base58::ToBase58;
-                    let stringified_data = hex::encode(&data);
-
-                    // the data in secure_cell_config must be the encrypted data for future decryption
-                    // we need to update the data field right after the encryption since we're storing 
-                    // the secure_cell_config instance on redis which must contains the encrypted data.
-                    secure_cell_config.data = data; 
-
-                    stringified_data // this can also be a base58 or base64
-                },
-                Err(e) => {
-                    let zerlog_producer_actor = self.zerlog_producer_actor.clone();
-                    // log the error in the a background lightweight thread of execution inside tokio threads
-                    // since we don't need output or any result from the task inside the thread thus
-                    // there is no channel to send data to outside of tokio::spawn, the writing however
-                    // consists of file and rmq (network) operations which are none blocking async io
-                    // processes need to get executed in a light thread instead of cpu thread.
-                    tokio::spawn(async move{
-                        let source = &e.to_string(); // we know every goddamn type implements Error trait, we've used it here which allows use to call the source method on the object
-                        let err_instance = crate::error::HoopoeErrorResponse::new(
-                            *CRYPTER_THEMIS_ERROR_CODE, // error hex (u16) code
-                            source.as_bytes().to_vec(), // text of error source in form of utf8 bytes
-                            crate::error::ErrorKind::Crypter(crate::error::CrypterError::Themis(e)), // the actual source of the error caused at runtime
-                            &String::from("NotifBrokerActor.ActixMessageHandler<PublishNotifToRmq>.Wallet::secure_cell_encrypt"), // current method name
-                            Some(&zerlog_producer_actor)
-                        ).await;
-                    });
-                    // return the actual data with no encryption
-                    serde_json::to_string_pretty(&notif_data).unwrap()
-                }
-            };
-
-            (str_data, secure_cell_config.to_owned())
+            stringData
 
         } else{
-            // we can't return a reference to a SecureCellConfig in here cause 
-            // it's a variable which has defined in the current scope and once 
-            // this scope gets executed and dropped the instance hence any pointer 
-            // of it won't be valid. so don't return a mutable pointer to SecureCellConfig
-            // instance in here.
-            (serde_json::to_string_pretty(&notif_data).unwrap(), SecureCellConfig::default())
+            stringData
         };
-        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
-        // ===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>>===>>
 
-        let this = self.clone();
-
-        let (
-            stringified_data, 
-            mut secure_cell_config, 
-        ) = stringified_config_data;
 
         // spawn the future in the background into the given actor context thread
         // by doing this we're executing the future inside the actor thread since
         // every actor has its own thread of execution.
         if local_spawn{
             async move{
-                this.publishToRmq(&stringified_data, &exchange_name, &routing_key, &exchange_type,&mut secure_cell_config).await;
+                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type).await;
             }
             .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
             .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
-                this.publishToRmq(&stringified_data, &exchange_name, &routing_key, &exchange_type,&mut secure_cell_config).await;
+                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type).await;
             });
         }
         
@@ -1978,7 +1885,7 @@ impl ActixMessageHandler<ConsumeNotifFromRmq> for NotifBrokerActor{
                 redis_cache_exp,
                 local_spawn,
                 store_in_db,
-                decryption_config
+                decryptionConfig
 
             } = msg.clone(); // the unpacking pattern is always matched so if let ... is useless
         
@@ -1996,7 +1903,7 @@ impl ActixMessageHandler<ConsumeNotifFromRmq> for NotifBrokerActor{
                     &routing_key, 
                     &exchange_name,
                     store_in_db,
-                    decryption_config
+                    decryptionConfig
                 ).await;
             }
             .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
@@ -2010,7 +1917,7 @@ impl ActixMessageHandler<ConsumeNotifFromRmq> for NotifBrokerActor{
                     &routing_key, 
                     &exchange_name,
                     store_in_db,
-                    decryption_config
+                    decryptionConfig
                 ).await;
             });
         }

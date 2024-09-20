@@ -114,12 +114,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkTRZGDr9L6fszxLz6xKvXrqJSJQNo9vAMjYs5tbbiRPskTGUgRegd"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"Rmq\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"Rmq\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -147,7 +147,7 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {
@@ -180,7 +180,7 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {
@@ -207,18 +207,18 @@
 							"response": []
 						},
 						{
-							"name": "Start RMQ Consumer",
+							"name": "Start RMQ Consumer | Run Me First!",
 							"request": {
 								"method": "POST",
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkRUAJQtFUBmfjrpL99YjTeaJ1jBEDgt7sCVdKKdvoUi4n6Ennr8e2"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Rmq\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryption_config\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Rmq\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -240,13 +240,13 @@
 							"response": []
 						},
 						{
-							"name": "Start Redis Consumer",
+							"name": "Start Redis Consumer | Run Me First!",
 							"request": {
 								"method": "POST",
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {
@@ -273,13 +273,13 @@
 							"response": []
 						},
 						{
-							"name": "Start Kafka Consumer",
+							"name": "Start Kafka Consumer | Run Me First!",
 							"request": {
 								"method": "POST",
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkFidRW3uAzhcFniiky7b2HjFPME8R5ZLdFgs9z6WncoLbPh72EPNX"
+										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
 									}
 								],
 								"body": {

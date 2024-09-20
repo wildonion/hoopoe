@@ -34,7 +34,7 @@ async fn consume(
     res: &mut Response, 
     depot: &mut Depot,
     ctrl: &mut FlowCtrl,
-    notif_query: QueryParam<EventQuery, true> // query param is required, showcasing in swagger ui
+    // notif_query: QueryParam<EventQuery, true> // query param is required, showcasing in swagger ui
 ) -> Result<(), StatusError>{
 
     let app_ctx = depot.obtain::<Option<AppContext>>().unwrap(); // extracting shared app context

@@ -319,7 +319,7 @@ impl ActixMessageHandler<Send2Pool> for StatelessTransactionPool{
                 exchange_name: format!("{}.notif:TxPool", APP_NAME),
                 exchange_type: String::from("fanout"),
                 routing_key: String::from(""),
-                encryption_config: None, // don't encrypt the data 
+                encryptionConfig: None, // don't encrypt the data 
             };
 
         // background worker thread using tokio
