@@ -12,7 +12,6 @@ members = [
 [dependencies]
 migration = { path = "migration", name = "migration" }
 crypter = { path = "crypter", name = "crypter" }
-capnp-rpc = "0.19.4"
 salvo = { version = "0.71.1", features = ["full"] }
 actix = "0.13.5"
 actix-web = "4"
@@ -30,7 +29,6 @@ is_type = "0.2.1"
 rayon = "1.10.0"
 rand = "0.8"
 rslock = "0.4.0"
-tonic = "0.12"
 futures = "0.3"
 deadpool-lapin = { version = "0.12.1", features = ["serde", "rt_tokio_1"] }
 deadpool-redis = "0.16.0"
@@ -68,11 +66,6 @@ rand_chacha = "0.3"
 chacha20 = "0.9"
 indexmap = "2.4"
 
-
-[[bin]]
-name = "playground"
-path = "playground/main.rs"
-
 [[bin]]
 path = "src/app.rs"
 name = "hoopoe"
@@ -83,12 +76,6 @@ opt-level = 3
 lto = true
 codegen-units = 1
 overflow-checks = true # panic on any overflow
-
-[build-dependencies]
-tonic-build = "0.10.2"
-
-[dependencies.capnp]
-version = "0.19.0"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3

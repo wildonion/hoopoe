@@ -115,8 +115,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     channel
         .basic_publish(
-            "",
-            request_queue,
+            "", // "" means direct exchange
+            request_queue, // in direct exchange routing key is the same as the queue name
             BasicPublishOptions::default(),
             request_payload.to_vec(),
             BasicProperties::default()
@@ -207,8 +207,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let response_payload = b"Response Payload";
             channel
                 .basic_publish(
-                    "",
-                    reply_to.as_str(),
+                    "", // "" means direct exchange
+                    reply_to.as_str(), // in direct exchange routing key is the same as the queue name 
                     BasicPublishOptions::default(),
                     response_payload.to_vec(),
                     BasicProperties::default()

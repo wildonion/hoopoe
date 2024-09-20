@@ -4,8 +4,6 @@ use std::sync::atomic::AtomicU8;
 use interfaces::payment::PaymentProcess;
 use models::event::ActionType;
 use notif::PublishNotifToRmq;
-use rand_chacha::ChaCha12Core;
-use salvo::rate_limiter::QuotaGetter;
 use wallexerr::misc::Wallet;
 use crate::interfaces::tx::TransactionExt;
 use crate::*;
@@ -358,132 +356,66 @@ impl ActixMessageHandler<Execute> for StatelessTransactionPool{
 
 }
 
-pub async fn any_type_dyn_stat_dispatch(){
+// ---------------------------------------------------------
+//         SOLID BASED DESIGN PATTERN FOR PAYMENT
+// ---------------------------------------------------------
+// there should be always a rely solution on abstractions like 
+// implementing trait for struct and extending its behaviour 
+// instead of changing the actual code base and concrete impls. 
+struct PayPal; // paypal gateway
+struct ZarinPal; // zarinpal gateway
+
+struct PaymentWallet{
+    pub owner: String,
+    pub id: uuid::Uuid,
+    pub transactions: Vec<Transaction> // transactions that need to be executed
+}
+
+impl PaymentProcess<PayPal> for PaymentWallet{
+    type Status = AtomicU8;
+
+    // future traits as objects must be completelly a separate type
+    // which can be achieved by pinning the boxed version of future obj 
+    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
     
-    // ---------------------------------------------------------
-    //         SOLID BASED DESIGN PATTERN FOR PAYMENT
-    // ---------------------------------------------------------
-    // there should be always a rely solution on abstractions like 
-    // implementing trait for struct and extending its behaviour 
-    // instead of changing the actual code base and concrete impls. 
-    struct PayPal; // paypal gateway
-    struct ZarinPal; // zarinpal gateway
-    
-    struct PaymentWallet{
-        pub owner: String,
-        pub id: uuid::Uuid,
-        pub transactions: Vec<Transaction> // transactions that need to be executed
-    }
-    
-    impl PaymentProcess<PayPal> for PaymentWallet{
-        type Status = AtomicU8;
-    
-        // future traits as objects must be completelly a separate type
-        // which can be achieved by pinning the boxed version of future obj 
-        type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+    type Wallet = Self;
+
+    async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {
+
+        // either clone or borrow it to avoid from moving out of the self 
+        // cause self is behind reference which is not allowed by Rust 
+        // to move it around or take its ownership.
+        let txes: &Vec<Transaction> = self.transactions.as_ref();
         
-        type Wallet = Self;
-    
-        async fn pay<O: Send + Sync + 'static>(&self, gateway: PayPal) -> Self::Output<O> {
-    
-            // either clone or borrow it to avoid from moving out of the self 
-            // cause self is behind reference which is not allowed by Rust 
-            // to move it around or take its ownership.
-            let txes: &Vec<Transaction> = self.transactions.as_ref();
-            
-            // process all transactions with the paypal gateway
-            // ...
-    
-            todo!()
-    
-        }
+        // process all transactions with the paypal gateway
+        // ...
+
+        todo!()
+
     }
+}
+
+impl PaymentProcess<ZarinPal> for PaymentWallet{
+    type Status = AtomicU8;
+
+    // future traits as objects must be completelly a separate type
+    // which can be achieved by pinning the boxed version of future obj 
+    type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
     
-    impl PaymentProcess<ZarinPal> for PaymentWallet{
-        type Status = AtomicU8;
-    
-        // future traits as objects must be completelly a separate type
-        // which can be achieved by pinning the boxed version of future obj 
-        type Output<O: Send + Sync + 'static> = std::pin::Pin<Box<dyn std::future::Future<Output = O>>>;
+    type Wallet = Self;
+
+    async fn pay<O: Send + Sync + 'static>(&self, gateway: ZarinPal) -> Self::Output<O> {
+
+        // either clone or borrow it to avoid from moving out of the self 
+        // cause self is behind reference which is not allowed by Rust 
+        // to move it around or take its ownership.
+        let txes: &Vec<Transaction> = self.transactions.as_ref();
         
-        type Wallet = Self;
-    
-        async fn pay<O: Send + Sync + 'static>(&self, gateway: ZarinPal) -> Self::Output<O> {
-    
-            // either clone or borrow it to avoid from moving out of the self 
-            // cause self is behind reference which is not allowed by Rust 
-            // to move it around or take its ownership.
-            let txes: &Vec<Transaction> = self.transactions.as_ref();
-            
-            // process all transactions with the paypal gateway
-            // ...
-            
-    
-            todo!()
-    
-        }
-    }
-
-    // spawn a tokio thread for every request in a lightweight
-    async fn getCode<O: Send + Sync + 'static>(param: O) 
-        -> impl std::future::Future<Output=O> + Send + Sync + 'static{
-        // the return type is a type which impls the trait directly through 
-        // static dispatch
-        async move{
-            param
-        }
-    }
-    tokio::spawn(getCode(String::from("wildonion")));
-
-    /* 
-        Access different types through a single interface to use common method of traits with either default 
-        or trait implementations we can impl the trait broadly for any possible types using impl Trair for T{} 
-        instead of implementing for every single type manually box pin, box dyn trait impl trait for dyn stat 
-        and poly implementations.
-        is, the type has been erased. As such, a dyn Trait reference contains two pointers. One pointer goes 
-        to the data (e.g., an instance of a struct). Another pointer goes to a map of method call names to 
-        function pointers (known as a virtual method table or vtable).
-        At run-time, when a method needs to be called on the dyn Trait, the vtable is consulted to get the 
-        function pointer and then that function pointer is called.
-        See the Reference for more information on trait objects and object safety.
-        Trade-offs
-        The above indirection is the additional runtime cost of calling a function on a dyn Trait. Methods 
-        called by dynamic dispatch generally cannot be inlined by the compiler.
-        However, dyn Trait is likely to produce smaller code than impl Trait / generic parameters as the 
-        method won't be duplicated for each concrete type.
-    */
-    trait AnyTypeCanBe1<T>: Send + Sync + 'static{
-        fn getNickName(&self) -> String{
-            String::from("")
-        }
-    }
-    impl<T: Send + Sync + 'static> AnyTypeCanBe1<T> for T{}
-    struct InGamePlayer{}
-    let player = InGamePlayer{};
-    player.getNickName(); // don't need to impl AnyTypeCanBe1 for InGamePlayer cause it's already implemented for any T
-
-    
-    // handling pushing into the map using trait polymorphism
-    trait AnyTypeCanBe{}
-    impl<T> AnyTypeCanBe for T{} // impl AnyTypeCanBe for every T, reduces the time of implementing trait
-    let any_map1: std::collections::HashMap<String, Box<dyn AnyTypeCanBe + Send + Sync + 'static>>;
-    let mut any_map1 = std::collections::HashMap::new();
-    any_map1.insert(String::from("wildonion"), Box::new(0));
-    // or 
-    // any_map1.insert(String::from("wildonion"), Box::new(String::from("")));
-
-    // to have any types we can dynamically dispatch the Any trait which is an object safe trait
-    type AnyType = Box<dyn std::any::Any + Send + Sync + 'static>;
-    let any_map: std::collections::HashMap<String, AnyType>; // the value can be any type impls the Any trait
-    let boxed_trait_object: Box<dyn AnyTypeCanBe>; // Boxed trait object
-    let arced_trait_object: std::sync::Arc<dyn AnyTypeCanBe>; // thread safe trait object
-
-    fn getTrait(t: &(dyn AnyTypeCanBe + Send)){ // dynamic dispatch
-
-    }
-    fn getTrait1(t: impl AnyTypeCanBe + Send){ // static dispatch
+        // process all transactions with the paypal gateway
+        // ...
         
+
+        todo!()
+
     }
-
-
 }

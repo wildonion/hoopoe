@@ -82,7 +82,6 @@ use indexmap::IndexMap;
 use models::event::NotifData;
 use salvo::http::response;
 use serde_json::Value;
-use tests::{actor, orex};
 use workers::notif::{self, NotifBrokerActor};
 use std::io::BufWriter;
 use std::str::FromStr;

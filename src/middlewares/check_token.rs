@@ -1,7 +1,6 @@
 
 
 
-use capnp::data;
 use context::AppContext;
 use interfaces::passport::Passport;
 use models::user::UserData;

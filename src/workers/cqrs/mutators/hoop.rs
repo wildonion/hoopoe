@@ -5,7 +5,6 @@ use salvo::rate_limiter::QuotaGetter;
 use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TryIntoModel, Value};
 use serde::{Serialize, Deserialize};
 use actix::prelude::*;
-use tonic::IntoRequest;
 use std::sync::Arc;
 use std::thread;
 use actix::{Actor, AsyncContext, Context};

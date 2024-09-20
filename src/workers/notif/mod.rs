@@ -43,9 +43,6 @@ use workers::scheduler::CronScheduler;
 use crate::*;
 use deadpool_lapin::lapin::protocol::channel;
 use deadpool_redis::redis::AsyncCommands;
-use base58::FromBase58;
-use constants::CRYPTER_THEMIS_ERROR_CODE;
-use constants::FILE_ERROR_CODE;
 use deadpool_redis::redis::RedisResult;
 use futures::executor;
 use models::event::NotifData;
@@ -89,6 +86,10 @@ use crate::interfaces::crypter::Crypter;
     queue per each consumer.
     offset in kafka is an strategy which determines the way of tracking the sequential 
     order of receiving messages by kafka topics it's like routing key in rmq 
+    in kafka you should create consumer and producer separately but in rmq everything is 
+    started from a channel, we'll create a channel to declare the queue, exchange, consumer 
+    and producer in that channel, channel is a thread that can manage multiple connection 
+    to the broker through a single tcp connection.
 
     BROKER TYPES: (preferred stack: RMQ + RPC + WebSocket + ShortPollingJobId)
         → REDIS PUBSUB => light task queue
@@ -1712,7 +1713,9 @@ impl NotifBrokerActor{
                                 // -ˋˏ✄┈┈┈┈ publishing to exchange from this channel,
                                 // later consumer bind its queue to this exchange and its
                                 // routing key so messages go inside its queue, later they 
-                                // can be consumed from the queue by the consumer
+                                // can be consumed from the queue by the consumer.
+                                // in direct exchange ("") it has assumed that the queue
+                                // name is the same as the routing key name.
                                 use deadpool_lapin::lapin::options::BasicPublishOptions;
                                 let payload = data.as_bytes();
                                 match chan
@@ -1742,6 +1745,10 @@ impl NotifBrokerActor{
 
                                                 return; // needs to terminate the caller in let else pattern
                                             };
+
+                                            if confirmation.is_ack(){
+                                                log::info!("publisher confirmation is acked");
+                                            }
 
                                         },
                                         Err(e) => {
