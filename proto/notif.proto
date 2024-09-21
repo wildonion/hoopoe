@@ -1,0 +1,35 @@
+
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+package notifications;
+
+// Enum for action types
+enum ActionType {
+    ACTION_TYPE_UNSPECIFIED = 0;  // Default unspecified action type
+    PRODUCT_PURCHASED = 1;        // Product purchased or minted
+    ZERLOG = 2;                   // Zerlog action type
+    EVENT_CREATED = 3;            // Event created
+    EVENT_EXPIRED = 4;            // Event expired
+    EVENT_LOCKED = 5;             // Event locked
+}
+
+// Message to hold NotifData
+message NotifData {
+    string id = 1;                       // Corresponds to Rust's String
+    string receiver_info = 2;            // Corresponds to Rust's String
+    google.protobuf.Struct action_data = 3;          // Nested message for action data (serde_json::Value equivalent)
+    string actioner_info = 4;            // Corresponds to Rust's String
+    ActionType action_type = 5;          // Enum for action type
+    int64 fired_at = 6;                  // Corresponds to Rust's i64
+    bool is_seen = 7;                    // Corresponds to Rust's bool
+}
+
+// Message for arbitrary action data (serde_json::Value equivalent)
+// You can modify the structure of ActionData as per your actual use case
+message ActionData {
+    string json = 1;  // This can hold serialized JSON as a string
+}
+
+

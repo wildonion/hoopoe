@@ -1,11 +1,12 @@
 
 
-/*  ========================================================================================
+/*  ====================================================================================
        REALTIME NOTIF EVENT STREAMING DESIGN PATTERN (README files inside docs folder)
-    ========================================================================================
+    ====================================================================================
                    MAKE SURE YOU'VE STARTED CONSUMERS BEFORE PRODUCING
                    THEY MUST BE READY FOR CONSUMING WHILE PRODUCERS ARE
-                   SENDING MESSAGES TO THE BROKER.
+                   SENDING MESSAGES TO THE BROKER. USUALLY RUN THE PRODUCER
+                   USING CLI AND THE CONSUMER AT STARTUP.
 
     NotifBrokerActor is the worker of handling the process of publishing and consuming 
     messages through rmq, redis and kafka, talking to the NotifBrokerActor can be done 
@@ -22,7 +23,7 @@
     a place where the application logic which is likely a server is being started.
     ************************************************************************************
     
-    ========================================================================================
+    ====================================================================================
 */
 
 use constants::STORAGE_IO_ERROR_CODE;

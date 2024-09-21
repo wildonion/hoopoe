@@ -2306,8 +2306,6 @@ dependencies = [
  "once_cell",
  "percentage",
  "pretty_env_logger",
- "prost",
- "prost-types",
  "rand",
  "rand_chacha",
  "rayon",
@@ -2696,15 +2694,6 @@ name = "is_type"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fee7cda167bfafe6eb1c70926de545028f3169c9a8bcfa6db9d53f67aab2f3ec"
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itoa"
@@ -3771,38 +3760,6 @@ dependencies = [
  "syn 2.0.77",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "prost"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b2ecbe40f08db5c006b5764a2645f7f3f141ce756412ac9e1dd6087e6d32995"
-dependencies = [
- "bytes",
- "prost-derive",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acf0c195eebb4af52c752bec4f52f645da98b6e92077a04110c7f349477ae5ac"
-dependencies = [
- "anyhow",
- "itertools",
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
-name = "prost-types"
-version = "0.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60caa6738c7369b940c3d49246a8d1749323674c65cb13010134f5c9bad5b519"
-dependencies = [
- "prost",
 ]
 
 [[package]]
