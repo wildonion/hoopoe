@@ -114,12 +114,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"Rmq\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"Rmq\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"exchange_name\": \"SavageEx\",\n            \"exchange_type\": \"fanout\", // amq.topic for pubsub\n            \"routing_key\": \"\", // routing pattern or key - will be ignored if type is fanout\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -147,12 +147,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"Kafka\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"headers\": [{\n                \"key\": \"wildonionKey\", \n                \"val\": \"wildonionValue\"\n            }],\n            \"partitions\": 4,\n            \"topic\": \"SavageTopic\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"Kafka\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"headers\": [{\n                \"key\": \"wildonionKey\", \n                \"val\": \"wildonionValue\"\n            }],\n            \"partitions\": 4,\n            \"topic\": \"SavageTopic\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12341\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    },\n    \"consumer_info\": null\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -180,12 +180,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": {\n        \"Redis\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"channel\": \"savege channel\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    },\n    \"consumer_info\": null\n}",
+									"raw": "{\n    \"producer_info\": {\n        \"Redis\":{\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"notif_data\": { \n                \"receiver_info\": \"1\",\n                \"id\": \"unqie-id0\",\n                \"action_data\": {\n                    \"pid\": 200.4\n                }, \n                \"actioner_info\": \"2\", \n                \"action_type\": \"ProductPurchased\", \n                \"fired_at\": 1714316645, \n                \"is_seen\": false\n            }, \n            \"channel\": \"savege channel\",\n            \"encryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@123452\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    },\n    \"consumer_info\": null\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -213,12 +213,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Rmq\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Rmq\": {\n            \"queue\": \"TestOnion\",\n            \"exchange_name\": \"SavageEx\",\n            \"routing_key\": \"\",\n            \"tag\": \"cons_tag0\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"local_spawn\": true, // spawn the task into the actor thread itself\n            \"store_in_db\": true,\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Kafka\": null,\n        \"Redis\": null\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -246,12 +246,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Redis\": {\n            \"channel\": \"savege channel\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Redis\": {\n            \"channel\": \"savege channel\",\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@123452\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Rmq\": null,\n        \"Kafka\": null\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -279,12 +279,12 @@
 								"header": [
 									{
 										"key": "token_time",
-										"value": "124kUmD39YUwJRKxaQqTkhhPRLLaieQJWkV2VpXLgRNFuXheXocqxVVT8M6Zxcce5ZKEArkkE"
+										"value": "124kUmD39YUwJRKxaQqTkFGmzvpLdYvq4fofcvJ2i9VJ9hUNX5fYQRot2QK8XC5wrfA1cc4fo"
 									}
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Kafka\": {\n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"topics\": [\"SavageTopic\"],\n            \"consumerGroupId\": \"cid\", // this can be UUID\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12345\"\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    }\n}",
+									"raw": "{\n    \"producer_info\": null,\n    \"consumer_info\": {\n        \"Kafka\": {\n            \"brokers\": \"localhost:9092\", // localhost:29092,localhost:39092,localhost:49092\n            \"topics\": [\"SavageTopic\"],\n            \"consumerGroupId\": \"cid\", // this can be UUID\n            \"redis_cache_exp\": 300, // this can be 0 to not to store data on redis\n            \"decryptionConfig\": { // this can be null\n                \"secret\": \"wildonion@1234\",\n                \"passphrase\": \"wildonion@12341\",\n                \"unique_key\": \"123\" // use a new UUID per each notif data\n            }\n        },\n        \"Rmq\": null,\n        \"Redis\": null\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"

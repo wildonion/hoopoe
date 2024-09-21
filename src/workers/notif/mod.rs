@@ -233,6 +233,7 @@ pub struct ConsumerInfo{
 pub struct CryptoConfig{
     pub secret: String,
     pub passphrase: String,
+    pub unique_key: String
 }
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
@@ -350,12 +351,18 @@ impl NotifBrokerActor{
                     let mut dataString = serde_json::to_string(&notif_data).unwrap();
                     let finalData = if encryptionConfig.is_some(){
                         
-                        let CryptoConfig{ secret, passphrase } = encryptionConfig.unwrap();
+                        let CryptoConfig{ secret, passphrase, unique_key } = encryptionConfig.unwrap();
                         let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
                             secret_key: hex::encode(secret),
                             passphrase: hex::encode(passphrase),
                             data: vec![],
                         };
+
+                        // store the config on redis for future validation in consumer
+                        let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+                        let redisKey = format!("Redis_SecureCellConfig-{}", unique_key);
+                        let configString = serde_json::to_string(&secure_cell_config).unwrap();
+                        let _: () = redis_conn.set(redisKey, configString).await.unwrap();
     
                         // after calling encrypt method dataString has changed and contains the hex encrypted data
                         dataString.encrypt(secure_cell_config);
@@ -421,20 +428,22 @@ impl NotifBrokerActor{
                 // try to create the secure cell config and 
                 // do passphrase and secret key validation logic before
                 // consuming messages
-                let mut secure_cell_config = if let Some(mut config) = decryption_config.clone(){
+                let secure_cell_config_unique_key = if let Some(mut config) = decryption_config.clone(){
             
                     config.secret = hex::encode(config.secret);
                     config.passphrase = hex::encode(config.passphrase);
 
                     // return the loaded instance from redis
-                    SecureCellConfig{
-                        secret_key: config.secret,
-                        passphrase: config.passphrase,
+                    let secureCellConfig = SecureCellConfig{
+                        secret_key: config.clone().secret,
+                        passphrase: config.clone().passphrase,
                         data: vec![],
-                    }
+                    };
+
+                    (secureCellConfig, config.unique_key)
 
                 } else{
-                    SecureCellConfig::default()
+                    (SecureCellConfig::default(), String::from(""))
                 };
 
                 // use redis async for handling realtime streaming of events
@@ -459,10 +468,32 @@ impl NotifBrokerActor{
                 tokio::spawn(async move{
                     // realtime streaming over redis channel to receive emitted notifs 
                     while let Some(message) = pubsubstream.next().await{
+                        
+                        /* WE SHOULD DO THE VALIDATION IN EVERY ITERATION */
+                        let mut secure_cell_config = secure_cell_config_unique_key.clone().0;
+                        let redisUniqueKey = secure_cell_config_unique_key.clone().1;
+                        let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+                        let redisKey = format!("Redis_SecureCellConfig-{}", redisUniqueKey);
+                        let isKeyThere: bool = redis_conn.exists(&redisKey).await.unwrap();
+                        if isKeyThere{
+                            let getConfig: String = redis_conn.get(redisKey).await.unwrap();
+                            let mut redisConfig = serde_json::from_str::<SecureCellConfig>(&getConfig).unwrap();
+                            // validating...
+                            if 
+                                redisConfig.passphrase != secure_cell_config.passphrase || 
+                                redisConfig.secret_key != secure_cell_config.secret_key
+                                {
+                                    log::error!("invalid secure cell config, CHANNEL IS NOT SAFE!");
+                                    return;
+                            }
+                            
+                        } else{
+                            log::error!("Redis configs are not set properly on Redis");
+                        }
+
                         let resp_val = message.unwrap();
                         let mut channelData = String::from_resp(resp_val).unwrap(); // this is the expired key
-                        
-                        let mut secure_cell_config = secure_cell_config.clone();
+
                         let cloned_notif_data_sender_channel = cloned_notif_data_sender_channel.clone();
                         let zerlog_producer_actor = zerlog_producer_actor.clone();
                         let notif_mutator_actor = notif_mutator_actor.clone();
@@ -724,12 +755,18 @@ impl NotifBrokerActor{
                     let mut dataString = serde_json::to_string(&notif_data).unwrap();
                     let finalData = if encryptionConfig.is_some(){
                         
-                        let CryptoConfig{ secret, passphrase } = encryptionConfig.clone().unwrap();
+                        let CryptoConfig{ secret, passphrase, unique_key } = encryptionConfig.clone().unwrap();
                         let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
                             secret_key: hex::encode(secret),
                             passphrase: hex::encode(passphrase),
                             data: vec![],
                         };
+
+                        // store the config on redis for future validation in consumer
+                        let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+                        let redisKey = format!("Kafka_SecureCellConfig-{}", unique_key);
+                        let configString = serde_json::to_string(&secure_cell_config).unwrap();
+                        let _: () = redis_conn.set(redisKey, configString).await.unwrap();
     
                         // after calling encrypt method dataString has changed and contains the hex encrypted data
                         dataString.encrypt(secure_cell_config);
@@ -889,20 +926,22 @@ impl NotifBrokerActor{
         match redis_pool.get().await{
             Ok(mut redis_conn) => {
 
-                let mut secure_cell_config = if let Some(mut config) = decryptionConfig.clone(){
+                let secure_cell_config_unique_key = if let Some(mut config) = decryptionConfig.clone(){
 
                     config.secret = hex::encode(config.secret);
                     config.passphrase = hex::encode(config.passphrase);
 
                     // return the loaded instance from redis
-                    SecureCellConfig{
-                        secret_key: config.secret,
-                        passphrase: config.passphrase,
+                    let secureCellConfig = SecureCellConfig{
+                        secret_key: config.clone().secret,
+                        passphrase: config.clone().passphrase,
                         data: vec![],
-                    }
+                    };
+
+                    (secureCellConfig, config.unique_key)
 
                 } else{
-                    SecureCellConfig::default()
+                    (SecureCellConfig::default(), String::from(""))
                 };
 
                 let cloned_notif_data_sender_channel = notif_data_sender.clone();
@@ -948,6 +987,28 @@ impl NotifBrokerActor{
 
                             // streaming over the consumer to receive messages from the topics
                             while let Ok(message) = consumer.recv().await{
+
+                                /* WE SHOULD DO THE VALIDATION IN EVERY ITERATION */
+                                let mut secure_cell_config = secure_cell_config_unique_key.clone().0;
+                                let redisUniqueKey = secure_cell_config_unique_key.clone().1;
+                                let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+                                let redisKey = format!("Kafka_SecureCellConfig-{}", redisUniqueKey);
+                                let isKeyThere: bool = redis_conn.exists(&redisKey).await.unwrap();
+                                if isKeyThere{
+                                    let getConfig: String = redis_conn.get(redisKey).await.unwrap();
+                                    let mut redisConfig = serde_json::from_str::<SecureCellConfig>(&getConfig).unwrap();
+                                    // validating...
+                                    if 
+                                        redisConfig.passphrase != secure_cell_config.passphrase || 
+                                        redisConfig.secret_key != secure_cell_config.secret_key
+                                        {
+                                            log::error!("invalid secure cell config, CHANNEL IS NOT SAFE!");
+                                            return;
+                                    }
+                                    
+                                } else{
+                                    log::error!("Kafka configs are not set properly on Redis");
+                                }
 
                                 // it uses std::str::from_utf8() to convert utf8 bytes into string
                                 let mut consumedBuffer = message.payload().unwrap();
@@ -1295,20 +1356,22 @@ impl NotifBrokerActor{
                             // try to create the secure cell config and 
                             // do passphrase and secret key validation logic before
                             // consuming messages
-                            let mut secure_cell_config = if let Some(mut config) = decryptionConfig.clone(){
+                            let secure_cell_config_uniqueKey = if let Some(mut config) = decryptionConfig.clone(){
                         
                                 config.secret = hex::encode(config.secret);
                                 config.passphrase = hex::encode(config.passphrase);
 
                                 // return the loaded instance from redis
-                                SecureCellConfig{
-                                    secret_key: config.secret,
-                                    passphrase: config.passphrase,
+                                let secureCellConfig = SecureCellConfig{
+                                    secret_key: config.clone().secret,
+                                    passphrase: config.clone().passphrase,
                                     data: vec![],
-                                }
+                                };
+
+                                (secureCellConfig, config.unique_key)
 
                             } else{
-                                SecureCellConfig::default()
+                                (SecureCellConfig::default(), String::from(""))
                             };
 
                             // -ˋˏ✄┈┈┈┈ consuming from the queue owned by this consumer
@@ -1335,12 +1398,33 @@ impl NotifBrokerActor{
                                         match delivery{
                                             Ok(delv) => {
 
+                                                /* WE SHOULD DO THE VALIDATION IN EVERY ITERATION */
+                                                let mut secure_cell_config = secure_cell_config_uniqueKey.0.clone();
+                                                let redisUniqueKey = secure_cell_config_uniqueKey.clone().1;
+                                                let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+                                                let redisKey = format!("Rmq_SecureCellConfig-{}", redisUniqueKey);
+                                                let isKeyThere: bool = redis_conn.exists(&redisKey).await.unwrap();
+                                                if isKeyThere{
+                                                    let getConfig: String = redis_conn.get(redisKey).await.unwrap();
+                                                    let mut redisConfig = serde_json::from_str::<SecureCellConfig>(&getConfig).unwrap();
+                                                    // validating...
+                                                    if 
+                                                        redisConfig.passphrase != secure_cell_config.passphrase || 
+                                                        redisConfig.secret_key != secure_cell_config.secret_key
+                                                        {
+                                                            log::error!("invalid secure cell config, CHANNEL IS NOT SAFE!");
+                                                            return;
+                                                    }
+                                                    
+                                                } else{
+                                                    log::error!("Rmq configs are not set properly on Redis");
+                                                }
+
                                                 log::info!("[*] received delivery from queue#<{}>", q.name());
                                                 let consumedBuffer = delv.data.clone();
                                                 let hexed_data = std::str::from_utf8(&consumedBuffer).unwrap();
                                                 let mut payload = hexed_data.to_string();
 
-                                                let mut secure_cell_config = secure_cell_config.clone();
                                                 let cloned_notif_data_sender_channel = cloned_notif_data_sender_channel.clone();
                                                 let redis_pool = redis_pool.clone();
                                                 let notif_mutator_actor = notif_mutator_actor.clone();
@@ -1633,7 +1717,8 @@ impl NotifBrokerActor{
     /* ********************************************************************* */
     /* ***************************** PRODUCING ***************************** */
     /* ********************************************************************* */
-    pub async fn publishToRmq(&self, data: &str, exchange: &str, routing_key: &str, exchange_type: &str){
+    pub async fn publishToRmq(&self, data: &str, exchange: &str, routing_key: &str, 
+        exchange_type: &str, secureCellConfig: SecureCellConfig, redisUniqueKey: &str){
 
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         let this = self.clone();
@@ -1646,6 +1731,7 @@ impl NotifBrokerActor{
         let routing_key = routing_key.to_string();
         let exchange_type = exchange_type.to_string();
         let data = data.to_string();
+        let redisUniqueKey = redisUniqueKey.to_string();
 
         tokio::spawn(async move{
 
@@ -1653,6 +1739,14 @@ impl NotifBrokerActor{
             let rmq_pool = storage.as_ref().unwrap().get_lapin_pool().await.unwrap();
             let redis_pool = storage.as_ref().unwrap().get_redis_pool().await.unwrap();
             
+
+            // store the config on redis for future validation in consumer
+            let mut redis_conn = redis_pool.get().await.unwrap(); // TODO - handle the error properly
+            let redisKey = format!("Rmq_SecureCellConfig-{}", redisUniqueKey);
+            let configString = serde_json::to_string(&secureCellConfig).unwrap();
+            let _: () = redis_conn.set(redisKey, configString).await.unwrap();
+
+
             // trying to ge a connection from the pool
             match rmq_pool.get().await{
                 Ok(pool) => {
@@ -1836,14 +1930,20 @@ impl ActixMessageHandler<PublishNotifToRmq> for NotifBrokerActor{
         let this = self.clone();
         
         let mut stringData = serde_json::to_string(&notif_data).unwrap();
+        let mut scc = SecureCellConfig::default();
+        let mut ruk = String::from(""); 
+
         let finalData = if encryptionConfig.is_some(){
                         
-            let CryptoConfig{ secret, passphrase } = encryptionConfig.clone().unwrap();
+            let CryptoConfig{ secret, passphrase, unique_key } = encryptionConfig.clone().unwrap();
             let mut secure_cell_config = &mut wallexerr::misc::SecureCellConfig{
                 secret_key: hex::encode(secret),
                 passphrase: hex::encode(passphrase),
                 data: vec![],
             };
+
+            scc = secure_cell_config.clone();
+            ruk = unique_key;
 
             // after calling encrypt method stringData has changed and contains the hex encrypted data
             stringData.encrypt(secure_cell_config);
@@ -1860,13 +1960,13 @@ impl ActixMessageHandler<PublishNotifToRmq> for NotifBrokerActor{
         // every actor has its own thread of execution.
         if local_spawn{
             async move{
-                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type).await;
+                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type, scc, &ruk).await;
             }
             .into_actor(self) // convert the future into an actor future of type NotifBrokerActor
             .spawn(ctx); // spawn the future object into this actor context thread
         } else{ // spawn the future in the background into the tokio lightweight thread
             tokio::spawn(async move{
-                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type).await;
+                this.publishToRmq(&finalData, &exchange_name, &routing_key, &exchange_type, scc, &ruk).await;
             });
         }
         
