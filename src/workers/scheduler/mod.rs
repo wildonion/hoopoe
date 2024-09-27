@@ -36,7 +36,7 @@ pub async fn runInterval1<M, R, O>(task: std::sync::Arc<dyn Fn() -> R + Send + S
 }
 
 // task is a closure that returns a future object 
-pub async fn runInterval<M, R, O>(task: M, period: u64)
+pub async fn runInterval<M, R, O>(task: M, period: u64, mut retries: u8)
     where M: Fn() -> R + Send + Sync + 'static,
             R: std::future::Future<Output = O> + Send + Sync + 'static,
 {
@@ -44,7 +44,15 @@ pub async fn runInterval<M, R, O>(task: M, period: u64)
         let mut int = tokio::time::interval(tokio::time::Duration::from_secs(period));
         int.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         
+        let mut attempts = 0;
+
         loop{
+            if retries == 0{
+                continue;
+            }
+            if attempts >= retries{
+                break;
+            }
             int.tick().await;
             task().await;
         }
@@ -126,6 +134,7 @@ impl CronScheduler{
             let cloned_task = task.clone();
             loop{
                 interval.tick().await;
+                println!("ticking...");
                 tokio::spawn(cloned_task()); // the closure however returns a future 
             }
         });
@@ -143,7 +152,7 @@ impl CronScheduler{
         tokio::spawn(async move{
             runInterval(|| async move{
                 println!("i'm executing intervally in the background thread ...");
-            }, period)
+            }, period, 10)
             .await;
         });
 

@@ -93,7 +93,7 @@ i'm hoopoe, a realtime social event platform allows your hoop get heard!
 ```bash
 # -----------------------
 # ---- read/write access
-sudo chmod -R 777 . 
+sudo chmod -R 777 . && sudo chmod +x /root/
 ```
 
 #### step0) install necessary packages on Linux:

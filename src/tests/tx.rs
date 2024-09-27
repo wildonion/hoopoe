@@ -44,6 +44,9 @@ pub static WALLET: Lazy<std::sync::Arc<tokio::sync::Mutex<wallexerr::misc::Walle
     safe tx execution without double spending issue using tokio spawn select mutex and channels
     finally tx pool service publishes the result of executed each tx into the exchange 
 
+    create tx object with unique id -> publish to rmq 
+    receive tx in txpool -> commit tx -> execute tx -> update records -> record in treasury
+    all or none to avoid double spending which is sending same amount for two destinations but charge only once 
 
     once a tx object is made publish it to the rmq exchange so consumer 
     can consume it for committing and executing all tx objects finally 

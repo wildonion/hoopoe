@@ -347,7 +347,7 @@ impl HoopoeWsServerActor{
             // thread of tokio runtime.
             scheduler::runInterval(move || async move{
                 log::info!("websocket session for user#{} is alive", user_id);
-            }, 10).await;
+            }, 10, 0).await;
 
             /* -------------------------
                 can't move pointers which is not live long enough into 

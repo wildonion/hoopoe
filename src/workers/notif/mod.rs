@@ -17,6 +17,17 @@
     through producing messages to the broker. we can send either producing or consuming 
     message to this actor to start producing or consuming in the background.
 
+    how capnpc works?
+    in RPC every method call is a round trip in networking, canpnp pack all calls together 
+    in only one round trip, it uses the promise pipelining feature which every call is a 
+    future object which can be solved by awaiting in which it returns all the results from 
+    all the calls sent to the server it's like `foo().bar().end()` takes only 1 round trip 
+    which by awaiting on them it returns all the result from the server, it can call methods 
+    without waiting just take a round trip. call results are returned to the client before 
+    the request even arrives at the server, this is the feature of promise it's a place 
+    holder for the result of each call and once we await on them all the results will be 
+    arrived in one round trip.
+
     ************************************************************************************
     it's notable that for realtime push notif streaming we MUST start consuming from
     the specified broker passed in to the message structure when talking with actor, in
@@ -112,7 +123,7 @@ use crate::interfaces::crypter::Crypter;
                                                                  ----------> partition-key1 queue(m1, m2, m3, ...) - all messages with key1
              ---------                       ------------       |
             |consumer1| <-----consume-----> |Kafka Broker| <-----topic-----> partition-key3 queue(m1, m2, m3, ...) - all messages with key3
-             ---------                      ------------        |
+             ---------                      ------------ |      |
                 |_______partition1&2______________|      |      |----------> partition-key2 queue(m1, m2, m3, ...) - all messages with key2
              ---------                            |      |      |
             |consumer2|                           |      |       ----------> partition-key4 queue(m1, m2, m3, ...) - all messages with key4
@@ -155,9 +166,17 @@ use crate::interfaces::crypter::Crypter;
 
 #[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
 #[rtype(result = "()")]
+pub struct SendRpcMessage{ // used to send rpc request through rmq queue, good for actor communication directly through rpc backed by rmq
+    pub reqQueue: String,
+    pub repQueue: String,
+    pub payload: String, // json string maybe! we'll convert it to u8 bytes eventually
+}
+
+#[derive(Message, Clone, Serialize, Deserialize, Debug, Default, ToSchema)]
+#[rtype(result = "()")]
 pub struct PublishNotifToKafka{
     pub topic: String,
-    pub brokers: String,
+    pub brokers: String, // kafka servers separated by comma
     pub partitions: u64,
     pub headers: Vec<KafkaHeader>,
     pub local_spawn: bool,
@@ -176,7 +195,7 @@ pub struct KafkaHeader{
 pub struct ConsumeNotifFromKafka{ // we must build a unique consumer per each consuming process 
     pub topics: Vec<String>,
     pub consumerGroupId: String,
-    pub brokers: String,
+    pub brokers: String, // kafka servers separated by comma
     pub redis_cache_exp: u64,
     pub decryptionConfig: Option<CryptoConfig>
 }
@@ -295,7 +314,7 @@ pub struct ConsumeNotifFromRmq{ // we'll create a channel then start consuming b
 
 #[derive(Clone)]
 pub struct NotifBrokerActor{
-    pub notif_broker_sender: tokio::sync::mpsc::Sender<String>, // use to send notif data to mpsc channel for ws
+    pub notif_broker_ws_sender: tokio::sync::mpsc::Sender<String>, // use to send notif data to mpsc channel for ws
     pub app_storage: std::option::Option<Arc<Storage>>, // REQUIRED: communicating with third party storage
     pub notif_mutator_actor: Addr<NotifMutatorActor>, // REQUIRED: communicating with mutator actor to write into redis and db 
     pub zerlog_producer_actor: Addr<ZerLogProducerActor> // REQUIRED: send any error log to the zerlog rmq queue
@@ -307,13 +326,16 @@ impl Actor for NotifBrokerActor{
 
     fn started(&mut self, ctx: &mut Self::Context) {
 
-        log::info!("🎬 NotifBrokerActor has started");    
+        log::info!("🎬 NotifBrokerActor has started");
 
         ctx.run_interval(PING_INTERVAL, |actor, ctx|{
             
             let this = actor.clone();
             let addr = ctx.address();
+            let actorState = ctx.state();
 
+            log::info!("NotifBrokerActor state is: {:#?}", actorState);
+            
             tokio::spawn(async move{
 
                 // check something constantly, schedule to be executed 
@@ -325,6 +347,15 @@ impl Actor for NotifBrokerActor{
         });
 
     }
+    fn stopped(&mut self, ctx: &mut Self::Context) {
+
+        // stop internal states
+        // since db is only Arced we can't mutate it we should wrap it around Mutex 
+        // cause Arc requires data to be mutexed
+        // ...
+
+    }
+
 }
 
 impl NotifBrokerActor{
@@ -341,7 +372,7 @@ impl NotifBrokerActor{
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         // will be used to send received notif data from the broker to ws mpsc channel, 
         // later we can receive the notif in ws server setup and send it to the owner
-        let notif_data_sender = self.notif_broker_sender.clone(); 
+        let notif_data_sender = self.notif_broker_ws_sender.clone(); 
         
         match redis_pool.get().await{
             Ok(mut redis_conn) => {
@@ -372,8 +403,9 @@ impl NotifBrokerActor{
                     } else{
                         dataString
                     };
-    
-                    // we should keep sending until a consumer receive the data!
+
+                    // we should keep sending until a consumer receives the data!
+                    // do this in the background thread constantly
                     tokio::spawn(async move{
                         let mut int = tokio::time::interval(tokio::time::Duration::from_secs(1));
                         loop{
@@ -419,7 +451,7 @@ impl NotifBrokerActor{
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         // will be used to send received notif data from the broker to ws mpsc channel, 
         // later we can receive the notif in ws server setup and send it to the owner
-        let notif_data_sender = self.notif_broker_sender.clone(); 
+        let notif_data_sender = self.notif_broker_ws_sender.clone(); 
 
         // first thing first check the redis is up!
         match redis_pool.get().await{
@@ -731,7 +763,7 @@ impl NotifBrokerActor{
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         // will be used to send received notif data from the broker to ws mpsc channel, 
         // later we can receive the notif in ws server setup and send it to the owner
-        let notif_data_sender = self.notif_broker_sender.clone(); 
+        let notif_data_sender = self.notif_broker_ws_sender.clone(); 
 
         // since the redis is important, so we can't move forward without it 
         match redis_pool.get().await{
@@ -920,7 +952,7 @@ impl NotifBrokerActor{
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
         // will be used to send received notif data from the broker to ws mpsc channel, 
         // later we can receive the notif in ws server setup and send it to the owner
-        let notif_data_sender = self.notif_broker_sender.clone(); 
+        let notif_data_sender = self.notif_broker_ws_sender.clone(); 
 
         // since the redis is important, so we can't move forward without it 
         match redis_pool.get().await{
@@ -1272,7 +1304,7 @@ impl NotifBrokerActor{
         let redis_pool = storage.unwrap().get_redis_pool().await.unwrap();
         let notif_mutator_actor = self.notif_mutator_actor.clone();
         let zerlog_producer_actor = self.clone().zerlog_producer_actor;
-        let notif_data_sender = self.notif_broker_sender.clone();
+        let notif_data_sender = self.notif_broker_ws_sender.clone();
         
         match rmq_pool.get().await{
             Ok(conn) => {
@@ -1902,8 +1934,8 @@ impl NotifBrokerActor{
     pub fn new(app_storage: std::option::Option<Arc<Storage>>, 
         notif_mutator_actor: Addr<NotifMutatorActor>,
         zerlog_producer_actor: Addr<ZerLogProducerActor>,
-        notif_broker_sender: tokio::sync::mpsc::Sender<String>) -> Self{
-        Self { app_storage, notif_mutator_actor, zerlog_producer_actor, notif_broker_sender }
+        notif_broker_ws_sender: tokio::sync::mpsc::Sender<String>) -> Self{
+        Self { app_storage, notif_mutator_actor, zerlog_producer_actor, notif_broker_ws_sender }
     }
 
 }
